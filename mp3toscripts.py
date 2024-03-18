@@ -141,12 +141,16 @@ def read_test_mp3():
     # read all mp3 files in the folder
     for mp3_file in tqdm(os.listdir(mp3_folder)):
         if mp3_file.endswith(".mp3"):
+            # check is base_name +'.srt' exists in the dst_srt
+            base_name = os.path.splitext(mp3_file)[0]
+            dst_srt = os.path.join("./test_srt", base_name + ".srt")
+            if os.path.exists(dst_srt):
+                continue
+            print("processing:", base_name + ".mp3")
             mp3_path = os.path.join(mp3_folder, mp3_file)
             ts_list, txt_list = mp3totxt(mp3_path)
 
             # get base name without extension
-            base_name = os.path.splitext(mp3_file)[0]
-            dst_srt = os.path.join("./test_srt", base_name + ".srt")
             save_srt(ts_list, txt_list, dst_srt)
             # format_srt(ts_list, txt_list)
 
