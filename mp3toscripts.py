@@ -29,17 +29,6 @@ def mp3totxt(mp3_path):
     return ts_list, txt_list
 
 
-def time_str_to_obj(time_str):
-    # 将时间戳拆分成小时、分钟、秒和毫秒
-    hours, minutes, seconds = time_str.split(":")
-    seconds, milliseconds = seconds.split(",")
-
-    # 创建 time 对象
-    time_obj = time(int(hours), int(minutes), int(seconds), int(milliseconds) * 1000)
-
-    return time_obj
-
-
 def check_ends_condition(txt_list):
     # check if every line except the last one ends with a qutation that ends a sentence
     for txt in txt_list:
