@@ -5,6 +5,7 @@ from datetime import time, timedelta
 
 
 def time_str_to_obj(time_str):
+    """将时间戳字符串转换为 timedelta 对象。"""
     # 将时间戳拆分成小时、分钟、秒和毫秒
     hours, minutes, seconds = time_str.split(":")
     seconds, milliseconds = seconds.split(",")
@@ -21,6 +22,7 @@ def time_str_to_obj(time_str):
 
 
 def check_ends_condition(txt_list):
+    """check if the last line ends with a qutation that ends a sentence"""
     # check if every line except the last one ends with a qutation that ends a sentence
     for txt in txt_list:
         txt = txt.strip()
@@ -175,6 +177,7 @@ def break_srt_txt_into_sentences(old_ts_list, old_txt_list):
         # if the result length is greater than 1, generate corresponding timestamps
         for txt_id, txt in enumerate(old_txt_list):
             if len(txt.split(qutation)) > 1:
+                # 分割成子句
                 sentences = txt.split(qutation)
                 # compute timestamps for each sentence
                 timestamp = old_ts_list[txt_id]
@@ -198,8 +201,10 @@ def break_srt_txt_into_sentences(old_ts_list, old_txt_list):
                 temp_ts = None
                 for sentence_idx in range(len(sentences)):
                     # if the sentence is not the last sentence, append the qutation to the sentence
-                    if sentence_idx != len(sentences[-1]):
+                    if sentence_idx != len(sentences) - 1:
                         sentence = sentences[sentence_idx] + qutation.strip()
+                    else:
+                        sentence = sentences[sentence_idx]
                     # compute the start and end time of the sentence
                     if sentence_idx == 0:
                         new_start_time_obj = start_time_obj
@@ -213,9 +218,7 @@ def break_srt_txt_into_sentences(old_ts_list, old_txt_list):
                         temp_ts = new_end_time_obj
 
                     elif sentence_idx != len(sentences) - 1:
-                        new_start_time_obj = temp_ts + datetime.timedelta(
-                            seconds=word_speed
-                        )
+                        new_start_time_obj = temp_ts
                         new_end_time_obj = new_start_time_obj + datetime.timedelta(
                             seconds=word_speed * len(sentence.split(" "))
                         )
@@ -227,6 +230,18 @@ def break_srt_txt_into_sentences(old_ts_list, old_txt_list):
                         )
                         txt_list.append(sentence)
                         temp_ts = new_end_time_obj
+                    # 最后一个子句
+                    elif sentence_idx == len(sentences) - 1:
+                        new_start_time_obj = temp_ts
+                        new_end_time_obj = end_time_obj
+                        ts_list.append(
+                            (
+                                timedelta_to_srt(new_start_time_obj),
+                                timedelta_to_srt(new_end_time_obj),
+                            )
+                        )
+                        txt_list.append(sentence)
+                        temp_ts = None
             else:
                 ts_list.append(old_ts_list[txt_id])
                 txt_list.append(old_txt_list[txt_id])
@@ -235,11 +250,6 @@ def break_srt_txt_into_sentences(old_ts_list, old_txt_list):
         old_ts_list = ts_list
         old_txt_list = txt_list
 
-    # for i in range(len(txt_list)):
-    #     print(i + 1)
-    #     print(ts_list[i][0], "-->", ts_list[i][1])
-    #     print(txt_list[i])
-    #     print("\n")
     return ts_list, txt_list
 
 
@@ -258,6 +268,10 @@ def read_and_format():
                 f.write(ts_list[i][0] + " --> " + ts_list[i][1] + "\n")
                 f.write(txt_list[i] + "\n\n")
         ts_list, txt_list = break_srt_txt_into_sentences(ts_list, txt_list)
+
+        # check if the number of timestamps and subtitles are the same
+        assert len(ts_list) == len(txt_list)
+
         # save to ./test_format_final
         with open("./test_format_final/" + srt_name, "w") as f:
             for i in range(len(txt_list)):
@@ -265,38 +279,6 @@ def read_and_format():
                 f.write(ts_list[i][0] + " --> " + ts_list[i][1] + "\n")
                 f.write(txt_list[i] + "\n\n")
 
-        # check if the number of timestamps and subtitles are the same
-        # assert len(timestamps) == len(subtitles)
-
-        # print each srt text
-        # for i in range(len(subtitles)):
-        #     print(i + 1)
-        #     print(timestamps[i][0], "-->", timestamps[i][1])
-        #     print(subtitles[i])
-        #     print("\n")
-        # break
-
-
-# 示例用法
-# srt_content = """1
-# 00:00:00,498 --> 00:00:02,827
-# - Here's what I love most about food and diet.
-
-# 2
-# 00:00:02,827 --> 00:00:06,383
-# We all eat several times a day, and we're totally in charge
-
-# 3
-# 00:00:06,383 --> 00:00:09,427
-# of what goes on our plate and what stays off."""
-
-# timestamps, subtitles = parse_srt_with_re(srt_content)
-
-# print("时间戳列表:")
-# print(timestamps)
-
-# print("字幕列表:")
-# print(subtitles)
 
 if __name__ == "__main__":
     read_and_format()
