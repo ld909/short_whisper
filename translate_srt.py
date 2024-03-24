@@ -59,10 +59,7 @@ def controller():
 
 
 def translate_srt(eng_srt_str):
-    client = anthropic.Anthropic(
-        # defaults to os.environ.get("ANTHROPIC_API_KEY")
-        api_key="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",
-    )
+    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
     text = f"我会给你一个字幕的list，list每个item是一条英文字幕，帮我翻译为中文。返回一个list，长度和输入的list长度一致，每个item是对应翻译后的中文字幕。除了翻译后的结果list外，不用返回任何多余的文字和额外说明。英文字幕list是: {eng_srt_str}"
     message = client.messages.create(
         model="claude-3-haiku-20240307",
