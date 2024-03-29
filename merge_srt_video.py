@@ -2,6 +2,7 @@ import subprocess
 
 
 def run_ffmpeg_command(input_video, subtitles, font_file, output_video):
+    '''merge subtitle srt file into original mp4'''
     ffmpeg_command = [
         "ffmpeg",
         "-i",

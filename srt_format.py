@@ -52,7 +52,7 @@ def format_srt(ts_list, txt_list):
     if txt_list[-1][-1] not in [".", "?", "!"]:
         txt_list[-1] += "."
 
-    ########### merge lines that within a sentence
+    # merge lines that within a sentence
     end_condition = False
 
     while not end_condition:
@@ -139,6 +139,7 @@ def read_srt_file(file_path):
 
 
 def check_breack_condition(txt):
+    """check if the txt is a single sentence, if it is, return True, otherwise return False"""
     if ". " not in txt and "? " not in txt and "! " not in txt:
         return True
     else:
@@ -262,11 +263,11 @@ def read_and_format():
         timestamps, subtitles = parse_srt_with_re(srt_content)
         ts_list, txt_list = format_srt(timestamps, subtitles)
         # save to ./test_format
-        with open("./test_format/" + srt_name, "w") as f:
-            for i in range(len(txt_list)):
-                f.write(str(i + 1) + "\n")
-                f.write(ts_list[i][0] + " --> " + ts_list[i][1] + "\n")
-                f.write(txt_list[i] + "\n\n")
+        # with open("./test_format/" + srt_name, "w") as f:
+        #     for i in range(len(txt_list)):
+        #         f.write(str(i + 1) + "\n")
+        #         f.write(ts_list[i][0] + " --> " + ts_list[i][1] + "\n")
+        #         f.write(txt_list[i] + "\n\n")
         ts_list, txt_list = break_srt_txt_into_sentences(ts_list, txt_list)
 
         # check if the number of timestamps and subtitles are the same

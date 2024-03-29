@@ -4,9 +4,11 @@ from datetime import timedelta
 from datetime import datetime
 from datetime import time
 from tqdm import tqdm
+from srt_format import break_srt_txt_into_sentences, format_srt
 
 
 def mp3totxt(mp3_path):
+    """this function using whisper larger v3 to generate pure transcriptions"""
     model = whisper.load_model("large-v3")
     print("strat transcribing...")
     result = model.transcribe(mp3_path, word_timestamps=True)
@@ -23,7 +25,6 @@ def mp3totxt(mp3_path):
             continue
         segmentId = segment["id"] + 1
         segment = f"{segmentId}\n{start_time} --> {end_time}\n{text}\n\n"
-        # print(segment)
         ts_list.append((start_time, end_time))
         txt_list.append(text)
     return ts_list, txt_list
@@ -38,81 +39,10 @@ def check_ends_condition(txt_list):
             return True
 
 
-def format_srt(ts_list, txt_list):
-    print("start formatting...")
-    # merge lines with single qutation
-    single_qutation_idx = []
-    for txt_id, txt in enumerate(txt_list):
-        # if txt is a single qutation, merge it with the previous line
-        if len(txt) == 1 and txt in [",", ".", "?", "!"]:
-            txt_list[txt_id - 1] += txt
-            single_qutation_idx.append(txt_id)
-
-    # remove lines with single qutation from ts_list and txt_list
-    if len(single_qutation_idx) > 0:
-        for idx in single_qutation_idx:
-            ts_list.pop(idx)
-            txt_list.pop(idx)
-
-    # check if the last line ends with a qutation that ends a sentence, if not, add a qutation
-    if txt_list[-1][-1] not in [".", "?", "!"]:
-        txt_list[-1] += "."
-
-    ########### merge lines that within a sentence
-    end_condition = False
-
-    while end_condition:
-        new_ts_list = []
-        new_txt_list = []
-
-        cur_idx = 0
-        while cur_idx < len(txt_list):
-            cur_txt = txt_list[cur_idx]
-            cur_ts = ts_list[cur_idx]
-
-            # if the current line ends with a qutation that ends a sentence
-            if cur_txt[-1] in [".", "?", "!"]:
-                # append the current line to the new list
-                new_ts_list.append(cur_ts)
-                new_txt_list.append(cur_txt)
-                # increase the index
-                cur_idx += 1
-
-            else:
-                # merge the current line with the next line
-                next_txt = txt_list[cur_idx + 1]
-                next_ts = ts_list[cur_idx + 1]
-
-                # merge the current and next line
-                new_txt = cur_txt + " " + next_txt
-                new_ts = (cur_ts[0], next_ts[1])
-
-                # append the new line to the new list
-                new_ts_list.append(new_ts)
-                new_txt_list.append(new_txt)
-
-                # skip the next line
-                cur_idx += 2
-
-        # assign the new list to the old list
-        ts_list = new_ts_list
-        txt_list = new_txt_list
-
-        # check end condition
-        end_condition = check_ends_condition(new_txt_list)
-
-    # print each line
-    for i in range(len(txt_list)):
-        print(i + 1)
-        print(ts_list[i][0], "-->", ts_list[i][1])
-        print(txt_list[i])
-        print("\n")
-
-
 def save_srt(ts_list, txt_list, srt_dst):
+    """save the ts_list and txt_list as srt file in srt_dst"""
     srt_string = ""
     # save txt list with its corresponding ts list as srt file
-    print(len(ts_list), len(txt_list))
     for idx, (ts, txt) in enumerate(zip(ts_list, txt_list)):
         # append to srt
         start_time, end_time = ts
@@ -125,23 +55,44 @@ def save_srt(ts_list, txt_list, srt_dst):
 
 
 def read_test_mp3():
-    mp3_folder = "./test_mp3"
+
+    mp3_abs_path = ""  # fill in the absolute path of the mp3 folder
+    dst_srt_abs_path = ""  # fill in the absolute path of the srt folder
+
+    # check if the dst_srt_abs_path exists, if not create it
+    if not os.path.exists(dst_srt_abs_path):
+        os.makedirs(dst_srt_abs_path)
+
+    all_mp3_files = os.listdir(mp3_abs_path)
 
     # read all mp3 files in the folder
-    for mp3_file in tqdm(os.listdir(mp3_folder)):
-        if mp3_file.endswith(".mp3"):
-            # check is base_name +'.srt' exists in the dst_srt
-            base_name = os.path.splitext(mp3_file)[0]
-            dst_srt = os.path.join("./test_srt", base_name + ".srt")
-            if os.path.exists(dst_srt):
-                continue
-            print("processing:", base_name + ".mp3")
-            mp3_path = os.path.join(mp3_folder, mp3_file)
-            ts_list, txt_list = mp3totxt(mp3_path)
+    for mp3_channel_folder in all_mp3_files:
+        # read all mp3 files in the folder
+        for mp3_file in tqdm(
+            os.listdir(os.path.join(mp3_abs_path, mp3_channel_folder))
+        ):
+            if mp3_file.endswith(".mp3"):
+                # check if base_name +'.srt' exists in the dst_srt
+                base_name = os.path.splitext(mp3_file)[0]
 
-            # get base name without extension
-            save_srt(ts_list, txt_list, dst_srt)
-            # format_srt(ts_list, txt_list)
+                dst_srt = os.path.join(
+                    dst_srt_abs_path, mp3_channel_folder, base_name + ".srt"
+                )
+                # check if os.path.join(dst_srt_abs_path, mp3_channel_folder) exists
+                if not os.path.exists(
+                    os.path.join(dst_srt_abs_path, mp3_channel_folder)
+                ):
+                    os.makedirs(os.path.join(dst_srt_abs_path, mp3_channel_folder))
+
+                # check if the srt file exists, if it does, skip
+                if os.path.exists(dst_srt):
+                    continue
+
+                print("processing:", base_name + ".mp3")
+                mp3_path = os.path.join(mp3_abs_path, mp3_channel_folder, mp3_file)
+                ts_list, txt_list = mp3totxt(mp3_path)
+                # get base name without extension
+                # save_srt(ts_list, txt_list, dst_srt)
 
 
 if __name__ == "__main__":
