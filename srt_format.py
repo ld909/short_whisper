@@ -2,6 +2,7 @@ import datetime
 import re
 import os
 from datetime import time, timedelta
+import chardet
 
 
 def time_str_to_obj(time_str):
