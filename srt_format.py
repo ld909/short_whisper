@@ -2,7 +2,6 @@ import datetime
 import re
 import os
 from datetime import time, timedelta
-import chardet
 
 
 def time_str_to_obj(time_str):
@@ -148,24 +147,19 @@ def check_breack_condition(txt):
 
 
 def timedelta_to_srt(timedelta_obj):
-    """convert timedelta object to srt format time string"""
-    total_seconds = timedelta_obj.total_seconds()
+    """Convert timedelta object to SRT format time string."""
+    # 获取总的秒数
+    total_seconds = int(timedelta_obj.total_seconds())
+    # 计算小时、分钟和秒
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    # 计算毫秒，确保精度
+    milliseconds = int(timedelta_obj.microseconds / 1000)
 
-    # compute hours, minutes, seconds and milliseconds
-    hours = int(total_seconds // 3600)
-    minutes = int((total_seconds % 3600) // 60)
-    seconds = int(total_seconds % 60)
-    milliseconds = int(total_seconds * 1000 % 1000)
+    # 格式化时间字符串，确保小时、分钟和秒是2位数，毫秒是3位数
+    srt_time_string = f"{hours:02}:{minutes:02}:{seconds:02},{milliseconds:03}"
 
-    # format the time string
-    time_string = "{}:{}:{},{}".format(
-        str(hours).zfill(2),
-        str(minutes).zfill(2),
-        str(seconds).zfill(2),
-        str(milliseconds).zfill(3),
-    )
-
-    return time_string
+    return srt_time_string
 
 
 def break_srt_txt_into_sentences(old_ts_list, old_txt_list):
