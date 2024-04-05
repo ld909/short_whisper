@@ -7,17 +7,43 @@ from tqdm import tqdm
 from srt_format import break_srt_txt_into_sentences, format_srt
 
 
+def float_to_srt_timestamp(seconds):
+    """Convert a float to a srt timestamp string"""
+    # 将秒转换为毫秒
+    milliseconds = int(seconds * 1000)
+
+    # 将毫秒转换为小时、分钟、秒和毫秒
+    hours = milliseconds // 3600000
+    milliseconds = milliseconds % 3600000
+    minutes = milliseconds // 60000
+    milliseconds = milliseconds % 60000
+    seconds = milliseconds // 1000
+    milliseconds = milliseconds % 1000
+
+    # 格式化字符串,确保小时、分钟、秒和毫秒都是两位数
+    timestamp = "{:02d}:{:02d}:{:02d},{:03d}".format(
+        hours, minutes, seconds, milliseconds
+    )
+
+    return timestamp
+
+
 def mp3totxt(mp3_path):
     """this function using whisper larger v3 to generate pure transcriptions"""
     model = whisper.load_model("large-v3")
     print("strat transcribing...")
-    result = model.transcribe(mp3_path, word_timestamps=True)
+    result = model.transcribe(
+        mp3_path,
+        word_timestamps=True,
+        initial_prompt="Hi everyone, welcome to my Youtube video.",
+    )
     print("transcribing done")
     ts_list = []
     txt_list = []
     for segment in result["segments"]:
-        start_time = str(0) + str(timedelta(seconds=int(segment["start"]))) + ",000"
-        end_time = str(0) + str(timedelta(seconds=int(segment["end"]))) + ",000"
+        print(f'segment start {segment["start"]}, segment end {segment["end"]}')
+        start_time = float_to_srt_timestamp(float(segment["start"]))
+        end_time = float_to_srt_timestamp(float(segment["end"]))
         text = segment["text"]
         # strip the text of any newline characters using strip()
         text = text.strip()
@@ -95,5 +121,5 @@ def read_test_mp3():
                 # save_srt(ts_list, txt_list, dst_srt)
 
 
-if __name__ == "__main__":
-    read_test_mp3()
+# if __name__ == "__main__":
+#     read_test_mp3()

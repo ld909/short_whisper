@@ -10,8 +10,8 @@ from srt_format import format_srt, break_srt_txt_into_sentences
 
 
 def controller_mp3_to_format_srt():
-    mp3_abs_path = "/Users/donghaoliu/doc/short_whisper/test_format"  # fill in the absolute path of the mp3 folder
-    dst_srt_abs_path = "/Users/donghaoliu/doc/short_whisper/test_format_final"  # fill in the absolute path of the srt folder
+    mp3_abs_path = "/home/dhl/Documents/video_materials/mp3/code"  # fill in the absolute path of the mp3 folder
+    dst_srt_abs_path = "/home/dhl/Documents/video_materials/format_srt/code"  # fill in the absolute path of the srt folder
 
     # check if the dst_srt_abs_path exists, if not create it
     if not os.path.exists(dst_srt_abs_path):
