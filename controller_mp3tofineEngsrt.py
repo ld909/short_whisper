@@ -10,7 +10,7 @@ from srt_format import format_srt, break_srt_txt_into_sentences
 
 
 def controller_mp3_to_format_srt():
-    mp3_abs_path = "/home/dhl/Documents/video_materials/mp3/code"  # fill in the absolute path of the mp3 folder
+    mp3_abs_path = "/home/dhl/Documents/video_materials/mp3"  # fill in the absolute path of the mp3 folder
     dst_srt_abs_path = "/home/dhl/Documents/video_materials/format_srt/code"  # fill in the absolute path of the srt folder
 
     # check if the dst_srt_abs_path exists, if not create it
@@ -18,9 +18,12 @@ def controller_mp3_to_format_srt():
         os.makedirs(dst_srt_abs_path)
 
     all_mp3_folders = os.listdir(mp3_abs_path)
+    # remove .DS_store
+    all_mp3_folders = [folder for folder in all_mp3_folders if folder != ".DS_Store"]
 
     # read all mp3 files in the folder
     for mp3_channel_folder in tqdm(all_mp3_folders):
+
         print("processing: ", mp3_channel_folder)
         # read all mp3 files in the folder
         for mp3_file in tqdm(
@@ -29,7 +32,6 @@ def controller_mp3_to_format_srt():
             if mp3_file.endswith(".mp3"):
                 # check if base_name +'.srt' exists in the dst_srt
                 base_name = os.path.splitext(mp3_file)[0]
-                print("processing: ", base_name + ".mp3")
                 dst_srt = os.path.join(
                     dst_srt_abs_path, mp3_channel_folder, base_name + ".srt"
                 )
@@ -45,6 +47,7 @@ def controller_mp3_to_format_srt():
                     continue
 
                 mp3_path = os.path.join(mp3_abs_path, mp3_channel_folder, mp3_file)
+                print("processing: ", mp3_path)
                 print("transcribing mp3 to txt using OpenAI whisper model...")
                 ts_list, txt_list = mp3totxt(mp3_path)
 

@@ -41,7 +41,6 @@ def mp3totxt(mp3_path):
     ts_list = []
     txt_list = []
     for segment in result["segments"]:
-        print(f'segment start {segment["start"]}, segment end {segment["end"]}')
         start_time = float_to_srt_timestamp(float(segment["start"]))
         end_time = float_to_srt_timestamp(float(segment["end"]))
         text = segment["text"]
