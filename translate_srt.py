@@ -192,15 +192,43 @@ def controller():
                         f.write(srt_zh_list[i])
 
 
-def translate_return_json(api_key, eng_srt_str):
-    """translate srt from English to Chinese using Claude-3 Haiku"""
-    client = anthropic.Anthropic(api_key=api_key)
-    text = f"""我会给你一个字幕的list，list每个item是一条英文字幕，帮我翻译为中文。英文字幕list是:{eng_srt_str}。返回一个json，对应句子index（index从1开始）和翻译后的中文字幕，每除了翻译后的结果json外，不返回任何多余文字和额外说明，结果如{{"1":"字幕1"，"2":"字幕2"}}"""
+def translate_single_srt(api_key, eng_srt_single_str):
+    """translate a single srt from English to Chinese using Claude-3 Haiku"""
+    client = anthropic.Anthropic(
+        # defaults to os.environ.get("ANTHROPIC_API_KEY")
+        api_key=api_key,
+    )
     message = client.messages.create(
         model="claude-3-haiku-20240307",
         max_tokens=1000,
         temperature=0,
-        system="你是一个优秀的翻译家，能够精确优雅准确精炼地把英文字幕翻译为中文字幕。返回一个json格式，格式严格遵循prompt中的标准。",
+        system="你是一个优秀的翻译家，能够精确优雅准确精炼地把英文字幕翻译为中文字幕。不要返回多余信息，精准严格存寻prompt。原视频是关于计算机科学/编程/数学相关话题的，请注意你的专业用语。",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"""我有一个英文字幕，请帮我翻译为英文，直接返回翻译后的结果，不返回其他任何多余结果, 结果不要带任何引号。英文字幕是：{eng_srt_single_str}""",
+                    }
+                ],
+            }
+        ],
+    )
+    translate_srt_str = message.content[0].text
+    success = message.stop_reason == "end_turn"
+    return translate_srt_str, success
+
+
+def translate_return_json(api_key, eng_srt_str):
+    """translate srt from English to Chinese using Claude-3 Haiku"""
+    client = anthropic.Anthropic(api_key=api_key)
+    text = f"""我会给你一个字幕的list，list每个item是一条英文字幕，帮我翻译为中文。英文字幕list是:{eng_srt_str}。返回一个json，对应句子index（index从1开始）和翻译后的中文字幕，每除了翻译后的结果json外，不返回任何多余文字和额外说明，翻译后字幕不要包含双引号"，返回结果如{{"1":"字幕1"，"2":"字幕2"}}。"""
+    message = client.messages.create(
+        model="claude-3-haiku-20240307",
+        max_tokens=1000,
+        temperature=0,
+        system="你是一个优秀的翻译家，能够精确优雅准确精炼地把英文字幕翻译为中文字幕。返回一个json格式，格式严格遵循prompt中的标准。原视频是关于计算机科学/编程/数学相关话题的，请注意你的专业用语。",
         messages=[
             {
                 "role": "user",
@@ -214,24 +242,42 @@ def translate_return_json(api_key, eng_srt_str):
         ],
     )
     translate_srt_str = message.content[0].text
-    translate_od = json.loads(translate_srt_str, object_pairs_hook=OrderedDict)
-    translate_srt_list = []
-    # extract the translated sentences from the ordered dictionary
-    for key in translate_od:
-        translate_srt_list.append(translate_od[key])
-    success = message.stop_reason == "end_turn"
+    try:
+        # 先尝试转化为json
+        print("尝试转化为json格式")
+        translate_srt_list = []
+
+        translate_od = json.loads(translate_srt_str, object_pairs_hook=OrderedDict)
+        # extract the translated sentences from the ordered dictionary
+        for key in translate_od:
+            # replace double quotes with single quotes
+            translate_srt_list.append(translate_od[key].replace('"', "'"))
+        success = message.stop_reason == "end_turn"
+    except:
+        # 逐句翻译
+        print("尝试逐句翻译")
+        translate_srt_list = []
+        for srt_eng_single_str in eng_srt_str:
+            success = False
+            while not success:
+                zh_single_srt, success = translate_single_srt(
+                    api_key, srt_eng_single_str
+                )
+
+            translate_srt_list.append(zh_single_srt)
     return translate_srt_list, success
 
 
 def translate_srt(api_key, eng_srt_str):
     """translate srt from English to Chinese using Claude-3 Haiku"""
+    print("正在翻译：", eng_srt_str)
     client = anthropic.Anthropic(api_key=api_key)
     text = f"我会给你一个字幕的list，list每个item是一条英文字幕，帮我翻译为中文。返回一个list，长度和输入的list长度一致，每个item是对应翻译后的中文字幕。除了翻译后的结果list外，不用返回任何多余的文字和额外说明。英文字幕list是: {eng_srt_str}"
     message = client.messages.create(
         model="claude-3-haiku-20240307",
         max_tokens=1000,
         temperature=0,
-        system="你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，视频题材为科技编程等相关领域。",
+        system="你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于计算机科学/编程/数学相关话题的，请注意你的专业用语。",
         messages=[
             {
                 "role": "user",
@@ -251,7 +297,7 @@ def translate_srt(api_key, eng_srt_str):
     except:
         translate_srt_list, success = translate_return_json(api_key, eng_srt_str)
         print("使用json格式返回，结果：", translate_srt_list)
-    assert len(translate_srt_list) == len(eng_srt_str)
+
     return translate_srt_list, success
 
 

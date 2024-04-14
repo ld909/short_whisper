@@ -74,28 +74,28 @@ def controller():
     input_video_abs_path = "/Volumes/dhl/ytb-videos/code"
     dst_video_abs_path = "/Volumes/dhl/ytb-videos/mp4_zh/code"
 
-    all_folders = os.listdir(zh_srt_abs_path)
+    all_channels = os.listdir(zh_srt_abs_path)
     # remove .DS_Store using list comprehension
-    all_folders = [folder for folder in all_folders if folder != ".DS_Store"]
+    all_channels = [folder for folder in all_channels if folder != ".DS_Store"]
 
-    for folder in all_folders:
+    for channel in all_channels:
         # get all zh_srt files in the folder
-        zh_srts = os.listdir(os.path.join(zh_srt_abs_path, folder))
+        zh_srts = os.listdir(os.path.join(zh_srt_abs_path, channel))
         # remove .DS_Store using list comprehension
         zh_srts = [srt for srt in zh_srts if srt != ".DS_Store"]
 
         for zh_srt in zh_srts:
             # check if the output video file exists
             dst_mp4_path = os.path.join(
-                dst_video_abs_path, folder, zh_srt.replace(".srt", ".mp4")
+                dst_video_abs_path, channel, zh_srt.replace(".srt", ".mp4")
             )
             # 如果目标folder不存在，创建一个
-            if not os.path.exists(os.path.join(dst_video_abs_path, folder)):
-                os.makedirs(os.path.join(dst_video_abs_path, folder))
+            if not os.path.exists(os.path.join(dst_video_abs_path, channel)):
+                os.makedirs(os.path.join(dst_video_abs_path, channel))
 
             # 输入视频文件路径
             mp4_path_in = os.path.join(
-                input_video_abs_path, folder, zh_srt.replace(".srt", ".mp4")
+                input_video_abs_path, channel, zh_srt.replace(".srt", ".mp4")
             )
 
             # 比较mp4_path_in duration 和dst_mp4_path duration, 如果一致，跳过,使用python mutagen库
@@ -108,7 +108,9 @@ def controller():
 
             # merge the video with the zh_srt
             merger_single(
-                mp4_path_in, os.path.join(zh_srt_abs_path, folder, zh_srt), dst_mp4_path
+                mp4_path_in,
+                os.path.join(zh_srt_abs_path, channel, zh_srt),
+                dst_mp4_path,
             )
 
 
