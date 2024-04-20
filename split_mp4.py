@@ -74,6 +74,10 @@ def ffmpeg_cut_video(video_path, cut_points):
         # 构建输出文件名
         output_filename = f"{video_path.split('.')[0]}_clip_{i}.mp4"
 
+        # if output filename exist skip
+        if os.path.exists(output_filename):
+            continue
+
         # 构建ffmpeg命令
         command = ["ffmpeg", "-i", video_path, "-ss", str(start_time)]
         if end_time is not None:
