@@ -1,0 +1,290 @@
+import os
+import json
+from datetime import datetime, timedelta
+from short.publish_douyin import upload_douyin_video
+from short.publish_kuaishou import publish_kuaishou_video
+from short.publish_weixin import upload_weixin_video
+
+
+def read_upload_log():
+    log_path = "./upload_log/upload_log.json"
+    if not os.path.exists(log_path):
+        return {}
+    return json.load(open(log_path))
+
+
+def get_the_latest_upload_time(upload_log):
+    """返回最近上传的时间，datetime格式"""
+    latest_time = datetime(1900, 1, 1, 0, 0)
+    # get all keys from upload_log
+    all_keys = upload_log.keys()
+    for key in all_keys:
+        upload_time_list = upload_log[key]["upload_time"]
+        upload_time_str = upload_time_list[0]
+        # convert upload time str from 'year-month-day-hour-min' to datetime
+        upload_time = datetime.strptime(upload_time_str, "%Y-%m-%d-%H-%M")
+
+        # 得到最临近上传时间
+        if upload_time > latest_time:
+            latest_time = upload_time
+
+    return latest_time
+
+
+def update_log(log_key, platform, date_time_str):
+    """更新日志文件，记录上传时间和平台。"""
+
+    # 读取日志文件
+    upload_log = read_upload_log()
+
+    if log_key not in upload_log:
+        upload_log[log_key] = {"platforms": [platform], "upload_time": [date_time_str]}
+    else:
+        # add the platform to the platforms list
+        upload_log[log_key]["platforms"].append(platform)
+
+    print("更新日志：", upload_log)
+
+    # 使用 ensure_ascii=False 和 indent=4 参数
+    json_data = json.dumps(upload_log, ensure_ascii=False, indent=4)
+
+    # 将 JSON 数据写入文件
+    with open(
+        "/Users/donghaoliu/doc/short_whisper/upload_log/upload_log.json",
+        "w",
+        encoding="utf-8",
+    ) as file:
+        file.write(json_data)
+
+
+def next_time_point(current_time):
+    # 检查当前时间的小时数
+    hour = current_time.hour
+
+    # 如果当前时间是21点
+    if hour == 21:
+        # 返回第二天的6点
+        next_time = current_time.replace(
+            hour=6, minute=0, second=0, microsecond=0
+        ) + timedelta(days=1)
+    else:
+        # 否则返回当前时间加3小时（下一个整点时间）
+        next_time = current_time + timedelta(hours=3)
+        # 重置分钟、秒和微秒为0
+        next_time = next_time.replace(minute=0, second=0, microsecond=0)
+
+    return next_time
+
+
+def read_channels_from_ref_json(topic):
+    """读取ref.json文件，返回所有的channel名称。"""
+    ref_json_path = f"/Users/donghaoliu/doc/video_material/publish_ref/{topic}/ref.json"
+    ref_dict = json.load(open(ref_json_path))
+    return ref_dict.keys()
+
+
+def load_ref_json(topic):
+    ref_json_path = f"/Users/donghaoliu/doc/video_material/publish_ref/{topic}/ref.json"
+    return json.load(open(ref_json_path))
+
+
+def get_upload_time(uploaded_platforms, upload_log, log_key):
+    """根据上传情况，返回下一次上传的时间。"""
+    if 0 < len(uploaded_platforms) < 3:
+        #  "部分上传"
+        print("部分上传")
+        upload_time_list = upload_log[log_key]["upload_time"]
+        # get all keys from upload_time_dict
+        upload_time_str = upload_time_list[0]
+        # convert upload time str from 'year-month-day-hour-min' to datetime
+        upload_time_obj = datetime.strptime(upload_time_str, "%Y-%m-%d-%H-%M")
+
+    # elif len(uploaded_platforms) == 3:
+    else:
+        # "全部上传" 或全部未上传
+
+        partial_upload_time_obj = get_the_latest_upload_time(upload_log)
+        print(
+            "最新已上传的视频上传时间：",
+            partial_upload_time_obj.strftime("%Y-%m-%d %H:%M"),
+        )
+
+        # add 3 hours to the latest upload time
+        upload_time_obj = next_time_point(partial_upload_time_obj)
+        # print("获取下一个视频上传时间：", upload_time_obj.strftime("%Y-%m-%d %H:%M")）
+
+    # elif len(uploaded_platforms) == 0:
+    #     # "未上传"
+    #     print("未上传")
+    #     # 设定上传时间:北京时间明天早上6点
+    #     upload_time_obj = datetime.now() + timedelta(days=1)
+    #     upload_time_obj = upload_time_obj.replace(hour=6, minute=0, second=0)
+    # print("为上传，下一个视频上传时间：", upload_time_obj.strftime("%Y-%m-%d %H:%M")
+
+    return upload_time_obj
+
+
+def upload_all_platforms():
+
+    zh_mp4_path = "/Volumes/dhl/ytb-videos/mp4_zh"
+    zh_title_path = "/Users/donghaoliu/doc/video_material/zh_title"
+    zh_tags = "/Users/donghaoliu/doc/video_material/zh_tag"
+    thumbnail_vertical_path = "/Users/donghaoliu/doc/video_material/thumbnail_vertical"
+    thumbnail_horizontal_path = (
+        "/Users/donghaoliu/doc/video_material/thumbnail_horizontal"
+    )
+    topic = "code"
+    ref_dict = load_ref_json(topic)
+    # get all channels from the ref.json file
+    channels = read_channels_from_ref_json(topic)
+
+    for channel in channels:
+        # get all mp4 files from the ref_dict
+        all_mp4 = ref_dict[channel].keys()
+
+        for mp4_single in all_mp4:
+
+            upload_log = read_upload_log()
+
+            log_key = f"{topic}~~~~{channel}~~~~{mp4_single}"
+            if log_key in upload_log:
+                uploaded_platforms = upload_log[log_key]["platforms"]
+            else:
+                uploaded_platforms = []
+
+            if len(uploaded_platforms) == 3:
+                continue
+
+            # preapre the video and upload
+            ref_mp4 = ref_dict[channel][mp4_single]
+            basename = os.path.basename(ref_mp4)
+            base_name_prefix = os.path.splitext(basename)[0]
+
+            # video path
+            video_path = os.path.join(zh_mp4_path, topic, channel, mp4_single)
+
+            print("上传视频路径：", video_path)
+
+            # read zh title from the txt file
+
+            video_zh_title_txt_path = os.path.join(
+                zh_title_path, topic, channel, base_name_prefix + "_title.txt"
+            )
+
+            if "_clip_" in mp4_single:
+                # extract the clip id
+                mp4_single_prefix = os.path.splitext(mp4_single)[0]
+                clip_id = mp4_single_prefix.split("_clip_")[1]
+                video_title_zh = (
+                    open(video_zh_title_txt_path).read().strip() + f"{clip_id}"
+                )
+            else:
+                video_title_zh = open(video_zh_title_txt_path).read().strip()
+            print("视频标题：", video_title_zh)
+
+            # read zh tags from the txt file
+            video_zh_tags_txt_path = os.path.join(
+                zh_tags, topic, channel, base_name_prefix + "_title.txt"
+            )
+            video_tags_zh_lines = open(video_zh_tags_txt_path).readlines()
+
+            # convert list to str and add # in front of each tag
+            video_tags_zh_str = (
+                " ".join(["#" + tag.strip() for tag in video_tags_zh_lines]) + " "
+            )
+
+            # thumbnail path
+            thunbnail_basename = os.path.splitext(mp4_single)[0]
+            thumbnail_png_vertical = os.path.join(
+                thumbnail_vertical_path,
+                topic,
+                channel,
+                thunbnail_basename + ".png",
+            )
+
+            thumbnail_png_horizontal = os.path.join(
+                thumbnail_horizontal_path,
+                topic,
+                channel,
+                thunbnail_basename + ".png",
+            )
+
+            # get the upload time
+            upload_time_obj = get_upload_time(uploaded_platforms, upload_log, log_key)
+            print(
+                "获取下一个视频上传时间：", upload_time_obj.strftime("%Y-%m-%d %H:%M")
+            )
+
+            # 如果upload_time_obj超过当下北京时间七天，结束整个程序
+            if upload_time_obj > datetime.now() + timedelta(days=7):
+                print("上传时间超过7天，结束上传程序...")
+                break
+
+            if "douyin" not in uploaded_platforms:
+                print("uploading to douyin...")
+
+                # convert upload time to str to format 'year-month-day hour:min'
+                upload_time_str = upload_time_obj.strftime("%Y-%m-%d %H:%M")
+
+                # upload to douyin
+                upload_douyin_video(
+                    video_path,
+                    video_title_zh,
+                    video_tags_zh_str,
+                    thumbnail_png_vertical,
+                    upload_time_str,
+                )
+
+                # update the log
+                update_log(
+                    log_key, "douyin", upload_time_obj.strftime("%Y-%m-%d-%H-%M")
+                )
+                print("douyin上传完成,已更新日志...")
+                print("*" * 50)
+
+            if "kuaishou" not in uploaded_platforms:
+                print("uploading to kuaishou...")
+                title_add_description = video_title_zh + " " + video_tags_zh_str
+
+                # convert upload time to str to format '2024-04-21 04:03:00', 'year-month-day hour:min:sec'
+                kuaishou_time_str = upload_time_obj.strftime("%Y-%m-%d %H:%M:00")
+
+                # upload to kuaishou
+                publish_kuaishou_video(
+                    video_path,
+                    thumbnail_png_vertical,
+                    title_add_description,
+                    kuaishou_time_str,
+                )
+                # 更新日志
+                update_log(
+                    log_key, "kuaishou", upload_time_obj.strftime("%Y-%m-%d-%H-%M")
+                )
+                print("kuaishou上传完成,已更新日志...")
+                print("*" * 50)
+
+            if "weixin" not in uploaded_platforms:
+                print("uploading to weixin...")
+                # upload to weixin
+                title_add_description = video_title_zh + " " + video_tags_zh_str
+                weixin_time_str = upload_time_obj.strftime("%Y-%m-%d %H:%M")
+
+                # upload to weixin
+                upload_weixin_video(
+                    video_path,
+                    thumbnail_png_horizontal,
+                    video_title_zh.replace("#", "sharp"),
+                    title_add_description,
+                    weixin_time_str,
+                )
+
+                # 更新日志
+                update_log(
+                    log_key, "weixin", upload_time_obj.strftime("%Y-%m-%d-%H-%M")
+                )
+                print("weixin上传完成,已更新日志...")
+                print("*" * 50)
+
+
+if __name__ == "__main__":
+    upload_all_platforms()

@@ -14,7 +14,7 @@ from selenium.common.exceptions import TimeoutException
 
 def login_and_save_cookies():
     # a new webdriver instance
-    driver_path = "./driver/chromedriver"
+    driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
     service = Service(executable_path=driver_path)
 
     driver = webdriver.Chrome(service=service)
@@ -27,12 +27,14 @@ def login_and_save_cookies():
 
     # save the cookies
     cookies = driver.get_cookies()
-    with open("./cookies/weixin.json", "w") as f:
+    with open(
+        "/Users/donghaoliu/doc/short_whisper/short/cookies/weixin.json", "w"
+    ) as f:
         json.dump(cookies, f)
 
 
 def load_cookies():
-    driver_path = "./driver/chromedriver"
+    driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
     service = Service(executable_path=driver_path)
 
     driver = webdriver.Chrome(service=service)
@@ -40,7 +42,9 @@ def load_cookies():
     # open the login page
     driver.get("https://channels.weixin.qq.com/platform/post/create")
 
-    with open("./cookies/weixin.json", "r") as f:
+    with open(
+        "/Users/donghaoliu/doc/short_whisper/short/cookies/weixin.json", "r"
+    ) as f:
         cookies = json.load(f)
         for cookie in cookies:
             driver.add_cookie(cookie)
@@ -154,7 +158,15 @@ def upload_thumbnail(driver, thumbnail_path):
     # send the thumbnail path to the input element
     thumbnail_input.send_keys(thumbnail_path)
 
-    time.sleep(5)
+    time.sleep(2)
+
+    # 平铺展示btn xpath
+    exten_thumbnail_xpath = "/html/body/div[1]/div/div[2]/div[2]/div/div/div[1]/div[3]/div/div[2]/div[2]/div[1]/div[2]/div/div[2]/div/div[1]/div/div[2]/div/div[2]/div[2]/div[1]/div[2]/div[2]/div"
+    # find the extend thumbnail button and click it
+    extend_thumbnail_button = driver.find_element(By.XPATH, exten_thumbnail_xpath)
+    extend_thumbnail_button.click()
+
+    time.sleep(1.5)
 
     #  confirm btn xpath
     confirm_btn2_xpath = '//*[@id="container-wrap"]/div[2]/div/div/div[1]/div[3]/div/div[2]/div[2]/div[1]/div[2]/div/div[2]/div/div[1]/div/div[3]/div/div/div[2]/button'
@@ -169,7 +181,7 @@ def upload_thumbnail(driver, thumbnail_path):
 
     # click the confirm button
     confirm_btn2.click()
-    time.sleep(10)
+    time.sleep(2)
 
 
 def add_description(driver, description):
@@ -230,7 +242,7 @@ def add_collection(driver, collection):
 
 def add_title(driver, title):
     """input title"""
-    title_xpath = '//*[@id="container-wrap"]/div[2]/div/div/div[1]/div[3]/div/div[2]/div[2]/div[8]/div[2]/div/div/span/input'
+    title_xpath = "/html/body/div[1]/div/div[2]/div[2]/div/div/div[1]/div[3]/div/div[2]/div[2]/div[8]/div[2]/div/div/span/input"
 
     # wait for the title element to be loaded for 10 seconds
     timeout = 10
@@ -239,41 +251,56 @@ def add_title(driver, title):
     )
 
     # input the title
+    title = title.replace("!", "")
+    title = title.replace("！", "")
     title_element.send_keys(title)
 
 
-def upload_video():
+def set_time(time_str):
+    print("weixin设定的发布时间：", time_str)
+    # wait for use to set time press enter to continue
+    print("请设定发布时间，按Enter键继续...")
+    input()
+    print("程序继续执行")
+
+
+def upload_weixin_video(
+    mp4_path, thumbnail_path, title, title_and_description, time_str
+):
     driver = load_cookies()
 
-    # 指定你想上传的视频文件路径
-    # get absolute path of current folder
-    abs_path = os.path.abspath(os.path.dirname(__file__))
-    file_path = f"{abs_path}/test_videos/1.webm"
-    upload_video_file(driver, file_path)
+    # 指定你想上传的视频
+    upload_video_file(driver, mp4_path)
 
     # wait for the video to be uploaded
     wait_for_uploaded(driver)
 
     # 上传thumbnail
-    upload_thumbnail(driver, f"{abs_path}/test_thumbnail/1.png")
+    upload_thumbnail(driver, thumbnail_path)
 
     # input the description
-    add_description(driver, "test description #python #刘邦 ")
+    add_description(driver, title_and_description)
 
-    # select collection
-    add_collection(driver, "test1")
+    # select time
+    set_time(time_str)
 
     # input the title
-    add_title(driver, "test title")
+    add_title(driver, title)
+
+    time.sleep(1)
 
     # press publish
     press_publish(driver)
 
+    time.sleep(10)
+
+    # close the chrome driver
+    driver.quit()
 
 
-if __name__ == "__main__":
-    # read 1st argument from command line
-    if sys.argv[1] == "login":
-        login_and_save_cookies()
-    elif sys.argv[1] == "upload":
-        upload_video()
+# if __name__ == "__main__":
+#     # read 1st argument from command line
+#     if sys.argv[1] == "login":
+#         login_and_save_cookies()
+# elif sys.argv[1] == "upload":
+#     upload_video()

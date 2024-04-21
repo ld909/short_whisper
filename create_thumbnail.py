@@ -1,10 +1,13 @@
 import os
-from PIL import Image
 import numpy as np
 from tqdm import tqdm
-import cv2
 import random
 import jieba
+from PIL import Image, ImageDraw, ImageFont
+import cv2
+from upload_controller import read_channels_from_ref_json, load_ref_json
+
+Image.MAX_IMAGE_PIXELS = None
 
 
 def convert_thumbnail_black(input_path, output_path):
@@ -46,22 +49,22 @@ def controller_convert_black_to_white():
         )
 
 
-from PIL import Image
-from PIL import Image, ImageDraw, ImageFont
-import numpy as np
-import cv2
-
-Image.MAX_IMAGE_PIXELS = None
-
-
-def create_thumbnail(srt_png_path, dst_thumbnail_path):
+def create_thumbnail(
+    srt_png_path,
+    dst_thumbnail_path,
+    cover_width,
+    cover_height,
+    margin,
+    left_right_margin,
+    bottom_margin,
+):
 
     # 设置参数
-    cover_width = 1080
-    cover_height = 1920
-    margin = 50  # 图片a距离灰色背景的边距
-    left_right_margin = 26  # 图像b距离背景a左右边的距离
-    bottom_margin = 80  # 图像b距离背景a下边的距离
+    # cover_width = 1080
+    # cover_height = 1464
+    # margin = 50  # 图片a距离灰色背景的边距
+    # left_right_margin = 26  # 图像b距离背景a左右边的距离
+    # bottom_margin = 26  # 图像b距离背景a下边的距离
 
     # 创建纯黑色背景a
     background_a = np.zeros((cover_height, cover_width, 3), dtype=np.uint8)
@@ -85,7 +88,8 @@ def create_thumbnail(srt_png_path, dst_thumbnail_path):
 
     # 将图像b放置在背景a正下方
     image_b_width = cover_width - 2 * left_right_margin
-    image_b_height = int(image_b_width * gray_background_height / gray_background_width)
+    # image_b_height = int(image_b_width * gray_background_height / gray_background_width)
+    image_b_height = int(cover_height * 0.46)
     image_b = gray_background.resize(
         (image_b_width, image_b_height), Image.Resampling.LANCZOS
     )
@@ -125,9 +129,6 @@ def paste_logo(jpg_path, png_path, position, size):
     return result
 
 
-from PIL import Image, ImageDraw, ImageFont
-
-
 def write_text_on_image(image, text, position, font_path, font_size, font_color):
     """在图像上写入文字"""
 
@@ -147,15 +148,31 @@ def white_temp1_controller():
     """Convert all white png files to black png files"""
 
     # read all white png files
-    white_png_path = "/Users/donghaoliu/doc/video_material/thumbnail/white"
-    dst_white_path = "/Users/donghaoliu/doc/video_material/thumbnail/white1"
+    white_png_path = "/Users/donghaoliu/doc/video_material/thumbnail_material/white"
+    dst_white_path = (
+        "/Users/donghaoliu/doc/video_material/thumbnail_material/white1_horizontal"
+    )
+
+    # create the destination folder if it does not exist
+    if not os.path.exists(dst_white_path):
+        os.makedirs(dst_white_path)
+
+    # get all png files
     pngs = os.listdir(white_png_path)
     # remove .DS_Store using list comprehension
     pngs = [png for png in pngs if png != ".DS_Store"]
+
+    # horizontal thumbnail for 微信视频号
     for png in tqdm(pngs):
         print("Converting: ", png)
         create_thumbnail(
-            os.path.join(white_png_path, png), os.path.join(dst_white_path, png)
+            os.path.join(white_png_path, png),
+            os.path.join(dst_white_path, png),
+            1920,
+            1080,
+            50,
+            610,
+            50,
         )
 
 
@@ -163,8 +180,13 @@ def white_temp2_controller():
     """Paste logo and write 芒果文档 chinese text on the white thumbnail images"""
 
     # read all white png files from white1 folder
-    src_white_path = "/Users/donghaoliu/doc/video_material/thumbnail_material/white1"
-    dst_white_path = "/Users/donghaoliu/doc/video_material/thumbnail_material/white2"
+    src_white_path = (
+        "/Users/donghaoliu/doc/video_material/thumbnail_material/white1_horizontal"
+    )
+    dst_white_path = (
+        "/Users/donghaoliu/doc/video_material/thumbnail_material/white2_horizontal"
+    )
+
     # create the destination folder if it does not exist
     if not os.path.exists(dst_white_path):
         os.makedirs(dst_white_path)
@@ -174,23 +196,42 @@ def white_temp2_controller():
     all_pngs = [png for png in all_pngs if png != ".DS_Store"]
     for png in tqdm(all_pngs):
 
-        # 贴入logo
+        # 贴入logo 竖屏for 抖音和快手
+        # img = paste_logo(
+        #     os.path.join(src_white_path, png),
+        #     "./test_thumbnail/mango.png",
+        #     (700, 25),
+        #     (60, 60),
+        # )
+
+        # 贴入logo 横屏 for 微信视频号
         img = paste_logo(
             os.path.join(src_white_path, png),
             "./test_thumbnail/mango.png",
-            (700, 25),
-            (70, 70),
+            (940, 25),
+            (60, 60),
         )
 
         text = "</> 芒果文档"
-        position = (780, 36)  # 指定文字的位置(x, y)
+        # 竖屏for 抖音和快手
+        # position_vertical = (780, 36)  # 指定文字的位置(x, y)
+
+        # 横屏 for 微信视频号
+        position_horizontal = (1000, 36)  # 指定文字的位置(x, y)
         font_path = "/Users/donghaoliu/doc/video_material/font/douyuFont-2.otf"  # 字体文件的路径
         font_size = 38  # 字体大小
         font_color = (255, 255, 255)  # 字体颜色(白色)
 
+        # 竖屏for 抖音和快手
+        # result_image = write_text_on_image(
+        #     img, text, position_vertical, font_path, font_size, font_color
+        # )
+
+        # 横屏 for 微信视频号
         result_image = write_text_on_image(
-            img, text, position, font_path, font_size, font_color
+            img, text, position_horizontal, font_path, font_size, font_color
         )
+
         # save the image
         result_image.save(os.path.join(dst_white_path, png))
 
@@ -241,7 +282,18 @@ def draw_ch_title_on_image(
 
 def random_bg():
     """randomly select a background image"""
-    bg_path = "/Users/donghaoliu/doc/video_material/thumbnail_material/thumbnail_bg"
+    bg_path = "/Users/donghaoliu/doc/video_material/thumbnail_material/white2"
+    all_bg_images = os.listdir(bg_path)
+    all_bg_images = [bg for bg in all_bg_images if bg != ".DS_Store"]
+
+    return os.path.join(bg_path, random.choice(all_bg_images))
+
+
+def random_bg_horizontal():
+    """randomly select a background image"""
+    bg_path = (
+        "/Users/donghaoliu/doc/video_material/thumbnail_material/white2_horizontal"
+    )
     all_bg_images = os.listdir(bg_path)
     all_bg_images = [bg for bg in all_bg_images if bg != ".DS_Store"]
 
@@ -254,23 +306,22 @@ def read_zh_title(zh_title_path):
         return f.read().strip()
 
 
-def create_zh_title_thumbnail():
+def create_zh_title_thumbnail_vertical():
     """Create thumbnail for Chinese title"""
     zh_title_src_path = "/Users/donghaoliu/doc/video_material/zh_title"
 
-    dst_thumbnail_path = "/Users/donghaoliu/doc/video_material/thumbnail"
+    dst_thumbnail_path = "/Users/donghaoliu/doc/video_material/thumbnail_vertical"
 
-    all_topics = os.listdir(zh_title_src_path)
+    all_topics = ["code"]
     # remove .DS_Store using list comprehension
-    all_topics = [topic for topic in all_topics if topic != ".DS_Store"]
+
+    ref_dict = load_ref_json("code")
 
     for topic in all_topics:
-        all_channels = os.listdir(os.path.join(zh_title_src_path, topic))
-        all_channels = [channel for channel in all_channels if channel != ".DS_Store"]
+        all_channels = ref_dict.keys()
 
         for channel in all_channels:
-            all_titles = os.listdir(os.path.join(zh_title_src_path, topic, channel))
-            all_titles = [title for title in all_titles if title != ".DS_Store"]
+            all_titles = ref_dict[channel].keys()
 
             # 如果topic和channel文件夹不存在，创建他们
             if not os.path.exists(os.path.join(dst_thumbnail_path, topic, channel)):
@@ -286,10 +337,35 @@ def create_zh_title_thumbnail():
                     continue
                 print("Creating thumbnail for: ", title)
 
+                map_title = ref_dict[channel][title]
+                map_base_name = os.path.splitext(map_title)[0]
+
                 bg_image_path = random_bg()
-                zh_title = read_zh_title(
-                    os.path.join(zh_title_src_path, topic, channel, title)
-                )
+                map_title = ref_dict[channel][title]
+                map_base_name = os.path.splitext(map_title)[0]
+
+                if "_clip_" in base_name:
+                    clip_id = base_name.split("_clip_")[-1]
+                    zh_title = (
+                        read_zh_title(
+                            os.path.join(
+                                zh_title_src_path,
+                                topic,
+                                channel,
+                                map_base_name + "_title.txt",
+                            )
+                        )
+                        + f" - {clip_id}"
+                    )
+                else:
+                    zh_title = read_zh_title(
+                        os.path.join(
+                            zh_title_src_path,
+                            topic,
+                            channel,
+                            map_base_name + "_title.txt",
+                        )
+                    )
                 # Chinese title position on the thumbnail bg image
                 position = (160, 180)  # 文本的起始位置
 
@@ -314,6 +390,90 @@ def create_zh_title_thumbnail():
                 )
 
 
+def create_zh_title_thumbnail_horizontal():
+    """Create thumbnail for Chinese title"""
+    zh_title_src_path = "/Users/donghaoliu/doc/video_material/zh_title"
+
+    dst_thumbnail_path = "/Users/donghaoliu/doc/video_material/thumbnail_horizontal"
+
+    all_topics = ["code"]
+    # remove .DS_Store using list comprehension
+
+    ref_dict = load_ref_json("code")
+
+    for topic in all_topics:
+        all_channels = ref_dict.keys()
+
+        for channel in all_channels:
+
+            all_titles = ref_dict[channel].keys()
+
+            # 如果topic和channel文件夹不存在，创建他们
+            if not os.path.exists(os.path.join(dst_thumbnail_path, topic, channel)):
+                os.makedirs(os.path.join(dst_thumbnail_path, topic, channel))
+
+            for title in all_titles:
+                base_name = os.path.splitext(title)[0]
+                dst_file_name = base_name + ".png"
+                if os.path.exists(
+                    os.path.join(dst_thumbnail_path, topic, channel, dst_file_name)
+                ):
+                    print(f"{dst_file_name} 文件存在, 跳过继续...")
+                    continue
+                print("Creating thumbnail for: ", title)
+
+                bg_image_path = random_bg_horizontal()
+
+                map_title = ref_dict[channel][title]
+                map_base_name = os.path.splitext(map_title)[0]
+
+                if "_clip_" in base_name:
+                    clip_id = base_name.split("_clip_")[-1]
+                    zh_title = (
+                        read_zh_title(
+                            os.path.join(
+                                zh_title_src_path,
+                                topic,
+                                channel,
+                                map_base_name + "_title.txt",
+                            )
+                        )
+                        + f" - {clip_id}"
+                    )
+                else:
+                    zh_title = read_zh_title(
+                        os.path.join(
+                            zh_title_src_path,
+                            topic,
+                            channel,
+                            map_base_name + "_title.txt",
+                        )
+                    )
+                # Chinese title position on the thumbnail bg image
+                position = (700, 100)  # 文本的起始位置
+
+                # chinese font path
+                font_path = "/Users/donghaoliu/doc/video_material/font/DottedSongtiCircleRegular.otf"  # 字体文件路径
+                font_size = 100  # 字体大小
+                right_padding = 600  # 主标题到图像右边缘的距离
+
+                # 贴中文标题到背景图像上
+                merged_thumbnail_img = draw_ch_title_on_image(
+                    bg_image_path,
+                    zh_title,
+                    position,
+                    font_path,
+                    font_size,
+                    right_padding,
+                )
+
+                # save the image to the destination folder
+                merged_thumbnail_img.save(
+                    os.path.join(dst_thumbnail_path, topic, channel, dst_file_name)
+                )
+
+
 if __name__ == "__main__":
     # white_temp2_controller()
-    create_zh_title_thumbnail()
+    create_zh_title_thumbnail_vertical()
+    # create_zh_title_thumbnail_horizontal()

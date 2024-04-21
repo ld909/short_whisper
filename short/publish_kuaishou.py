@@ -1,5 +1,4 @@
 import random
-import sys
 import time
 from selenium import webdriver
 import json
@@ -8,12 +7,12 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import os
+from selenium.webdriver.common.keys import Keys
 
 
 def login_and_save_cookies():
     # a new webdriver instance
-    driver_path = "./driver/chromedriver"
+    driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
     service = Service(executable_path=driver_path)
 
     driver = webdriver.Chrome(service=service)
@@ -26,12 +25,14 @@ def login_and_save_cookies():
 
     # save the cookies
     cookies = driver.get_cookies()
-    with open("./cookies/kuaishou.json", "w") as f:
+    with open(
+        "/Users/donghaoliu/doc/short_whisper/short/cookies/kuaishou.json", "w"
+    ) as f:
         json.dump(cookies, f)
 
 
 def load_cookies():
-    driver_path = "./driver/chromedriver"
+    driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
     service = Service(executable_path=driver_path)
 
     driver = webdriver.Chrome(service=service)
@@ -39,7 +40,9 @@ def load_cookies():
     # open the login page
     driver.get("https://cp.kuaishou.com/profile")
 
-    with open("./cookies/kuaishou.json", "r") as f:
+    with open(
+        "/Users/donghaoliu/doc/short_whisper/short/cookies/kuaishou.json", "r"
+    ) as f:
         cookies = json.load(f)
         for cookie in cookies:
             driver.add_cookie(cookie)
@@ -143,15 +146,6 @@ def no_download_check(driver):
 
 def confirm_publish_video(driver):
     """press the publish button"""
-    publish_btn_xpath = (
-        '//*[@id="rc-tabs-0-panel-1"]/div/div[4]/div/div[4]/div[2]/div[8]/button[1]'
-    )
-
-    # wait for the input element to be loaded for 10 seconds
-    timeout = 10
-    publish_btn_element = WebDriverWait(driver, timeout).until(
-        EC.presence_of_element_located((By.XPATH, publish_btn_xpath))
-    )
 
     # get upload progress under span element
     progress_xpath = "span.DqNkLCyIyfQ-"
@@ -169,38 +163,93 @@ def confirm_publish_video(driver):
     # wait 2s
     time.sleep(2)
 
-    publish_btn_element.click()
+    # publish button css div.XwacrNGK2pY-
+    publish_button_css = "div.XwacrNGK2pY-"
+    div_element = driver.find_element(By.CSS_SELECTOR, publish_button_css)
+    # find all button elements
+    spans = div_element.find_elements(By.TAG_NAME, "span")
+    # click the button with text "发布"
+    for span in spans:
+        if span.text == "发布":
+            span.click()
+            print("点击发布按钮...")
+
+    # wait 2s
+    time.sleep(2)
+
+    # 确认发布
+    confirm_btn_full_xpath = (
+        "/html/body/div[2]/div[4]/div/div[2]/div/div[2]/div/div/div[2]/button[2]/span"
+    )
+    confirm_btn_element = driver.find_element(By.XPATH, confirm_btn_full_xpath)
+    confirm_btn_element.click()
+    time.sleep(2)
+    print("确认发布...")
 
 
-def publish_video():
+def set_timedate(driver, time_str):
+    """设置定时发布时间"""
 
+    # 点击定时发布
+    father_css = "div.FEOCM-Tkqec-"
+    father_element = driver.find_element(By.CSS_SELECTOR, father_css)
+
+    # 找到father element下的所有label
+    labels = father_element.find_elements(By.TAG_NAME, "label")
+
+    # 点击第2个label
+    labels[1].click()
+    print("点击定时发布")
+
+    # 输入时间
+    input_father_css = "div.KEH-2Slzocg-"
+    # 找到father element
+    input_father_element = driver.find_element(By.CSS_SELECTOR, input_father_css)
+
+    # 找到input element
+    input_element = input_father_element.find_elements(By.TAG_NAME, "input")
+    input_element = input_element[0]
+    time.sleep(1)
+    input_element.send_keys(time_str)
+    time.sleep(1.5)
+    # press enter key
+    input_element.send_keys(Keys.ENTER)
+    print(f"快手短视频，设定发布时间:{time_str}完成...")
+
+
+def publish_kuaishou_video(
+    mp4_path, thumbnail_path, title_and_description_str, time_str
+):
+    # load the cookies
     driver = load_cookies()
 
-    # 指定你想上传的视频文件路径
-    # get absolute path of current folder
-    abs_path = os.path.abspath(os.path.dirname(__file__))
-    file_path = f"{abs_path}/test_videos/1.webm"
-
+    time.sleep(3.5)
     # upload video
-    video_upload(driver, file_path)
+    video_upload(driver, mp4_path)
 
     # upload thumbnail
-    thumbnail_path = f"{abs_path}/test_thumbnail/1.png"
     upload_video_thumbnail(driver, thumbnail_path)
 
     # wait 5s
     time.sleep(5)
     # input the title and description
-    title_and_description = "test title and description #刘邦 #python "
-    input_title_and_description(driver, title_and_description)
+    # title_and_description = "test title and description #刘邦 #python "
+    input_title_and_description(driver, title_and_description_str)
 
     # check the no download checkbox
     no_download_check(driver)
 
+    set_timedate(driver, time_str)
+
     # confirm publish video
     confirm_publish_video(driver)
 
+    time.sleep(5)
 
-if __name__ == "__main__":
-    # login_and_save_cookies()
-    publish_video()
+    # close the chrome driver
+    driver.quit()
+
+
+# if __name__ == "__main__":
+# login_and_save_cookies()
+# publish_video()

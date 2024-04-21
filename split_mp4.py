@@ -4,6 +4,7 @@ from srt_format import parse_srt_with_re, time_str_to_obj, read_srt_file
 from datetime import timedelta
 import subprocess
 import json
+from upload_controller import read_channels_from_ref_json, read_ref_json
 
 
 def calculate_video_cuts(end_times, max_length=timedelta(minutes=25)):
@@ -54,7 +55,7 @@ def get_video_duration_ffprobe(video_path):
     return float(duration)
 
 
-def ffmpeg_cut_video(video_path, cut_points):
+def ffmpeg_cut_video(video_path, cut_points, reference_dict, channel):
     """
     使用 FFmpeg 根据提供的切割点将视频切割成多个片段。
 
@@ -72,11 +73,17 @@ def ffmpeg_cut_video(video_path, cut_points):
         end_time = cut_points[i].total_seconds() if cut_points[i] is not None else None
 
         # 构建输出文件名
-        output_filename = f"{video_path.split('.')[0]}_clip_{i}.mp4"
+        output_filename = video_path.replace(".mp4", f"_clip_{i}.mp4")
+        clip_base_name = os.path.basename(output_filename)
 
         # if output filename exist skip
         if os.path.exists(output_filename):
             continue
+
+        # get the base name of the video
+        base_name = os.path.basename(video_path)
+        # add the base name to the reference dict
+        reference_dict[channel][clip_base_name] = base_name
 
         # 构建ffmpeg命令
         command = ["ffmpeg", "-i", video_path, "-ss", str(start_time)]
@@ -89,8 +96,11 @@ def ffmpeg_cut_video(video_path, cut_points):
 
         print(f"Created clip: {output_filename}")
 
+    return reference_dict
+
 
 def time_large_than_25(duration_seconds):
+    """判断视频时长是否大于25分钟。"""
     return duration_seconds > 25 * 60
 
 
@@ -100,18 +110,28 @@ def split_mp4():
     channels = os.listdir(os.path.join(mp4_folder, topic))
     eng_format_srt_path = "/Users/donghaoliu/doc/video_material/format_srt"
 
+    publish_ref = f"/Users/donghaoliu/doc/video_material/publish_ref/{topic}"
+    # create the publish_ref folder if not exist
+    if not os.path.exists(publish_ref):
+        os.makedirs(publish_ref)
+
     # remove DS_Store using list comprehension
-    channels = [channel for channel in channels if channel != ".DS_Store"]
+    channels = read_channels_from_ref_json(topic)
+
+    # reference dict
+    ref_dict = {}
 
     for channel in channels:
         all_mp4 = os.listdir(os.path.join(mp4_folder, topic, channel))
         # remove .DS_Store
         all_mp4 = [mp4 for mp4 in all_mp4 if mp4 != ".DS_Store"]
+        ref_dict[channel] = {}
         for mp4_single in all_mp4:
             # get the duration of the mp4 file
             mp4_path = os.path.join(mp4_folder, topic, channel, mp4_single)
             mp4_duration = get_duration(mp4_path)
             if not time_large_than_25(mp4_duration):
+                ref_dict[channel][mp4_single] = mp4_single
                 continue
             # get the base name of the mp4 single file
             base_name = os.path.basename(mp4_single)
@@ -131,7 +151,14 @@ def split_mp4():
             cut_points = calculate_video_cuts(end_time_list)
 
             # cut the video
-            ffmpeg_cut_video(mp4_path, cut_points)
+            ref_dict = ffmpeg_cut_video(mp4_path, cut_points, ref_dict, channel)
+
+    # 使用 ensure_ascii=False 和 indent=4 参数
+    json_data = json.dumps(ref_dict, ensure_ascii=False, indent=4)
+
+    # 将 JSON 数据写入文件
+    with open(os.path.join(publish_ref, "ref.json"), "w", encoding="utf-8") as file:
+        file.write(json_data)
 
 
 if __name__ == "__main__":
