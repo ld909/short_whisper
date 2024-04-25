@@ -109,27 +109,48 @@ def wrap_srt_text_chinese(subtitle_text, max_length=25, timestamps=None):
         return new_lines, new_timestamps
 
 
-def controller():
+def controller_srt(warp=False):
     """Translate the formatted English srt files to Chinese srt files using Claude-3 Haiku."""
     api_key = ""
-    eng_srt_abs_path = "/Users/donghaoliu/doc/video_material/format_srt/code"
-    dst_zh_srt_abs_path = "/Users/donghaoliu/doc/video_material/zh_srt/code"
-    all_folders = os.listdir(eng_srt_abs_path)
+    topic = "code"
+    eng_srt_abs_path = f"/Users/donghaoliu/doc/video_material/format_srt/{topic}"
+
+    # warp为True时，翻译的中文字幕保存在zh_srt/code文件夹下
+    if warp:
+        print("warp为True，翻译的中文字幕进行split")
+        dst_zh_srt_abs_path = f"/Users/donghaoliu/doc/video_material/zh_srt/{topic}"
+    # warp为False时，翻译的中文字幕保存在zh_srt_nowarp/code文件夹下
+    else:
+        print("warp为False，翻译的中文字幕不进行split")
+        dst_zh_srt_abs_path = (
+            f"/Users/donghaoliu/doc/video_material/zh_srt_nowarp/{topic}"
+        )
+
+    all_channels = os.listdir(eng_srt_abs_path)
     # remove .DS_Store using list comprehension
-    all_folders = [folder for folder in all_folders if folder != ".DS_Store"]
-    for folder in all_folders:
-        formatted_srts = os.listdir(os.path.join(eng_srt_abs_path, folder))
+    all_channels = [folder for folder in all_channels if folder != ".DS_Store"]
+
+    for channel_single in all_channels:
+
+        formatted_srts = os.listdir(os.path.join(eng_srt_abs_path, channel_single))
         # remove .DS_Store using list comprehension
         formatted_srts = [srt for srt in formatted_srts if srt != ".DS_Store"]
+
+        # 检查目标folder是否存在，不存在就创建
+        if not os.path.exists(os.path.join(dst_zh_srt_abs_path, channel_single)):
+            os.makedirs(os.path.join(dst_zh_srt_abs_path, channel_single))
+
         for srt in formatted_srts:
 
             # 检查之前是否完成过此任务，完成就跳过
-            if os.path.exists(os.path.join(dst_zh_srt_abs_path, folder, srt)):
+            if os.path.exists(os.path.join(dst_zh_srt_abs_path, channel_single, srt)):
                 print(f"{srt} 文件存在, 跳过继续...")
                 continue
 
             # parse the srt file
-            srt_read = read_srt_file(os.path.join(eng_srt_abs_path, folder, srt))
+            srt_read = read_srt_file(
+                os.path.join(eng_srt_abs_path, channel_single, srt)
+            )
             print("Translating: ", srt)
             # get the timestamps and subtitles from the srt file
             timestamps, subtitles = parse_srt_with_re(srt_read)
@@ -162,25 +183,31 @@ def controller():
 
             # save the translated subtitles and timestamps to a new file
             # 检查目标folder是否存在，不存在就创建
-            if not os.path.exists(os.path.join(dst_zh_srt_abs_path, folder)):
-                os.makedirs(os.path.join(dst_zh_srt_abs_path, folder))
+            if not os.path.exists(os.path.join(dst_zh_srt_abs_path, channel_single)):
+                os.makedirs(os.path.join(dst_zh_srt_abs_path, channel_single))
 
             ts_list = []
             srt_zh_list = []
 
-            for i in range(len(zh_srt)):
-                srt_txt = zh_srt[i].replace("。", "")
-                temp_srt_list, temp_ts_list = wrap_srt_text_chinese(
-                    srt_txt, timestamps=timestamps[i]
-                )
-                ts_list += temp_ts_list
-                srt_zh_list += temp_srt_list
+            # warp为True时，翻译的中文字幕进行split
+            if warp:
+                for i in range(len(zh_srt)):
+                    srt_txt = zh_srt[i].replace("。", "")
+                    temp_srt_list, temp_ts_list = wrap_srt_text_chinese(
+                        srt_txt, timestamps=timestamps[i]
+                    )
+                    ts_list += temp_ts_list
+                    srt_zh_list += temp_srt_list
+            # warp为False时，翻译的中文字幕不进行split
+            else:
+                ts_list = timestamps
+                srt_zh_list = zh_srt
 
             # 检查时间戳和字幕数量是否一致
             assert len(ts_list) == len(srt_zh_list)
 
             # 写入目标srt文件
-            with open(os.path.join(dst_zh_srt_abs_path, folder, srt), "w") as f:
+            with open(os.path.join(dst_zh_srt_abs_path, channel_single, srt), "w") as f:
                 for i in range(len(srt_zh_list)):
                     f.write(str(i + 1) + "\n")
                     f.write(ts_list[i][0] + " --> " + ts_list[i][1] + "\n")
@@ -302,4 +329,4 @@ def translate_srt(api_key, eng_srt_str):
 
 
 if __name__ == "__main__":
-    controller()
+    controller_srt(warp=False)
