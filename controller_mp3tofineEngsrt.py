@@ -10,43 +10,38 @@ from srt_format import format_srt, break_srt_txt_into_sentences
 
 
 def controller_mp3_to_format_srt():
-    mp3_abs_path = "/home/dhl/Documents/video_materials/mp3"  # fill in the absolute path of the mp3 folder
-    dst_srt_abs_path = "/home/dhl/Documents/video_materials/format_srt/code"  # fill in the absolute path of the srt folder
+    topic = "mama"
+    mp3_abs_path = f"/home/dhl/Documents/video_materials/mp3/{topic}"  # fill in the absolute path of the mp3 folder
+    dst_srt_abs_path = f"/home/dhl/Documents/video_materials/format_srt/{topic}"  # fill in the absolute path of the srt folder
 
     # check if the dst_srt_abs_path exists, if not create it
     if not os.path.exists(dst_srt_abs_path):
         os.makedirs(dst_srt_abs_path)
 
-    all_mp3_folders = os.listdir(mp3_abs_path)
+    all_channels = os.listdir(mp3_abs_path)
     # remove .DS_store
-    all_mp3_folders = [folder for folder in all_mp3_folders if folder != ".DS_Store"]
+    all_channels = [folder for folder in all_channels if folder != ".DS_Store"]
 
     # read all mp3 files in the folder
-    for mp3_channel_folder in tqdm(all_mp3_folders):
+    for channel in tqdm(all_channels):
 
-        print("processing: ", mp3_channel_folder)
+        print("processing: ", channel)
         # read all mp3 files in the folder
-        for mp3_file in tqdm(
-            os.listdir(os.path.join(mp3_abs_path, mp3_channel_folder))
-        ):
+        for mp3_file in tqdm(os.listdir(os.path.join(mp3_abs_path, channel))):
             if mp3_file.endswith(".mp3"):
                 # check if base_name +'.srt' exists in the dst_srt
                 base_name = os.path.splitext(mp3_file)[0]
-                dst_srt = os.path.join(
-                    dst_srt_abs_path, mp3_channel_folder, base_name + ".srt"
-                )
-                # check if os.path.join(dst_srt_abs_path, mp3_channel_folder) exists
-                if not os.path.exists(
-                    os.path.join(dst_srt_abs_path, mp3_channel_folder)
-                ):
-                    os.makedirs(os.path.join(dst_srt_abs_path, mp3_channel_folder))
+                dst_srt = os.path.join(dst_srt_abs_path, channel, base_name + ".srt")
+                # check if os.path.join(dst_srt_abs_path, channel) exists
+                if not os.path.exists(os.path.join(dst_srt_abs_path, channel)):
+                    os.makedirs(os.path.join(dst_srt_abs_path, channel))
 
                 # 检查之前是否完成过此任务，完成就跳过
                 if os.path.exists(dst_srt):
                     print("srt file exists, skip")
                     continue
 
-                mp3_path = os.path.join(mp3_abs_path, mp3_channel_folder, mp3_file)
+                mp3_path = os.path.join(mp3_abs_path, channel, mp3_file)
                 print("processing: ", mp3_path)
                 print("transcribing mp3 to txt using OpenAI whisper model...")
                 ts_list, txt_list = mp3totxt(mp3_path)
