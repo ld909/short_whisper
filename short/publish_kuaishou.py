@@ -136,12 +136,17 @@ def no_download_check(driver):
         '//*[@id="rc-tabs-0-panel-1"]/div/div[4]/div/div[4]/div[2]/div[3]/div/label[2]'
     )
 
-    # wait for the input element to be loaded for 10 seconds
+    # wait for the input element to be loaded for 10 seconds, if not loaded, just continue the next step
     timeout = 10
-    no_download_element = WebDriverWait(driver, timeout).until(
-        EC.presence_of_element_located((By.XPATH, no_download_xpath))
-    )
-    no_download_element.click()
+    try:
+        no_download_element = WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((By.XPATH, no_download_xpath))
+        )
+        no_download_element.click()
+        print("点击不允许下载...")
+    except:
+        print('没有找到"不允许下载"的checkbox...')
+        pass
 
 
 def confirm_publish_video(driver):
@@ -250,6 +255,6 @@ def publish_kuaishou_video(
     driver.quit()
 
 
-# if __name__ == "__main__":
-# login_and_save_cookies()
+if __name__ == "__main__":
+    login_and_save_cookies()
 # publish_video()

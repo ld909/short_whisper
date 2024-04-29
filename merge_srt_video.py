@@ -4,7 +4,7 @@ from mutagen import File
 
 
 def run_ffmpeg_command(input_video, subtitles, font_file, output_video):
-    """merge subtitle srt file into original mp4"""
+    '''merge subtitle srt file into original mp4'''
     ffmpeg_command = [
         "ffmpeg",
         "-i",
@@ -70,6 +70,7 @@ def merger_single(input_video, subtitles, output_video):
 
 
 def controller():
+    """合并所有的中文字幕到视频文件中，生成新的视频文件带中文字幕的mp4文件"""
     zh_srt_abs_path = "/Users/donghaoliu/doc/video_material/zh_srt/code"
     input_video_abs_path = "/Volumes/dhl/ytb-videos/code"
     dst_video_abs_path = "/Volumes/dhl/ytb-videos/mp4_zh/code"
@@ -79,7 +80,7 @@ def controller():
     all_channels = [folder for folder in all_channels if folder != ".DS_Store"]
 
     for channel in all_channels:
-        # get all zh_srt files in the folder
+        # 以中文srt为参照物，get all zh_srt files in the folder
         zh_srts = os.listdir(os.path.join(zh_srt_abs_path, channel))
         # remove .DS_Store using list comprehension
         zh_srts = [srt for srt in zh_srts if srt != ".DS_Store"]

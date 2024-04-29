@@ -4,7 +4,7 @@ from srt_format import parse_srt_with_re, time_str_to_obj, read_srt_file
 from datetime import timedelta
 import subprocess
 import json
-from upload_controller import read_channels_from_ref_json, read_ref_json
+from upload_controller import read_channels_from_ref_json, load_ref_json
 
 
 def calculate_video_cuts(end_times, max_length=timedelta(minutes=25)):
@@ -99,15 +99,22 @@ def ffmpeg_cut_video(video_path, cut_points, reference_dict, channel):
     return reference_dict
 
 
-def time_large_than_25(duration_seconds):
+def time_large_than_30(duration_seconds):
     """判断视频时长是否大于25分钟。"""
-    return duration_seconds > 25 * 60
+    return duration_seconds > 30 * 60
 
 
-def split_mp4():
+def read_ref_json(ref_json_path):
+    """读取ref.json文件并返回字典。"""
+    with open(ref_json_path, "r", encoding="utf-8") as file:
+        ref_dict = json.load(file)
+    return ref_dict
+
+
+def split_mp4(topic):
+    """split the mp4 files into clips with duration less than 25 minutes and generate the reference json file."""
+
     mp4_folder = "/Volumes/dhl/ytb-videos/mp4_zh"
-    topic = "code"
-    channels = os.listdir(os.path.join(mp4_folder, topic))
     eng_format_srt_path = "/Users/donghaoliu/doc/video_material/format_srt"
 
     publish_ref = f"/Users/donghaoliu/doc/video_material/publish_ref/{topic}"
@@ -115,22 +122,44 @@ def split_mp4():
     if not os.path.exists(publish_ref):
         os.makedirs(publish_ref)
 
-    # remove DS_Store using list comprehension
-    channels = read_channels_from_ref_json(topic)
+    # 创造ref.json文件的路径
+    ref_json_path = os.path.join(publish_ref, "ref.json")
 
-    # reference dict
-    ref_dict = {}
+    # get all channels from the ref.json file
+    channels = read_channels_from_ref_json(topic)
+    # if ref.json exists, read the ref.json file
+    if os.path.exists(ref_json_path):
+        # json load the ref.json file
+        print(f"读取 {ref_json_path} 文件...")
+        ref_dict = load_ref_json(topic)
+    else:
+        # reference dict
+        ref_dict = {}
 
     for channel in channels:
+        print(f"处理频道：{channel}...")
         all_mp4 = os.listdir(os.path.join(mp4_folder, topic, channel))
         # remove .DS_Store
         all_mp4 = [mp4 for mp4 in all_mp4 if mp4 != ".DS_Store"]
-        ref_dict[channel] = {}
+
+        if channel not in ref_dict:
+            ref_dict[channel] = {}
         for mp4_single in all_mp4:
+            # print(mp4_single, list(ref_dict[channel].keys()))
+            # check if the mp4 file is already in the ref.json file
+            if mp4_single in list(ref_dict[channel].keys()):
+
+                # print(
+                #     f"频道：{channel}，视频：{mp4_single} 已经在 ref.json 文件中，跳过..."
+                # )
+                continue
+            else:
+                print(f"新视频，处理视频：{mp4_single}")
+
             # get the duration of the mp4 file
             mp4_path = os.path.join(mp4_folder, topic, channel, mp4_single)
             mp4_duration = get_duration(mp4_path)
-            if not time_large_than_25(mp4_duration):
+            if not time_large_than_30(mp4_duration):
                 ref_dict[channel][mp4_single] = mp4_single
                 continue
             # get the base name of the mp4 single file
@@ -157,9 +186,10 @@ def split_mp4():
     json_data = json.dumps(ref_dict, ensure_ascii=False, indent=4)
 
     # 将 JSON 数据写入文件
-    with open(os.path.join(publish_ref, "ref.json"), "w", encoding="utf-8") as file:
+    with open(ref_json_path, "w", encoding="utf-8") as file:
         file.write(json_data)
 
 
 if __name__ == "__main__":
-    split_mp4()
+    topic = "code"
+    split_mp4(topic)

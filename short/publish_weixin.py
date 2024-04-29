@@ -285,6 +285,8 @@ def upload_weixin_video(
     set_time(time_str)
 
     # input the title
+    if len(title) <= 6:
+        title += "     "
     add_title(driver, title)
 
     time.sleep(1)
@@ -298,9 +300,9 @@ def upload_weixin_video(
     driver.quit()
 
 
-# if __name__ == "__main__":
-#     # read 1st argument from command line
-#     if sys.argv[1] == "login":
-#         login_and_save_cookies()
+if __name__ == "__main__":
+    # read 1st argument from command line
+    if sys.argv[1] == "login":
+        login_and_save_cookies()
 # elif sys.argv[1] == "upload":
 #     upload_video()

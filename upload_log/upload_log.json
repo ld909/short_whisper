@@ -361,10 +361,182 @@
     },
     "code~~~~fknight~~~~How Data Structures & Algorithms are Actually Used.mp4": {
         "platforms": [
-            "douyin"
+            "douyin",
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-04-28-06-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Build this JS Digital Clock in 10 minutes! 🕐.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-28-09-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C nested loops ➰.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-28-12-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C print an array with loop 🔃.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-28-15-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C return statement 🔙.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-28-18-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C ternary operator ❓.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-28-21-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C# conditional operator ❓.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-29-06-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C# enums 🪐.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-29-09-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C# generics ⁉️.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-29-12-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C# getters & setters 🔒.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-29-15-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C# inheritance 👪.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-29-18-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C# nested loops ➿.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-29-21-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C# objects as arguments 🧳.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-30-06-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C# ToString method 💭.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-30-09-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C# user input ⌨️.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-30-12-00"
+        ]
+    },
+    "code~~~~brocodez~~~~A game of Snake written in JavaScript 🐍.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-30-15-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Build a JavaScript IMAGE SLIDER in 15 minutes! 🖼️.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-30-18-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C array of strings🧵.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-04-30-21-00"
         ]
     }
 }

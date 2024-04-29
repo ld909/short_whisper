@@ -308,57 +308,47 @@ def read_zh_title(zh_title_path):
 
 def create_zh_title_thumbnail_vertical():
     """Create thumbnail for Chinese title"""
+    # 参考中文srt文件的路径
     zh_title_src_path = "/Users/donghaoliu/doc/video_material/zh_title"
 
     dst_thumbnail_path = "/Users/donghaoliu/doc/video_material/thumbnail_vertical"
 
-    all_topics = ["code"]
+    topic = "code"
     # remove .DS_Store using list comprehension
 
     ref_dict = load_ref_json("code")
 
-    for topic in all_topics:
-        all_channels = ref_dict.keys()
+    # read all channels from ref_dict
+    all_channels = read_channels_from_ref_json(topic)
 
-        for channel in all_channels:
-            all_titles = ref_dict[channel].keys()
+    for channel in all_channels:
+        all_titles = list(ref_dict[channel].keys())
 
-            # 如果topic和channel文件夹不存在，创建他们
-            if not os.path.exists(os.path.join(dst_thumbnail_path, topic, channel)):
-                os.makedirs(os.path.join(dst_thumbnail_path, topic, channel))
+        # 如果topic和channel文件夹不存在，创建他们
+        if not os.path.exists(os.path.join(dst_thumbnail_path, topic, channel)):
+            os.makedirs(os.path.join(dst_thumbnail_path, topic, channel))
 
-            for title in all_titles:
-                base_name = os.path.splitext(title)[0]
-                dst_file_name = base_name + ".png"
-                if os.path.exists(
-                    os.path.join(dst_thumbnail_path, topic, channel, dst_file_name)
-                ):
-                    print(f"{dst_file_name} 文件存在, 跳过继续...")
-                    continue
-                print("Creating thumbnail for: ", title)
+        for title in all_titles:
+            base_name = os.path.splitext(title)[0]
+            dst_file_name = base_name + ".png"
+            if os.path.exists(
+                os.path.join(dst_thumbnail_path, topic, channel, dst_file_name)
+            ):
+                print(f"{dst_file_name} 文件存在, 跳过继续...")
+                continue
+            print("Creating thumbnail for: ", title)
 
-                map_title = ref_dict[channel][title]
-                map_base_name = os.path.splitext(map_title)[0]
+            map_title = ref_dict[channel][title]
+            map_base_name = os.path.splitext(map_title)[0]
 
-                bg_image_path = random_bg()
-                map_title = ref_dict[channel][title]
-                map_base_name = os.path.splitext(map_title)[0]
+            bg_image_path = random_bg()
+            map_title = ref_dict[channel][title]
+            map_base_name = os.path.splitext(map_title)[0]
 
-                if "_clip_" in base_name:
-                    clip_id = base_name.split("_clip_")[-1]
-                    zh_title = (
-                        read_zh_title(
-                            os.path.join(
-                                zh_title_src_path,
-                                topic,
-                                channel,
-                                map_base_name + "_title.txt",
-                            )
-                        )
-                        + f" - {clip_id}"
-                    )
-                else:
-                    zh_title = read_zh_title(
+            if "_clip_" in base_name:
+                clip_id = base_name.split("_clip_")[-1]
+                zh_title = (
+                    read_zh_title(
                         os.path.join(
                             zh_title_src_path,
                             topic,
@@ -366,28 +356,39 @@ def create_zh_title_thumbnail_vertical():
                             map_base_name + "_title.txt",
                         )
                     )
-                # Chinese title position on the thumbnail bg image
-                position = (160, 180)  # 文本的起始位置
-
-                # chinese font path
-                font_path = "/Users/donghaoliu/doc/video_material/font/DottedSongtiCircleRegular.otf"  # 字体文件路径
-                font_size = 120  # 字体大小
-                right_padding = 100  # 文本到图像右边缘的距离
-
-                # 贴中文标题到背景图像上
-                merged_thumbnail_img = draw_ch_title_on_image(
-                    bg_image_path,
-                    zh_title,
-                    position,
-                    font_path,
-                    font_size,
-                    right_padding,
+                    + f" - {clip_id}"
                 )
-
-                # save the image to the destination folder
-                merged_thumbnail_img.save(
-                    os.path.join(dst_thumbnail_path, topic, channel, dst_file_name)
+            else:
+                zh_title = read_zh_title(
+                    os.path.join(
+                        zh_title_src_path,
+                        topic,
+                        channel,
+                        map_base_name + "_title.txt",
+                    )
                 )
+            # Chinese title position on the thumbnail bg image
+            position = (160, 180)  # 文本的起始位置
+
+            # chinese font path
+            font_path = "/Users/donghaoliu/doc/video_material/font/DottedSongtiCircleRegular.otf"  # 字体文件路径
+            font_size = 120  # 字体大小
+            right_padding = 100  # 文本到图像右边缘的距离
+
+            # 贴中文标题到背景图像上
+            merged_thumbnail_img = draw_ch_title_on_image(
+                bg_image_path,
+                zh_title,
+                position,
+                font_path,
+                font_size,
+                right_padding,
+            )
+
+            # save the image to the destination folder
+            merged_thumbnail_img.save(
+                os.path.join(dst_thumbnail_path, topic, channel, dst_file_name)
+            )
 
 
 def create_zh_title_thumbnail_horizontal():
@@ -396,52 +397,41 @@ def create_zh_title_thumbnail_horizontal():
 
     dst_thumbnail_path = "/Users/donghaoliu/doc/video_material/thumbnail_horizontal"
 
-    all_topics = ["code"]
+    topic = "code"
+
     # remove .DS_Store using list comprehension
 
-    ref_dict = load_ref_json("code")
+    ref_dict = load_ref_json(topic)
 
-    for topic in all_topics:
-        all_channels = ref_dict.keys()
+    all_channels = read_channels_from_ref_json(topic)
 
-        for channel in all_channels:
+    for channel in all_channels:
 
-            all_titles = ref_dict[channel].keys()
+        all_titles = ref_dict[channel].keys()
 
-            # 如果topic和channel文件夹不存在，创建他们
-            if not os.path.exists(os.path.join(dst_thumbnail_path, topic, channel)):
-                os.makedirs(os.path.join(dst_thumbnail_path, topic, channel))
+        # 如果topic和channel文件夹不存在，创建他们
+        if not os.path.exists(os.path.join(dst_thumbnail_path, topic, channel)):
+            os.makedirs(os.path.join(dst_thumbnail_path, topic, channel))
 
-            for title in all_titles:
-                base_name = os.path.splitext(title)[0]
-                dst_file_name = base_name + ".png"
-                if os.path.exists(
-                    os.path.join(dst_thumbnail_path, topic, channel, dst_file_name)
-                ):
-                    print(f"{dst_file_name} 文件存在, 跳过继续...")
-                    continue
-                print("Creating thumbnail for: ", title)
+        for title in all_titles:
+            base_name = os.path.splitext(title)[0]
+            dst_file_name = base_name + ".png"
+            if os.path.exists(
+                os.path.join(dst_thumbnail_path, topic, channel, dst_file_name)
+            ):
+                print(f"{dst_file_name} 文件存在, 跳过继续...")
+                continue
+            print("Creating thumbnail for: ", title)
 
-                bg_image_path = random_bg_horizontal()
+            bg_image_path = random_bg_horizontal()
 
-                map_title = ref_dict[channel][title]
-                map_base_name = os.path.splitext(map_title)[0]
+            map_title = ref_dict[channel][title]
+            map_base_name = os.path.splitext(map_title)[0]
 
-                if "_clip_" in base_name:
-                    clip_id = base_name.split("_clip_")[-1]
-                    zh_title = (
-                        read_zh_title(
-                            os.path.join(
-                                zh_title_src_path,
-                                topic,
-                                channel,
-                                map_base_name + "_title.txt",
-                            )
-                        )
-                        + f" - {clip_id}"
-                    )
-                else:
-                    zh_title = read_zh_title(
+            if "_clip_" in base_name:
+                clip_id = base_name.split("_clip_")[-1]
+                zh_title = (
+                    read_zh_title(
                         os.path.join(
                             zh_title_src_path,
                             topic,
@@ -449,31 +439,45 @@ def create_zh_title_thumbnail_horizontal():
                             map_base_name + "_title.txt",
                         )
                     )
-                # Chinese title position on the thumbnail bg image
-                position = (700, 100)  # 文本的起始位置
-
-                # chinese font path
-                font_path = "/Users/donghaoliu/doc/video_material/font/DottedSongtiCircleRegular.otf"  # 字体文件路径
-                font_size = 100  # 字体大小
-                right_padding = 600  # 主标题到图像右边缘的距离
-
-                # 贴中文标题到背景图像上
-                merged_thumbnail_img = draw_ch_title_on_image(
-                    bg_image_path,
-                    zh_title,
-                    position,
-                    font_path,
-                    font_size,
-                    right_padding,
+                    + f" - {clip_id}"
                 )
-
-                # save the image to the destination folder
-                merged_thumbnail_img.save(
-                    os.path.join(dst_thumbnail_path, topic, channel, dst_file_name)
+            else:
+                zh_title = read_zh_title(
+                    os.path.join(
+                        zh_title_src_path,
+                        topic,
+                        channel,
+                        map_base_name + "_title.txt",
+                    )
                 )
+            # Chinese title position on the thumbnail bg image
+            position = (700, 100)  # 文本的起始位置
+
+            # chinese font path
+            font_path = "/Users/donghaoliu/doc/video_material/font/DottedSongtiCircleRegular.otf"  # 字体文件路径
+            font_size = 100  # 字体大小
+            right_padding = 600  # 主标题到图像右边缘的距离
+
+            # 贴中文标题到背景图像上
+            merged_thumbnail_img = draw_ch_title_on_image(
+                bg_image_path,
+                zh_title,
+                position,
+                font_path,
+                font_size,
+                right_padding,
+            )
+
+            # save the image to the destination folder
+            merged_thumbnail_img.save(
+                os.path.join(dst_thumbnail_path, topic, channel, dst_file_name)
+            )
 
 
 if __name__ == "__main__":
     # white_temp2_controller()
+    print("创造vertical海报")
     create_zh_title_thumbnail_vertical()
-    # create_zh_title_thumbnail_horizontal()
+    print("*" * 50)
+    print("创造horizontal海报")
+    create_zh_title_thumbnail_horizontal()

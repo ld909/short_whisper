@@ -4,11 +4,16 @@ import anthropic
 from tqdm import tqdm
 
 
-def translate_to_zh_title(eng_title):
+def translate_to_zh_title(eng_title, topic):
     client = anthropic.Anthropic(
         # defaults to os.environ.get("ANTHROPIC_API_KEY")
-        api_key="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",
+        # api_key=api_key,
+        api_key=os.environ.get("ANTHROPIC_API_KEY")
     )
+    if topic == "code":
+        prompt_txt = f"""我有一个英文视频的名称，视频是关于变成或者计算机科学的话题，请准确翻译相关专业词汇。请注意，英文名可能包含emoji等表情符号，返回的结果中请剔除这些emoji等符号，我要得到纯净的中文翻译结果。直接返回翻译后的中文标题，不需要其他多余信息。英文标题是：{eng_title}"""
+    elif topic == "mama":
+        prompt_txt = f"""我有一个英文视频的名称，视频是母婴类的标题，请准确翻译相关专业词汇。请注意，英文名可能包含emoji等表情符号，返回的结果中请剔除这些emoji等符号，我要得到纯净的中文翻译结果。直接返回翻译后的中文标题，不需要其他多余信息。英文标题是：{eng_title}"""
     message = client.messages.create(
         model="claude-3-sonnet-20240229",
         max_tokens=1000,
@@ -20,7 +25,7 @@ def translate_to_zh_title(eng_title):
                 "content": [
                     {
                         "type": "text",
-                        "text": f"""我有一个英文视频的名称，视频是关于变成或者计算机科学的话题，请准确翻译相关专业词汇。请注意，英文名可能包含emoji等表情符号，返回的结果中请剔除这些emoji等符号，我要得到纯净的中文翻译结果。直接返回翻译后的中文标题，不需要其他多余信息。英文标题是：{eng_title}""",
+                        "text": prompt_txt,
                     }
                 ],
             }
@@ -33,7 +38,8 @@ def claude3_zh_tag(zh_title):
 
     client = anthropic.Anthropic(
         # defaults to os.environ.get("ANTHROPIC_API_KEY")
-        api_key="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",
+        # api_key=api_key,
+        api_key=os.environ.get("ANTHROPIC_API_KEY")
     )
     message = client.messages.create(
         model="claude-3-sonnet-20240229",
@@ -56,14 +62,17 @@ def claude3_zh_tag(zh_title):
     return message.content[0].text
 
 
-def get_zh_title_tags():
+def get_zh_title_tags(topic):
 
     # zh title从format srt这个文件路径得到
     format_srt_path = "/Users/donghaoliu/doc/video_material/format_srt"
 
     zh_title_dst_path = "/Users/donghaoliu/doc/video_material/zh_title"
     zh_tag_dst_path = "/Users/donghaoliu/doc/video_material/zh_tag"
-    all_topics = os.listdir(format_srt_path)
+    if topic == "code":
+        all_topics = os.listdir(format_srt_path)
+    elif topic == "mama":
+        all_topics = ["mama"]
     # remove DS_store using list comprehension
     all_topics = [topic for topic in all_topics if topic != ".DS_Store"]
 
@@ -120,7 +129,7 @@ def get_zh_title_tags():
                 eng_title = base_name
 
                 # using claude 3 to translate the eng title to zh title
-                title_zh = translate_to_zh_title(eng_title)
+                title_zh = translate_to_zh_title(eng_title, topic)
                 print(f"英文标题：{eng_title}")
                 print(f"中文标题：{title_zh}")
 
@@ -148,4 +157,5 @@ def get_zh_title_tags():
 
 
 if __name__ == "__main__":
-    get_zh_title_tags()
+    topic = "mama"
+    get_zh_title_tags(topic)

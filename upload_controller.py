@@ -43,7 +43,7 @@ def update_log(log_key, platform, date_time_str):
         # add the platform to the platforms list
         upload_log[log_key]["platforms"].append(platform)
 
-    print("更新日志：", upload_log)
+    # print("更新日志：", upload_log)
 
     # 使用 ensure_ascii=False 和 indent=4 参数
     json_data = json.dumps(upload_log, ensure_ascii=False, indent=4)
@@ -244,7 +244,9 @@ def upload_all_platforms():
 
             if "kuaishou" not in uploaded_platforms:
                 print("uploading to kuaishou...")
-                title_add_description = video_title_zh + " " + video_tags_zh_str
+                title_add_description = (
+                    video_title_zh.replace("#", "sharp") + " " + video_tags_zh_str
+                )
 
                 # convert upload time to str to format '2024-04-21 04:03:00', 'year-month-day hour:min:sec'
                 kuaishou_time_str = upload_time_obj.strftime("%Y-%m-%d %H:%M:00")
@@ -267,6 +269,7 @@ def upload_all_platforms():
                 print("uploading to weixin...")
                 # upload to weixin
                 title_add_description = video_title_zh + " " + video_tags_zh_str
+
                 weixin_time_str = upload_time_obj.strftime("%Y-%m-%d %H:%M")
 
                 # upload to weixin

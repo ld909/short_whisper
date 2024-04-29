@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import sys
 from srt_format import (
     read_srt_file,
     parse_srt_with_re,
@@ -109,10 +110,9 @@ def wrap_srt_text_chinese(subtitle_text, max_length=25, timestamps=None):
         return new_lines, new_timestamps
 
 
-def controller_srt(warp=False):
+def controller_srt(warp=False, topic=""):
     """Translate the formatted English srt files to Chinese srt files using Claude-3 Haiku."""
-    api_key = ""
-    topic = "code"
+
     eng_srt_abs_path = f"/Users/donghaoliu/doc/video_material/format_srt/{topic}"
 
     # warp为True时，翻译的中文字幕保存在zh_srt/code文件夹下
@@ -131,7 +131,7 @@ def controller_srt(warp=False):
     all_channels = [folder for folder in all_channels if folder != ".DS_Store"]
 
     for channel_single in all_channels:
-
+        # 得到已经完成翻译的字幕列表
         formatted_srts = os.listdir(os.path.join(eng_srt_abs_path, channel_single))
         # remove .DS_Store using list comprehension
         formatted_srts = [srt for srt in formatted_srts if srt != ".DS_Store"]
@@ -169,7 +169,7 @@ def controller_srt(warp=False):
                 # translate the 3 subtitles
                 success = False
                 while not success:
-                    translated_sentences, success = translate_srt(api_key, sentences)
+                    translated_sentences, success = translate_srt(sentences, topic)
 
                 # assert the number of translated subtitles is the same as the original subtitles
                 assert len(translated_sentences) == len(sentences)
@@ -219,17 +219,20 @@ def controller_srt(warp=False):
                         f.write(srt_zh_list[i])
 
 
-def translate_single_srt(api_key, eng_srt_single_str):
+def translate_single_srt(eng_srt_single_str, topic):
     """translate a single srt from English to Chinese using Claude-3 Haiku"""
-    client = anthropic.Anthropic(
-        # defaults to os.environ.get("ANTHROPIC_API_KEY")
-        api_key=api_key,
-    )
+    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+
+    if topic == "code":
+        prompt_txt = "你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于计算机科学/编程/数学相关话题的，请注意你的专业用语。"
+    elif topic == "mama":
+        prompt_txt = "你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于育儿/早教/母婴相关话题的，请注意你的专业用语。"
+
     message = client.messages.create(
         model="claude-3-haiku-20240307",
         max_tokens=1000,
         temperature=0,
-        system="你是一个优秀的翻译家，能够精确优雅准确精炼地把英文字幕翻译为中文字幕。不要返回多余信息，精准严格存寻prompt。原视频是关于计算机科学/编程/数学相关话题的，请注意你的专业用语。",
+        system=prompt_txt,
         messages=[
             {
                 "role": "user",
@@ -247,15 +250,20 @@ def translate_single_srt(api_key, eng_srt_single_str):
     return translate_srt_str, success
 
 
-def translate_return_json(api_key, eng_srt_str):
+def translate_return_json(eng_srt_str, topic):
     """translate srt from English to Chinese using Claude-3 Haiku"""
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
     text = f"""我会给你一个字幕的list，list每个item是一条英文字幕，帮我翻译为中文。英文字幕list是:{eng_srt_str}。返回一个json，对应句子index（index从1开始）和翻译后的中文字幕，每除了翻译后的结果json外，不返回任何多余文字和额外说明，翻译后字幕不要包含双引号"，返回结果如{{"1":"字幕1"，"2":"字幕2"}}。"""
+    if topic == "code":
+        prompt_txt = "你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于计算机科学/编程/数学相关话题的，请注意你的专业用语。"
+    elif topic == "mama":
+        prompt_txt = "你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于育儿/早教/母婴相关话题的，请注意你的专业用语。"
+
     message = client.messages.create(
         model="claude-3-haiku-20240307",
         max_tokens=1000,
         temperature=0,
-        system="你是一个优秀的翻译家，能够精确优雅准确精炼地把英文字幕翻译为中文字幕。返回一个json格式，格式严格遵循prompt中的标准。原视频是关于计算机科学/编程/数学相关话题的，请注意你的专业用语。",
+        system=prompt_txt,
         messages=[
             {
                 "role": "user",
@@ -287,24 +295,26 @@ def translate_return_json(api_key, eng_srt_str):
         for srt_eng_single_str in eng_srt_str:
             success = False
             while not success:
-                zh_single_srt, success = translate_single_srt(
-                    api_key, srt_eng_single_str
-                )
+                zh_single_srt, success = translate_single_srt(srt_eng_single_str, topic)
 
             translate_srt_list.append(zh_single_srt)
     return translate_srt_list, success
 
 
-def translate_srt(api_key, eng_srt_str):
+def translate_srt(eng_srt_str, topic):
     """translate srt from English to Chinese using Claude-3 Haiku"""
     print("正在翻译：", eng_srt_str)
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
     text = f"我会给你一个字幕的list，list每个item是一条英文字幕，帮我翻译为中文。返回一个list，长度和输入的list长度一致，每个item是对应翻译后的中文字幕。除了翻译后的结果list外，不用返回任何多余的文字和额外说明。英文字幕list是: {eng_srt_str}"
+    if topic == "code":
+        prompt_txt = "你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于计算机科学/编程/数学相关话题的，请注意你的专业用语。"
+    elif topic == "mama":
+        prompt_txt = "你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于育儿/早教/母婴相关话题的，请注意你的专业用语。"
     message = client.messages.create(
         model="claude-3-haiku-20240307",
         max_tokens=1000,
         temperature=0,
-        system="你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于计算机科学/编程/数学相关话题的，请注意你的专业用语。",
+        system=prompt_txt,
         messages=[
             {
                 "role": "user",
@@ -322,11 +332,19 @@ def translate_srt(api_key, eng_srt_str):
         translate_srt_list = ast.literal_eval(translate_srt_str)
         success = message.stop_reason == "end_turn"
     except:
-        translate_srt_list, success = translate_return_json(api_key, eng_srt_str)
+        translate_srt_list, success = translate_return_json(eng_srt_str, topic)
         print("使用json格式返回，结果：", translate_srt_list)
 
     return translate_srt_list, success
 
 
 if __name__ == "__main__":
-    controller_srt(warp=False)
+    # read the first arg from the command line
+    topic = sys.argv[1]
+
+    # set if_warp as the second arg from the command line
+    if_warp = sys.argv[2] == "True"
+
+    print(f"当前话题是：{topic}，是否split：{if_warp}")
+
+    controller_srt(warp=if_warp, topic=topic)

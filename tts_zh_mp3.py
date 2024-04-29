@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 
 def tts(content_str, mp3_dst_path):
+    """生成字幕"""
     group_id = "1725312458689614655"
     api_key = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJHcm91cE5hbWUiOiLliJjkuJzmmIoiLCJVc2VyTmFtZSI6IuWImOS4nOaYiiIsIkFjY291bnQiOiIiLCJTdWJqZWN0SUQiOiIxNzI1MzEyNDU4Njk4MDAzMjYzIiwiUGhvbmUiOiIxODU4MzM4MTAzNiIsIkdyb3VwSUQiOiIxNzI1MzEyNDU4Njg5NjE0NjU1IiwiUGFnZU5hbWUiOiIiLCJNYWlsIjoiIiwiQ3JlYXRlVGltZSI6IjIwMjQtMDQtMjMgMjA6NTU6MTQiLCJpc3MiOiJtaW5pbWF4In0.yv7qeUESVBLpi67g-BvEhFE0Fl9j13VUF0NddFJFAlauxZeTt1n8uaRSba__HGoLrDz_JgbWYFZPt1FEIbeYZQaDuTYJw68qbSTnSuUZCCRX7VjGeQ6x3tiWA7LlpF6hbzsUsiKRo2gT95Q3TQVKQJvpZszUrPlr6TODsrPycgoTaSbZ_gUwgY97ZHcJmSzbZyZEcsDyHe5hw_JYcGeO-fh8bsxZXrXHwFB1doR5YT3pVm8B24O_QMx2co3Z1jSh6ahJO1ctCvC0ff6Fpo9oZ4bKUbUUtcRm9iMeCwCx4LMaq80z3TnOKM22i5CTZxOfuOLjiCxD4Sp4Aq4-gDcSkA"
 
@@ -97,7 +98,7 @@ def merge_tts_mp3():
     tts_mp3_path = f"/Users/donghaoliu/doc/video_material/tts_mp3/{topic}"
     merge_mp3_dst_path = "/Users/donghaoliu/doc/video_material/merge_tts_mp3/{topic}"
     zh_srt_path = f"/Users/donghaoliu/doc/video_material/zh_srt_nowarp/{topic}"
-    
+
     if not os.path.exists(merge_mp3_dst_path):
         os.makedirs(merge_mp3_dst_path)
 
@@ -122,7 +123,6 @@ def merge_tts_mp3():
                 os.path.join(zh_srt_path, channel, f"{mp3_folder}.srt")
             )
             ts_list, txt_list = parse_srt_with_re(srt_content)
-            
 
 
 def controller_merge_single_mp3():
@@ -132,6 +132,8 @@ def controller_merge_single_mp3():
     if not os.path.exists(merge_mp3_dst_path):
         os.makedirs(merge_mp3_dst_path)
     tts_mp3_path = f"/Users/donghaoliu/doc/video_material/tts_mp3/{topic}"
+
+    mp4_path = f"/Users/donghaoliu/doc/video_material/zh_mp4/{topic}"
 
     all_channels = os.listdir(tts_mp3_path)
     # remove .DS_Store using list comprehension
@@ -156,10 +158,6 @@ def controller_merge_single_mp3():
 
             srt_content = read_srt_file(single_srt_path)
             ts_list, txt_list = parse_srt_with_re(srt_content)
-
-            # 计算每个srt的duration，如果mp3的duration和srt的duration不一致，就需要调整，如果mp3 duraion <= srt duration，就不需要调整,
-            # 如果mp3 duration > srt duration，就需要对mp3进行加速，让mp3 duration = srt duration
-            current_mp3_duration = None
 
 
 if __name__ == "__main__":

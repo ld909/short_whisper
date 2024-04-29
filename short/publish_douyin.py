@@ -29,7 +29,9 @@ def login_and_save_cookies():
 
     # save the cookies
     cookies = driver.get_cookies()
-    with open("./cookies/douyin.json", "w") as f:
+    with open(
+        "/Users/donghaoliu/doc/short_whisper/short/cookies/douyin.json", "w"
+    ) as f:
         json.dump(cookies, f)
 
 
@@ -392,12 +394,12 @@ def upload_douyin_video(
     driver.quit()
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
-#     # read parameters from the command line
-#     # get the first parameter
-#     action = sys.argv[1]
-#     if action == "login":
-#         login_and_save_cookies()
+    # read parameters from the command line
+    # get the first parameter
+    action = sys.argv[1]
+    if action == "login":
+        login_and_save_cookies()
 #     elif action == "upload":
 #         upload_douyin_video()
