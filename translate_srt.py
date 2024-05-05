@@ -115,7 +115,9 @@ def controller_srt(warp=False, topic="", jump30=True):
     """Translate the formatted English srt files to Chinese srt files using Claude-3 Haiku."""
 
     eng_srt_abs_path = f"/Users/donghaoliu/doc/video_material/format_srt/{topic}"
-    mp4_abs_path = f"/Users/donghaoliu/doc/video_material/mp4/{topic}"
+    mp4_abs_path = f"/Volumes/dhl/ytb-videos/{topic}"
+
+    exclude_channel = ["brocodez"]
 
     # warp为True时，对过长的单条srt字幕进行切割，翻译的中文字幕保存在zh_srt/code文件夹下
     if warp:
@@ -133,6 +135,11 @@ def controller_srt(warp=False, topic="", jump30=True):
     all_channels = [folder for folder in all_channels if folder != ".DS_Store"]
 
     for channel_single in all_channels:
+        # 从all_channels减除掉exclude_channel
+        if channel_single in exclude_channel:
+            print(f"跳过频道{channel_single}...")
+            continue
+
         # 得到已经完成翻译的字幕列表
         formatted_srts = os.listdir(os.path.join(eng_srt_abs_path, channel_single))
         # remove .DS_Store using list comprehension
@@ -168,9 +175,11 @@ def controller_srt(warp=False, topic="", jump30=True):
                 print(f"{srt} 文件存在, 跳过继续...")
                 continue
 
+            print(f"正在处理频道{channel_single}的{srt}...")
+
             # 超过30min的视频，跳过
             if jump30:
-                # read the mp4 file
+                # 读取mp4视视频，得到duration
                 mp4_file = os.path.join(
                     mp4_abs_path, channel_single, srt.replace(".srt", ".mp4")
                 )
@@ -183,7 +192,7 @@ def controller_srt(warp=False, topic="", jump30=True):
             srt_read = read_srt_file(
                 os.path.join(eng_srt_abs_path, channel_single, srt)
             )
-            print("Translating: ", srt)
+
             # get the timestamps and subtitles from the srt file
             timestamps, subtitles = parse_srt_with_re(srt_read)
 
@@ -204,6 +213,7 @@ def controller_srt(warp=False, topic="", jump30=True):
                     translated_sentences, success = translate_srt(sentences, topic)
 
                 # assert the number of translated subtitles is the same as the original subtitles
+                print(len(translated_sentences), len(sentences))
                 assert len(translated_sentences) == len(sentences)
 
                 # append the translated subtitles to the list
@@ -337,7 +347,8 @@ def translate_srt(eng_srt_str, topic):
     """translate srt from English to Chinese using Claude-3 Haiku"""
     print("正在翻译：", eng_srt_str)
     client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-    text = f"我会给你一个字幕的list，list每个item是一条英文字幕，帮我翻译为中文。返回一个list，长度和输入的list长度一致，每个item是对应翻译后的中文字幕。除了翻译后的结果list外，不用返回任何多余的文字和额外说明。英文字幕list是: {eng_srt_str}"
+    len_eng_srt = len(eng_srt_str)
+    text = f"我会给你一个字幕的list，list每个item是一条英文字幕，帮我翻译为中文。返回一个list，长度和输入的list长度一致，当前输入list长度为{len_eng_srt},你必须返回当度为{len_eng_srt}的list，每个item是对应翻译后的中文字幕。除了翻译后的结果list外，不用返回任何多余的文字和额外说明。英文字幕list是: {eng_srt_str}"
     if topic == "code":
         prompt_txt = "你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于计算机科学/编程/数学相关话题的，请注意你的专业用语。"
     elif topic == "mama":

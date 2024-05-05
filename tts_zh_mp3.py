@@ -5,7 +5,17 @@ from tqdm import tqdm
 from srt_format import time_str_to_obj
 
 
-def tts(content_str, mp3_dst_path):
+def tts(content_str, mp3_dst_path, topic):
+    """调用minimax的tts接口，生成mp3文件"""
+
+    if topic == "mama":
+        voice_id = "presenter_female"
+    elif topic == "code":
+        voice_id = "male-qn-jingying-jingpin"
+    else:
+        print("对应的topic不存在，请检查topic是否正确")
+        return
+
     """生成字幕"""
     group_id = "1725312458689614655"
     api_key = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJHcm91cE5hbWUiOiLliJjkuJzmmIoiLCJVc2VyTmFtZSI6IuWImOS4nOaYiiIsIkFjY291bnQiOiIiLCJTdWJqZWN0SUQiOiIxNzI1MzEyNDU4Njk4MDAzMjYzIiwiUGhvbmUiOiIxODU4MzM4MTAzNiIsIkdyb3VwSUQiOiIxNzI1MzEyNDU4Njg5NjE0NjU1IiwiUGFnZU5hbWUiOiIiLCJNYWlsIjoiIiwiQ3JlYXRlVGltZSI6IjIwMjQtMDQtMjMgMjA6NTU6MTQiLCJpc3MiOiJtaW5pbWF4In0.yv7qeUESVBLpi67g-BvEhFE0Fl9j13VUF0NddFJFAlauxZeTt1n8uaRSba__HGoLrDz_JgbWYFZPt1FEIbeYZQaDuTYJw68qbSTnSuUZCCRX7VjGeQ6x3tiWA7LlpF6hbzsUsiKRo2gT95Q3TQVKQJvpZszUrPlr6TODsrPycgoTaSbZ_gUwgY97ZHcJmSzbZyZEcsDyHe5hw_JYcGeO-fh8bsxZXrXHwFB1doR5YT3pVm8B24O_QMx2co3Z1jSh6ahJO1ctCvC0ff6Fpo9oZ4bKUbUUtcRm9iMeCwCx4LMaq80z3TnOKM22i5CTZxOfuOLjiCxD4Sp4Aq4-gDcSkA"
@@ -16,7 +26,7 @@ def tts(content_str, mp3_dst_path):
         "Content-Type": "application/json",
     }
     data = {
-        "voice_id": "male-qn-jingying-jingpin",
+        "voice_id": voice_id,
         # 如同时传入voice_id和timber_weights时，则会自动忽略voice_id，以timber_weights传递的参数为准
         "text": f"{content_str}",
         "model": "speech-02",
@@ -35,8 +45,7 @@ def tts(content_str, mp3_dst_path):
         return True
 
 
-def controller_tts():
-    topic = "code"
+def controller_tts(topic):
     zh_nowarp_srt_path = f"/Users/donghaoliu/doc/video_material/zh_srt_nowarp/{topic}"
     tts_mp3_path = f"/Users/donghaoliu/doc/video_material/tts_mp3/{topic}"
 
@@ -57,9 +66,10 @@ def controller_tts():
         for srt_name in all_srt:
             srt_path = os.path.join(zh_nowarp_srt_path, channel, srt_name)
             srt_content = read_srt_file(srt_path)
-            timestamps, subtitles = parse_srt_with_re(srt_content)
+            _, subtitles = parse_srt_with_re(srt_content)
             srt_basename = os.path.splitext(srt_name)[0]
 
+            # 创建一个文件夹，用于存放每个字幕的mp3 clips
             if not os.path.exists(os.path.join(tts_mp3_path, channel, srt_basename)):
                 os.makedirs(os.path.join(tts_mp3_path, channel, srt_basename))
 
@@ -80,6 +90,7 @@ def controller_tts():
                         os.path.join(
                             tts_mp3_path, channel, srt_basename, f"{sub_idx}.mp3"
                         ),
+                        topic,
                     )
                 print(f"{srt_basename} {sub_idx} tts done!")
 
@@ -142,80 +153,7 @@ def ts_to_duration(ts_list):
     return duration_list
 
 
-from pydub import AudioSegment
-
-
-def controller_merge_single_mp3():
-    topic = "code"
-    zh_nowarp_srt_path = f"/Users/donghaoliu/doc/video_material/zh_srt_nowarp/{topic}"
-    merge_mp3_dst_path = "/Users/donghaoliu/doc/video_material/merge_mp3/{topic}"
-    if not os.path.exists(merge_mp3_dst_path):
-        os.makedirs(merge_mp3_dst_path)
-    tts_mp3_path = f"/Users/donghaoliu/doc/video_material/tts_mp3/{topic}"
-
-    mp4_path = f"/Users/donghaoliu/doc/video_material/zh_mp4/{topic}"
-
-    all_channels = os.listdir(tts_mp3_path)
-    # remove .DS_Store using list comprehension
-    all_channels = [channel for channel in all_channels if channel != ".DS_Store"]
-
-    for channel in all_channels:
-        print(f"当前处理的频道是{channel}")
-        all_mp3_folders = os.listdir(os.path.join(tts_mp3_path, channel))
-        # remove .DS_Store using list comprehension
-        all_mp3_folders = [
-            mp3_folder for mp3_folder in all_mp3_folders if mp3_folder != ".DS_Store"
-        ]
-        for mp3_folder in all_mp3_folders:
-            print(f"当前处理的文件夹是{mp3_folder}")
-            all_mp3 = get_sorted_mp3_list(
-                os.path.join(tts_mp3_path, channel, mp3_folder)
-            )
-
-            print(all_mp3)
-
-            # read srt file
-            single_srt_path = os.path.join(
-                zh_nowarp_srt_path, channel, f"{mp3_folder}.srt"
-            )
-
-            srt_content = read_srt_file(single_srt_path)
-            ts_list, txt_list = parse_srt_with_re(srt_content)
-
-            assert len(all_mp3) == len(
-                ts_list
-            ), f"mp3数量{len(all_mp3)}和srt数量{len(ts_list)}不一致"
-
-            # 得到每个 mp3 文件的时长
-            duration_list = ts_to_duration(ts_list)
-
-            # 创建一个空白的audio对象，并设定duration=1800s
-            merged_audio = AudioSegment.silent(duration=1800000)
-
-            for mp3_name, mp3_duration, ts_cur_tuple in tqdm(
-                zip(all_mp3, duration_list, ts_list)
-            ):
-                start_time_string, _ = ts_cur_tuple
-                start_time_obj = time_str_to_obj(start_time_string)
-                start_time_seconds = start_time_obj.total_seconds()
-
-                new_mp3 = process_mp3(
-                    os.path.join(tts_mp3_path, channel, mp3_folder, mp3_name),
-                    mp3_duration,
-                )
-
-                # overlay the new_mp3 on the merged_audio at the start_time_seconds
-                merged_audio = merged_audio.overlay(
-                    new_mp3, position=start_time_seconds * 1000
-                )
-
-            # save the merged_audio
-            merged_audio.export(
-                "./test_tts_mp3/tts.mp3",
-                format="mp3",
-            )
-
-
 if __name__ == "__main__":
-    # controller_tts()
-    controller_merge_single_mp3()
+    topic = "code"
+    controller_tts(topic=topic)
+    # controller_merge_single_mp3(topic)

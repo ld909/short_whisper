@@ -9,8 +9,8 @@ from mp3toscripts import mp3totxt, save_srt
 from srt_format import format_srt, break_srt_txt_into_sentences
 
 
-def controller_mp3_to_format_srt():
-    topic = "mama"
+def controller_mp3_to_format_srt(topic):
+    
     mp3_abs_path = f"/home/dhl/Documents/video_materials/mp3/{topic}"  # fill in the absolute path of the mp3 folder
     dst_srt_abs_path = f"/home/dhl/Documents/video_materials/format_srt/{topic}"  # fill in the absolute path of the srt folder
 
@@ -25,7 +25,7 @@ def controller_mp3_to_format_srt():
     # read all mp3 files in the folder
     for channel in tqdm(all_channels):
 
-        print("processing: ", channel)
+        print("处理频道: ", channel)
         # read all mp3 files in the folder
         for mp3_file in tqdm(os.listdir(os.path.join(mp3_abs_path, channel))):
             if mp3_file.endswith(".mp3"):
@@ -61,4 +61,5 @@ def controller_mp3_to_format_srt():
 
 
 if __name__ == "__main__":
-    controller_mp3_to_format_srt()
+    topic = "code"
+    controller_mp3_to_format_srt(topic)
