@@ -64,7 +64,7 @@ def claude3_zh_tag(zh_title):
 
 def get_zh_title_tags(topic):
 
-    # zh title从format srt这个文件路径得到
+    # zh title从format srt这个文件夹中获取依赖
     format_srt_path = "/Users/donghaoliu/doc/video_material/format_srt"
 
     zh_title_dst_path = "/Users/donghaoliu/doc/video_material/zh_title"
@@ -157,5 +157,5 @@ def get_zh_title_tags(topic):
 
 
 if __name__ == "__main__":
-    topic = "mama"
+    topic = "code"
     get_zh_title_tags(topic)

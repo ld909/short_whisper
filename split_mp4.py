@@ -114,19 +114,21 @@ def read_ref_json(ref_json_path):
 def split_mp4(topic):
     """split the mp4 files into clips with duration less than 25 minutes and generate the reference json file."""
 
-    mp4_folder = "/Volumes/dhl/ytb-videos/mp4_zh"
-    eng_format_srt_path = "/Users/donghaoliu/doc/video_material/format_srt"
-
+    mp4_folder = "/Volumes/dhl/ytb-videos/tts_mp4"
+    # eng_format_srt_path = "/Users/donghaoliu/doc/video_material/format_srt"
     publish_ref = f"/Users/donghaoliu/doc/video_material/publish_ref/{topic}"
+    zh_title_dst_path = f"/Users/donghaoliu/doc/video_material/zh_title"
+
+    all_channels = os.listdir(os.path.join(zh_title_dst_path, topic))
+    # remove .DS_Store
+    all_channels = [channel for channel in all_channels if channel != ".DS_Store"]
+
     # create the publish_ref folder if not exist
     if not os.path.exists(publish_ref):
         os.makedirs(publish_ref)
 
     # 创造ref.json文件的路径
     ref_json_path = os.path.join(publish_ref, "ref.json")
-
-    # get all channels from the ref.json file
-    channels = read_channels_from_ref_json(topic)
     # if ref.json exists, read the ref.json file
     if os.path.exists(ref_json_path):
         # json load the ref.json file
@@ -136,7 +138,10 @@ def split_mp4(topic):
         # reference dict
         ref_dict = {}
 
-    for channel in channels:
+    # get all channels from the ref.json file
+    # channels = read_channels_from_ref_json(topic)
+
+    for channel in all_channels:
         print(f"处理频道：{channel}...")
         all_mp4 = os.listdir(os.path.join(mp4_folder, topic, channel))
         # remove .DS_Store
@@ -144,6 +149,7 @@ def split_mp4(topic):
 
         if channel not in ref_dict:
             ref_dict[channel] = {}
+
         for mp4_single in all_mp4:
             # print(mp4_single, list(ref_dict[channel].keys()))
             # check if the mp4 file is already in the ref.json file
@@ -162,25 +168,26 @@ def split_mp4(topic):
             if not time_large_than_30(mp4_duration):
                 ref_dict[channel][mp4_single] = mp4_single
                 continue
+
             # get the base name of the mp4 single file
-            base_name = os.path.basename(mp4_single)
-            base_name_prefix = os.path.splitext(base_name)[0]
+            # base_name = os.path.basename(mp4_single)
+            # base_name_prefix = os.path.splitext(base_name)[0]
 
-            # srt path
-            eng_srt_path = os.path.join(
-                eng_format_srt_path, topic, channel, base_name_prefix + ".srt"
-            )
-            srt_content = read_srt_file(eng_srt_path)
-            ts, _ = parse_srt_with_re(srt_content)
+            # # srt path
+            # eng_srt_path = os.path.join(
+            #     eng_format_srt_path, topic, channel, base_name_prefix + ".srt"
+            # )
+            # srt_content = read_srt_file(eng_srt_path)
+            # ts, _ = parse_srt_with_re(srt_content)
 
-            # get the end time of each timestamp using list comprehension
-            end_time_list = [time_str_to_obj(t[1]) for t in ts]
+            # # get the end time of each timestamp using list comprehension
+            # end_time_list = [time_str_to_obj(t[1]) for t in ts]
 
-            # calculate the cut points
-            cut_points = calculate_video_cuts(end_time_list)
+            # # calculate the cut points
+            # cut_points = calculate_video_cuts(end_time_list)
 
-            # cut the video
-            ref_dict = ffmpeg_cut_video(mp4_path, cut_points, ref_dict, channel)
+            # # cut the video
+            # ref_dict = ffmpeg_cut_video(mp4_path, cut_points, ref_dict, channel)
 
     # 使用 ensure_ascii=False 和 indent=4 参数
     json_data = json.dumps(ref_dict, ensure_ascii=False, indent=4)

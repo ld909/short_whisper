@@ -66,9 +66,18 @@ def get_mp4_clip_list(video_path, ts_list, mp3_list):
     return mp4_clip_list, mp3_clip_list
 
 
+def combine_speech_bg(speech, background):
+
+    # 设置背景音乐的音量 (以 dB 为单位)
+    background_volume = -15  # 将背景音乐降低 X dB
+
+    # 合并 speech 和 background
+    combined = speech.overlay(background.apply_gain(background_volume))
+    return combined
+
+
 def merge_mp3tomp4(srt_file_path, video_file_path, chinese_audio_files):
     """把mp3和mp4合成为新视频"""
-    bg_music_path = ""
 
     srt_content = read_srt_file(srt_file_path)
     ts_list, _ = parse_srt_with_re(srt_content)
@@ -117,6 +126,15 @@ def merge_mp3tomp4(srt_file_path, video_file_path, chinese_audio_files):
     for audio in new_mp3_list:
         final_audio += audio
 
+    # 添加背景音乐
+    bg_audio = AudioSegment.from_file(
+        "/Users/donghaoliu/doc/video_material/tts_mp3/background/bg.mp3", format="mp3"
+    )
+    bg_audio = truncate_or_repeat_audio(bg_audio, final_video.duration)
+
+    # 合并音频
+    final_audio = combine_speech_bg(final_audio, bg_audio)
+
     # 保存音频为临时文件，使用后删除
     temp_audio = tempfile.NamedTemporaryFile()
     final_audio.export(temp_audio.name, format="mp3")
@@ -128,16 +146,46 @@ def merge_mp3tomp4(srt_file_path, video_file_path, chinese_audio_files):
     return final_video
 
 
-# # 示例用法
-# tts_mp3_path = f"/Users/donghaoliu/doc/video_material/tts_mp3/code/developedbyed/This React Drag and Drop Component Is Magic"
-# srt_file = "/Users/donghaoliu/doc/video_material/zh_srt_nowarp/code/developedbyed/This React Drag and Drop Component Is Magic.srt"
-# video_file = "/Volumes/dhl/ytb-videos/code/developedbyed/This React Drag and Drop Component Is Magic.mp4"
-# mp3 = get_sorted_mp3_list(tts_mp3_path)
+def cross_fade(pydub_audio):
+    """在音频的开头和结尾添加 cross fade 效果"""
+    # 设置 cross fade 时长 (以毫秒为单位)
+    fade_duration = 2000  # 1 秒
 
-# # get mp3 absolute path
-# chinese_audio_files = [os.path.join(tts_mp3_path, mp3_file) for mp3_file in mp3]
-# final_video = merge_mp3tomp4(srt_file, video_file, chinese_audio_files)
-# final_video.write_videofile("./output.mp4")
+    # 在开始和结束添加 cross fade 效果
+    audio_with_fade = pydub_audio.fade_in(fade_duration).fade_out(fade_duration)
+    return audio_with_fade
+
+
+def truncate_or_repeat_audio(audio, target_time):
+    """截断或重复 MP3 文件,以使其达到目标时长"""
+    # 读取 MP3 文件
+    # audio = AudioSegment.from_file(input_file, format="mp3")
+
+    # 获取 MP3 文件的原始时长
+    original_duration = audio.duration_seconds
+
+    # 如果目标时长小于或等于原始时长
+    if target_time <= original_duration:
+        # 截断 MP3 文件
+        audio = audio[: int(target_time * 1000)]  # 单位是毫秒
+    else:
+        # 重复 MP3 文件
+        num_repeats = int(target_time // original_duration)
+        remainder = target_time % original_duration
+        repeated_audio = audio * num_repeats
+        if remainder > 0:
+            repeated_audio += audio[: int(remainder * 1000)]
+        audio = repeated_audio
+
+    # 添加 cross fade 效果
+    audio = cross_fade(audio)
+
+    return audio
+
+    # 输出新的 MP3 文件
+    # output_file = "./test_tts_mp3/bg.mp3"
+    # audio.export(output_file, format="mp3")
+    # return output_file
 
 
 def merge_mp4_controller(topic):
@@ -189,5 +237,5 @@ def merge_mp4_controller(topic):
 
 
 if __name__ == "__main__":
-    topic = "mama"
+    topic = "code"
     merge_mp4_controller(topic)

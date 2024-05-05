@@ -61,27 +61,26 @@ def next_time_point(current_time):
     # 检查当前时间的小时数
     hour = current_time.hour
 
-    # 如果当前时间是21点
-    if hour == 21:
-        # 返回第二天的6点
-        next_time = current_time.replace(
+    # 如果当前时间小于当前时间
+    if current_time < datetime.now():
+        # 返回当前时间的明早6点
+        next_time = datetime.now().replace(
             hour=6, minute=0, second=0, microsecond=0
         ) + timedelta(days=1)
-    else:
-        # # 否则返回当前时间加3小时（下一个整点时间）
-        # next_time = current_time + timedelta(hours=3)
-        # # 重置分钟、秒和微秒为0
-        # next_time = next_time.replace(minute=0, second=0, microsecond=0)
 
-        # 如果当前时间是6点，+5小时，即11点
-        if hour == 6:
-            next_time = current_time + timedelta(hours=5)
-        # 如果当前时间是11点，+7小时，即18点
-        elif hour == 11:
-            next_time = current_time + timedelta(hours=7)
-        # 如果当前时间是18点，+3小时，即21点
-        elif hour == 18:
-            next_time = current_time + timedelta(hours=3)
+    # 如果当前时间是6点，+5小时，即11点
+    elif hour == 6:
+        next_time = current_time + timedelta(hours=5)
+    # 如果当前时间是11点，+7小时，即18点
+    elif hour == 11:
+        next_time = current_time + timedelta(hours=7)
+    # 如果当前时间是18点，+3小时，即21点
+    elif hour == 18:
+        next_time = current_time + timedelta(hours=3)
+
+    # 如果当前时间是21点，+9小时，即下一天6点
+    elif hour == 21:
+        next_time = current_time + timedelta(hours=9)
 
     return next_time
 
@@ -136,7 +135,7 @@ def get_upload_time(uploaded_platforms, upload_log, log_key):
 
 def upload_all_platforms():
 
-    zh_mp4_path = "/Volumes/dhl/ytb-videos/mp4_zh"
+    zh_mp4_path = "/Volumes/dhl/ytb-videos/tts_mp4"
     zh_title_path = "/Users/donghaoliu/doc/video_material/zh_title"
     zh_tags = "/Users/donghaoliu/doc/video_material/zh_tag"
     thumbnail_vertical_path = "/Users/donghaoliu/doc/video_material/thumbnail_vertical"

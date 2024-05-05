@@ -310,7 +310,6 @@ def create_zh_title_thumbnail_vertical():
     """Create thumbnail for Chinese title"""
     # 参考中文srt文件的路径
     zh_title_src_path = "/Users/donghaoliu/doc/video_material/zh_title"
-
     dst_thumbnail_path = "/Users/donghaoliu/doc/video_material/thumbnail_vertical"
 
     topic = "code"
@@ -372,7 +371,7 @@ def create_zh_title_thumbnail_vertical():
 
             # chinese font path
             font_path = "/Users/donghaoliu/doc/video_material/font/DottedSongtiCircleRegular.otf"  # 字体文件路径
-            font_size = 120  # 字体大小
+            font_size = 100  # 字体大小
             right_padding = 100  # 文本到图像右边缘的距离
 
             # 贴中文标题到背景图像上
@@ -393,6 +392,8 @@ def create_zh_title_thumbnail_vertical():
 
 def create_zh_title_thumbnail_horizontal():
     """Create thumbnail for Chinese title"""
+
+    # 依赖路径，来自中文标题
     zh_title_src_path = "/Users/donghaoliu/doc/video_material/zh_title"
 
     dst_thumbnail_path = "/Users/donghaoliu/doc/video_material/thumbnail_horizontal"
@@ -479,5 +480,5 @@ if __name__ == "__main__":
     print("创造vertical海报")
     create_zh_title_thumbnail_vertical()
     print("*" * 50)
-    print("创造horizontal海报")
+    # print("创造horizontal海报")
     create_zh_title_thumbnail_horizontal()

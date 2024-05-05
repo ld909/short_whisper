@@ -386,8 +386,8 @@ if __name__ == "__main__":
     topic = sys.argv[1]
 
     # set if_warp as the second arg from the command line
-    # True：对过长的单条srt字幕进行切割
-    # False：不切割过长单条srt字幕，为中文配音准备的srt
+    # True：！！！对过长的单条srt字幕进行切割!!!!
+    # False：！！！不切割过长单条srt字幕，为中文配音准备的srt!!!
     if_warp = sys.argv[2] == "True"
 
     # 超过30min的视频，跳过
