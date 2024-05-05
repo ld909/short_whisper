@@ -10,7 +10,6 @@ from srt_format import format_srt, break_srt_txt_into_sentences
 
 
 def controller_mp3_to_format_srt(topic):
-    
     mp3_abs_path = f"/home/dhl/Documents/video_materials/mp3/{topic}"  # fill in the absolute path of the mp3 folder
     dst_srt_abs_path = f"/home/dhl/Documents/video_materials/format_srt/{topic}"  # fill in the absolute path of the srt folder
 
@@ -42,7 +41,7 @@ def controller_mp3_to_format_srt(topic):
                     continue
 
                 mp3_path = os.path.join(mp3_abs_path, channel, mp3_file)
-                print("processing: ", mp3_path)
+                print("processing: ", mp3_path, " in channel: ", channel)
                 print("transcribing mp3 to txt using OpenAI whisper model...")
                 ts_list, txt_list = mp3totxt(mp3_path)
 
@@ -62,4 +61,4 @@ def controller_mp3_to_format_srt(topic):
 
 if __name__ == "__main__":
     topic = "code"
-    controller_mp3_to_format_srt(topic)
+    controller_mp3_to_format_srt(topic=topic)

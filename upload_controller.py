@@ -68,10 +68,20 @@ def next_time_point(current_time):
             hour=6, minute=0, second=0, microsecond=0
         ) + timedelta(days=1)
     else:
-        # 否则返回当前时间加3小时（下一个整点时间）
-        next_time = current_time + timedelta(hours=3)
-        # 重置分钟、秒和微秒为0
-        next_time = next_time.replace(minute=0, second=0, microsecond=0)
+        # # 否则返回当前时间加3小时（下一个整点时间）
+        # next_time = current_time + timedelta(hours=3)
+        # # 重置分钟、秒和微秒为0
+        # next_time = next_time.replace(minute=0, second=0, microsecond=0)
+
+        # 如果当前时间是6点，+5小时，即11点
+        if hour == 6:
+            next_time = current_time + timedelta(hours=5)
+        # 如果当前时间是11点，+7小时，即18点
+        elif hour == 11:
+            next_time = current_time + timedelta(hours=7)
+        # 如果当前时间是18点，+3小时，即21点
+        elif hour == 18:
+            next_time = current_time + timedelta(hours=3)
 
     return next_time
 

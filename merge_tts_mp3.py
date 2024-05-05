@@ -68,6 +68,8 @@ def get_mp4_clip_list(video_path, ts_list, mp3_list):
 
 def merge_mp3tomp4(srt_file_path, video_file_path, chinese_audio_files):
     """把mp3和mp4合成为新视频"""
+    bg_music_path = ""
+
     srt_content = read_srt_file(srt_file_path)
     ts_list, _ = parse_srt_with_re(srt_content)
 

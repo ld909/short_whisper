@@ -191,7 +191,7 @@ def break_srt_txt_into_sentences(old_ts_list, old_txt_list):
                 # unit is seconds/word
                 words = txt.split(" ")
                 word_speed = duration / len(words)
-                print(duration, len(words), start_time_str, end_time_str, word_speed)
+                # print(duration, len(words), start_time_str, end_time_str, word_speed)
 
                 # loop through each new sentence split by qutation
                 temp_ts = None
