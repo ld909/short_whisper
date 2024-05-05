@@ -2,6 +2,7 @@ import requests
 from srt_format import read_srt_file, parse_srt_with_re
 import os
 from tqdm import tqdm
+from srt_format import time_str_to_obj
 
 
 def tts(content_str, mp3_dst_path):
@@ -115,7 +116,7 @@ def merge_tts_mp3():
         ]
         for mp3_folder in all_mp3_folders:
 
-            all_mp3s = get_sorted_mp3_list(
+            all_mp3 = get_sorted_mp3_list(
                 os.path.join(tts_mp3_path, channel, mp3_folder)
             )
 
@@ -123,6 +124,25 @@ def merge_tts_mp3():
                 os.path.join(zh_srt_path, channel, f"{mp3_folder}.srt")
             )
             ts_list, txt_list = parse_srt_with_re(srt_content)
+
+
+def ts_to_duration(ts_list):
+    duration_list = []
+    for ts_str in ts_list:
+        start_time_str, end_time_str = ts_str
+        # convert from string to timedelta
+        start_time_obj = time_str_to_obj(start_time_str)
+        end_time_obj = time_str_to_obj(end_time_str)
+        duration = end_time_obj - start_time_obj
+        # convert from timedelta to seconds
+        duration_seconds = duration.total_seconds()
+
+        # append to the list
+        duration_list.append(duration_seconds)
+    return duration_list
+
+
+from pydub import AudioSegment
 
 
 def controller_merge_single_mp3():
@@ -148,8 +168,11 @@ def controller_merge_single_mp3():
         ]
         for mp3_folder in all_mp3_folders:
             print(f"当前处理的文件夹是{mp3_folder}")
-            all_mp3_path = os.listdir(os.path.join(tts_mp3_path, channel, mp3_folder))
-            all_mp3 = get_sorted_mp3_list(all_mp3_path)
+            all_mp3 = get_sorted_mp3_list(
+                os.path.join(tts_mp3_path, channel, mp3_folder)
+            )
+
+            print(all_mp3)
 
             # read srt file
             single_srt_path = os.path.join(
@@ -159,6 +182,40 @@ def controller_merge_single_mp3():
             srt_content = read_srt_file(single_srt_path)
             ts_list, txt_list = parse_srt_with_re(srt_content)
 
+            assert len(all_mp3) == len(
+                ts_list
+            ), f"mp3数量{len(all_mp3)}和srt数量{len(ts_list)}不一致"
+
+            # 得到每个 mp3 文件的时长
+            duration_list = ts_to_duration(ts_list)
+
+            # 创建一个空白的audio对象，并设定duration=1800s
+            merged_audio = AudioSegment.silent(duration=1800000)
+
+            for mp3_name, mp3_duration, ts_cur_tuple in tqdm(
+                zip(all_mp3, duration_list, ts_list)
+            ):
+                start_time_string, _ = ts_cur_tuple
+                start_time_obj = time_str_to_obj(start_time_string)
+                start_time_seconds = start_time_obj.total_seconds()
+
+                new_mp3 = process_mp3(
+                    os.path.join(tts_mp3_path, channel, mp3_folder, mp3_name),
+                    mp3_duration,
+                )
+
+                # overlay the new_mp3 on the merged_audio at the start_time_seconds
+                merged_audio = merged_audio.overlay(
+                    new_mp3, position=start_time_seconds * 1000
+                )
+
+            # save the merged_audio
+            merged_audio.export(
+                "./test_tts_mp3/tts.mp3",
+                format="mp3",
+            )
+
 
 if __name__ == "__main__":
-    controller_tts()
+    # controller_tts()
+    controller_merge_single_mp3()

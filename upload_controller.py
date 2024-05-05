@@ -152,7 +152,10 @@ def upload_all_platforms():
             else:
                 uploaded_platforms = []
 
-            if len(uploaded_platforms) == 3:
+            # if len(uploaded_platforms) == 3:
+            #     continue
+            if "douyin" in uploaded_platforms and "kuaishou" in uploaded_platforms:
+                print(f"mp4 {mp4_single} in the platforms...")
                 continue
 
             # preapre the video and upload
@@ -265,28 +268,28 @@ def upload_all_platforms():
                 print("kuaishou上传完成,已更新日志...")
                 print("*" * 50)
 
-            if "weixin" not in uploaded_platforms:
-                print("uploading to weixin...")
-                # upload to weixin
-                title_add_description = video_title_zh + " " + video_tags_zh_str
+            # if "weixin" not in uploaded_platforms:
+            #     print("uploading to weixin...")
+            # # upload to weixin
+            # title_add_description = video_title_zh + " " + video_tags_zh_str
 
-                weixin_time_str = upload_time_obj.strftime("%Y-%m-%d %H:%M")
+            # weixin_time_str = upload_time_obj.strftime("%Y-%m-%d %H:%M")
 
-                # upload to weixin
-                upload_weixin_video(
-                    video_path,
-                    thumbnail_png_horizontal,
-                    video_title_zh.replace("#", "sharp"),
-                    title_add_description,
-                    weixin_time_str,
-                )
+            # # upload to weixin
+            # upload_weixin_video(
+            #     video_path,
+            #     thumbnail_png_horizontal,
+            #     video_title_zh.replace("#", "sharp"),
+            #     title_add_description,
+            #     weixin_time_str,
+            # )
 
-                # 更新日志
-                update_log(
-                    log_key, "weixin", upload_time_obj.strftime("%Y-%m-%d-%H-%M")
-                )
-                print("weixin上传完成,已更新日志...")
-                print("*" * 50)
+            # # 更新日志
+            # update_log(
+            #     log_key, "weixin", upload_time_obj.strftime("%Y-%m-%d-%H-%M")
+            # )
+            # print("weixin上传完成,已更新日志...")
+            # print("*" * 50)
 
 
 if __name__ == "__main__":

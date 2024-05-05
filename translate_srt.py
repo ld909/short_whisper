@@ -12,7 +12,8 @@ from tqdm import tqdm
 import ast
 import jieba
 import json
-from datetime import time, timedelta
+from datetime import timedelta
+from merge_srt_video import get_duration
 
 
 def get_line_timestamps(lines, start_time, end_time):
@@ -110,16 +111,17 @@ def wrap_srt_text_chinese(subtitle_text, max_length=25, timestamps=None):
         return new_lines, new_timestamps
 
 
-def controller_srt(warp=False, topic=""):
+def controller_srt(warp=False, topic="", jump30=True):
     """Translate the formatted English srt files to Chinese srt files using Claude-3 Haiku."""
 
     eng_srt_abs_path = f"/Users/donghaoliu/doc/video_material/format_srt/{topic}"
+    mp4_abs_path = f"/Users/donghaoliu/doc/video_material/mp4/{topic}"
 
-    # warp为True时，翻译的中文字幕保存在zh_srt/code文件夹下
+    # warp为True时，对过长的单条srt字幕进行切割，翻译的中文字幕保存在zh_srt/code文件夹下
     if warp:
         print("warp为True，翻译的中文字幕进行split")
         dst_zh_srt_abs_path = f"/Users/donghaoliu/doc/video_material/zh_srt/{topic}"
-    # warp为False时，翻译的中文字幕保存在zh_srt_nowarp/code文件夹下
+    # warp为False时，不切割过长单条srt字幕，翻译的中文字幕保存在zh_srt_nowarp/code文件夹下
     else:
         print("warp为False，翻译的中文字幕不进行split")
         dst_zh_srt_abs_path = (
@@ -136,16 +138,46 @@ def controller_srt(warp=False, topic=""):
         # remove .DS_Store using list comprehension
         formatted_srts = [srt for srt in formatted_srts if srt != ".DS_Store"]
 
+        # 如果warp=False，还需要除开掉warp=True已经翻译的字幕
+        if not warp:
+            # 得到已经完成翻译的字幕列表
+            formatted_srts_warp = os.listdir(
+                os.path.join(
+                    f"/Users/donghaoliu/doc/video_material/zh_srt/{topic}",
+                    channel_single,
+                )
+            )
+            # remove .DS_Store using list comprehension
+            formatted_srts_warp = [
+                srt for srt in formatted_srts_warp if srt != ".DS_Store"
+            ]
+            # 除去已经翻译的字幕
+            formatted_srts = list(set(formatted_srts) - set(formatted_srts_warp))
+            print(
+                f"移除前：{len(formatted_srts) + len(formatted_srts_warp)}个，移除后：{len(formatted_srts)}个"
+            )
+
         # 检查目标folder是否存在，不存在就创建
         if not os.path.exists(os.path.join(dst_zh_srt_abs_path, channel_single)):
             os.makedirs(os.path.join(dst_zh_srt_abs_path, channel_single))
 
+        # 遍历所有的srt文件
         for srt in formatted_srts:
-
             # 检查之前是否完成过此任务，完成就跳过
             if os.path.exists(os.path.join(dst_zh_srt_abs_path, channel_single, srt)):
                 print(f"{srt} 文件存在, 跳过继续...")
                 continue
+
+            # 超过30min的视频，跳过
+            if jump30:
+                # read the mp4 file
+                mp4_file = os.path.join(
+                    mp4_abs_path, channel_single, srt.replace(".srt", ".mp4")
+                )
+                mp4_duration = get_duration(mp4_file)
+                if mp4_duration > 1800:
+                    print(f"频道{channel_single}的{srt} 超过30min，跳过...")
+                    continue
 
             # parse the srt file
             srt_read = read_srt_file(
@@ -343,8 +375,13 @@ if __name__ == "__main__":
     topic = sys.argv[1]
 
     # set if_warp as the second arg from the command line
+    # True：对过长的单条srt字幕进行切割
+    # False：不切割过长单条srt字幕，为中文配音准备的srt
     if_warp = sys.argv[2] == "True"
+
+    # 超过30min的视频，跳过
+    jump30 = sys.argv[3] == "True"
 
     print(f"当前话题是：{topic}，是否split：{if_warp}")
 
-    controller_srt(warp=if_warp, topic=topic)
+    controller_srt(warp=if_warp, topic=topic, jump30=jump30)
