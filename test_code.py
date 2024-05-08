@@ -1,64 +1,64 @@
-"""
-  For more samples please visit https://github.com/Azure-Samples/cognitive-services-speech-sdk 
-"""
-
-import azure.cognitiveservices.speech as speechsdk
-import xml.etree.ElementTree as ET
-from xml.dom import minidom
+from datetime import datetime, timedelta
 
 
-def create_ssml_string(text, rate="1.05", yinse_name="zh-CN-YunjieNeural"):
-    # 创建根元素
-    speak = ET.Element(
-        "speak",
-        version="1.0",
-        xmlns="http://www.w3.org/2001/10/synthesis",
-        attrib={"xml:lang": "zh-CN"},
-    )
+def next_time_point(current_time, chunk_split):
 
-    # 创建 voice 元素
-    voice = ET.SubElement(speak, "voice", name=yinse_name)
+    # 开始时间是早上6点
+    start_hour = 6
+    # 结束时间是晚上22点
+    end_hour = 22
 
-    # 创建 prosody 元素
-    prosody = ET.SubElement(voice, "prosody", rate=rate)
+    # 一共时间间隔
+    time_gap = (end_hour - start_hour) / chunk_split
 
-    # 设置 prosody 元素的文本内容
-    prosody.text = text
+    # 四舍五入到最近的整数
+    time_gap = round(time_gap)
+    time_gap = int(time_gap)
 
-    # 创建 minidom 对象,用于格式化 XML
-    xml_str = ET.tostring(speak, "utf-8")
-    dom = minidom.parseString(xml_str)
+    # 计算从6点开始的所有时间点,包括6点和22点
+    all_time_points = [start_hour + i * time_gap for i in range(chunk_split + 1)]
 
-    # 获取格式化后的 SSML 字符串
-    ssml_string = dom.toprettyxml(indent="    ", encoding="utf-8").decode("utf-8")
+    # 如果当前时间小于当前时间
+    if current_time < datetime.now():
+        # 返回当前时间的明早6点
+        next_time = datetime.now().replace(
+            hour=6, minute=0, second=0, microsecond=0
+        ) + timedelta(days=1)
 
-    return ssml_string
+    # 如果当前时间在所有时间点之前,除开最后一个时间点
+    elif current_time > datetime.now() and current_time.hour in all_time_points[:-1]:
+        next_time = current_time + timedelta(hours=time_gap)
+
+    # 如果当前时间是最后一个时间点，设定下一个时间是明天早上6点
+    elif current_time > datetime.now() and current_time.hour == all_time_points[-1]:
+        next_time = current_time.replace(
+            hour=6, minute=0, second=0, microsecond=0
+        ) + timedelta(days=1)
+
+    return next_time
 
 
-def tts_ms(txt_string, topic):
-    # Creates an instance of a speech config with specified subscription key and service region.
-    speech_key = "cba10589e21e48dfb986f493e276b833"
-    service_region = "eastasia"
+def test_next_time_point():
+    # 测试用例1: 当前时间在所有时间点之前
+    # current_time1 = datetime(2024, 5, 1, 8, 0, 0)
+    # chunk_split1 = 4
+    # expected_time1 = datetime(2024, 5, 9, 6, 0, 0)
+    # assert next_time_point(current_time1, chunk_split1) == expected_time1
 
-    speech_config = speechsdk.SpeechConfig(
-        subscription=speech_key, region=service_region
-    )
+    # 测试用例2: 当前时间是最后一个时间点
+    # current_time2 = datetime(2024, 6, 1, 22, 0, 0)
+    # chunk_split2 = 4
+    # expected_time2 = datetime(2024, 6, 2, 6, 0, 0)
+    # assert next_time_point(current_time2, chunk_split2) == expected_time2
 
-    speech_config.set_speech_synthesis_output_format(
-        speechsdk.SpeechSynthesisOutputFormat.Audio48Khz192KBitRateMonoMp3
-    )
+    # # 测试用例3: 当前时间小于当前实际时间
+    current_time3 = datetime(2024, 6, 1, 6, 0, 0)
+    chunk_split3 = 4
+    expected_time3 = datetime(2024, 6, 1, 10, 0, 0)
+    assert next_time_point(current_time3, chunk_split3) == expected_time3
 
-    speech_synthesizer = speechsdk.SpeechSynthesizer(
-        speech_config=speech_config, audio_config=None
-    )
-    # 示例用法
-    content = "如何学习python编程？今天我们来学习一下Python编程的基础知识。"
-    ssml_string = create_ssml_string(content)
+    print("All tests passed!")
 
-    # 将 SSML 字符串传递给语音合成函数
-    result = speech_synthesizer.speak_ssml_async(ssml_string).get()
-    # ssml_string = open("./test_ssml/ssml.xml", "r").read()
-    # result = speech_synthesizer.speak_ssml_async(ssml_string).get()
 
-    stream = speechsdk.AudioDataStream(result)
-    stream.save_to_wav_file("./file-Audio48Khz192KBitRateMonoMp3.mp3")
+# 运行测试
+test_next_time_point()

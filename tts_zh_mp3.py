@@ -72,6 +72,7 @@ def tts_ms(txt_string, topic, clip_dst_path):
 
     # 判断是否合成成功
     if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+        print(f"成功使用azure tts合成语音")
         return True
     else:
         return False
