@@ -111,13 +111,149 @@ def wrap_srt_text_chinese(subtitle_text, max_length=25, timestamps=None):
         return new_lines, new_timestamps
 
 
-def controller_srt(warp=False, topic="", jump30=True):
+def controller_translate_srt_single(warp=False, topic="", jump30=True):
     """Translate the formatted English srt files to Chinese srt files using Claude-3 Haiku."""
 
     eng_srt_abs_path = f"/Users/donghaoliu/doc/video_material/format_srt/{topic}"
     mp4_abs_path = f"/Volumes/dhl/ytb-videos/{topic}"
 
-    exclude_channel = ["brocodez"]
+    # warp为False时，不切割过长单条srt字幕，翻译的中文字幕保存在zh_srt_nowarp/code文件夹下
+
+    print("warp为False，翻译的中文字幕不进行split")
+    dst_zh_srt_abs_path = f"/Users/donghaoliu/doc/video_material/zh_srt_nowarp/{topic}"
+
+    # 得到所有的频道
+    all_channels = os.listdir(eng_srt_abs_path)
+    # remove .DS_Store using list comprehension
+    all_channels = [folder for folder in all_channels if folder != ".DS_Store"]
+
+    for channel_single in all_channels:
+
+        # 得到已经完成翻译的字幕列表
+        formatted_srts = os.listdir(os.path.join(eng_srt_abs_path, channel_single))
+        # remove .DS_Store using list comprehension
+        formatted_srts = [srt for srt in formatted_srts if srt != ".DS_Store"]
+
+        # 要除开掉warp=True已经翻译的字幕，也就是已经发布的纯英文mp4对应的中文srt
+
+        # 得到已经完成翻译的字幕列表
+        formatted_srts_warp = os.listdir(
+            os.path.join(
+                f"/Users/donghaoliu/doc/video_material/zh_srt/{topic}",
+                channel_single,
+            )
+        )
+        # remove .DS_Store using list comprehension
+        formatted_srts_warp = [srt for srt in formatted_srts_warp if srt != ".DS_Store"]
+        # 除去已经翻译的字幕
+        formatted_srts = list(set(formatted_srts) - set(formatted_srts_warp))
+        print(
+            f"移除前：{len(formatted_srts) + len(formatted_srts_warp)}个，移除后：{len(formatted_srts)}个"
+        )
+        ### 以上代码是为了除去已经翻译的字幕
+
+        # 检查目标folder是否存在，不存在就创建
+        if not os.path.exists(os.path.join(dst_zh_srt_abs_path, channel_single)):
+            os.makedirs(os.path.join(dst_zh_srt_abs_path, channel_single))
+
+        # 遍历所有的srt文件
+        for srt in formatted_srts:
+            # 检查之前是否完成过此任务，完成就跳过
+            if os.path.exists(os.path.join(dst_zh_srt_abs_path, channel_single, srt)):
+                print(f"{srt} 文件存在, 跳过继续...")
+                continue
+
+            print(f"正在处理频道{channel_single}的{srt}...")
+
+            # # 超过30min的视频，跳过
+            # if jump30:
+            #     # 读取mp4视视频，得到duration
+            #     mp4_file = os.path.join(
+            #         mp4_abs_path, channel_single, srt.replace(".srt", ".mp4")
+            #     )
+            #     mp4_duration = get_duration(mp4_file)
+            #     if mp4_duration > 1800:
+            #         print(f"频道{channel_single}的{srt} 超过30min，跳过...")
+            #         continue
+
+            # parse the srt file
+            srt_read = read_srt_file(
+                os.path.join(eng_srt_abs_path, channel_single, srt)
+            )
+
+            # get the timestamps and subtitles from the srt file
+            timestamps, subtitles = parse_srt_with_re(srt_read)
+
+            # 检查时间戳和字幕数量是否一致
+            assert len(timestamps) == len(subtitles)
+
+            zh_srt = []
+            # everytime get 3 subtitles and corresponding timestamps
+            for i in tqdm(range(0, len(subtitles), 3)):
+                # get 3 subtitles
+                sentences = subtitles[i : i + 3]
+                # format the 3 subtitles into a list, each item is a sentence, surrounded by double quotes
+                sentences = [f"{sentence}" for sentence in sentences]
+
+                # translate the 3 subtitles
+                success = False
+                while not success:
+                    translated_sentences, success = translate_srt(sentences, topic)
+
+                # assert the number of translated subtitles is the same as the original subtitles
+                print(len(translated_sentences), len(sentences))
+                assert len(translated_sentences) == len(sentences)
+
+                # append the translated subtitles to the list
+                for zh_sentence in translated_sentences:
+                    zh_srt.append(zh_sentence)
+
+            # assert the number of translated subtitles is the same as the original subtitles
+            assert len(zh_srt) == len(subtitles) == len(timestamps)
+
+            # save the translated subtitles and timestamps to a new file
+            # 检查目标folder是否存在，不存在就创建
+            if not os.path.exists(os.path.join(dst_zh_srt_abs_path, channel_single)):
+                os.makedirs(os.path.join(dst_zh_srt_abs_path, channel_single))
+
+            ts_list = []
+            srt_zh_list = []
+
+            # warp为True时，翻译的中文字幕进行split
+            if warp:
+                for i in range(len(zh_srt)):
+                    srt_txt = zh_srt[i].replace("。", "")
+                    temp_srt_list, temp_ts_list = wrap_srt_text_chinese(
+                        srt_txt, timestamps=timestamps[i]
+                    )
+                    ts_list += temp_ts_list
+                    srt_zh_list += temp_srt_list
+            # warp为False时，翻译的中文字幕不进行split
+            else:
+                ts_list = timestamps
+                srt_zh_list = zh_srt
+
+            # 检查时间戳和字幕数量是否一致
+            assert len(ts_list) == len(srt_zh_list)
+
+            # 写入目标srt文件
+            with open(os.path.join(dst_zh_srt_abs_path, channel_single, srt), "w") as f:
+                for i in range(len(srt_zh_list)):
+                    f.write(str(i + 1) + "\n")
+                    f.write(ts_list[i][0] + " --> " + ts_list[i][1] + "\n")
+                    # if not the last sentence, add a \n\n
+                    if i != len(srt_zh_list) - 1:
+                        f.write(srt_zh_list[i] + "\n\n")
+                    # if the last sentence, add nothing
+                    else:
+                        f.write(srt_zh_list[i])
+
+
+def controller_srt(warp=False, topic="", jump30=True):
+    """Translate the formatted English srt files to Chinese srt files using Claude-3 Haiku."""
+
+    eng_srt_abs_path = f"/Users/donghaoliu/doc/video_material/format_srt/{topic}"
+    mp4_abs_path = f"/Volumes/dhl/ytb-videos/{topic}"
 
     # warp为True时，对过长的翻译后的中文srt字幕进行切割，翻译的中文字幕保存在zh_srt/code文件夹下
     if warp:
@@ -135,10 +271,6 @@ def controller_srt(warp=False, topic="", jump30=True):
     all_channels = [folder for folder in all_channels if folder != ".DS_Store"]
 
     for channel_single in all_channels:
-        # 从all_channels减除掉exclude_channel
-        if channel_single in exclude_channel:
-            print(f"跳过频道{channel_single}...")
-            continue
 
         # 得到已经完成翻译的字幕列表
         formatted_srts = os.listdir(os.path.join(eng_srt_abs_path, channel_single))
