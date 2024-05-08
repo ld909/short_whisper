@@ -4,8 +4,80 @@ import os
 from tqdm import tqdm
 from srt_format import time_str_to_obj
 
+import azure.cognitiveservices.speech as speechsdk
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
 
-def tts(content_str, mp3_dst_path, topic):
+
+def create_ssml_string(text, rate="1.05", yinse_name="zh-CN-YunjieNeural"):
+    """创建SSML字符串"""
+    # 创建根元素
+    speak = ET.Element(
+        "speak",
+        version="1.0",
+        xmlns="http://www.w3.org/2001/10/synthesis",
+        attrib={"xml:lang": "zh-CN"},
+    )
+
+    # 创建 voice 元素
+    voice = ET.SubElement(speak, "voice", name=yinse_name)
+
+    # 创建 prosody 元素
+    prosody = ET.SubElement(voice, "prosody", rate=rate)
+
+    # 设置 prosody 元素的文本内容
+    prosody.text = text
+
+    # 创建 minidom 对象,用于格式化 XML
+    xml_str = ET.tostring(speak, "utf-8")
+    dom = minidom.parseString(xml_str)
+
+    # 获取格式化后的 SSML 字符串
+    ssml_string = dom.toprettyxml(indent="    ", encoding="utf-8").decode("utf-8")
+
+    return ssml_string
+
+
+def tts_ms(txt_string, topic, clip_dst_path):
+    """调用微软的tts接口，生成mp3文件"""
+
+    # 配置参数
+    speech_key = "cba10589e21e48dfb986f493e276b833"
+    service_region = "eastasia"
+
+    speech_config = speechsdk.SpeechConfig(
+        subscription=speech_key, region=service_region
+    )
+
+    speech_config.set_speech_synthesis_output_format(
+        speechsdk.SpeechSynthesisOutputFormat.Audio48Khz192KBitRateMonoMp3
+    )
+
+    speech_synthesizer = speechsdk.SpeechSynthesizer(
+        speech_config=speech_config, audio_config=None
+    )
+    if topic == "mama":
+        yinse_name = ""
+    elif topic == "code":
+        yinse_name = "zh-CN-YunjieNeural"
+    # 构造SSML字符串
+    ssml_string = create_ssml_string(txt_string, yinse_name=yinse_name)
+
+    # 将 SSML 字符串传递给语音合成函数
+    result = speech_synthesizer.speak_ssml_async(ssml_string).get()
+
+    # 保存到本地
+    stream = speechsdk.AudioDataStream(result)
+    stream.save_to_wav_file(clip_dst_path)
+
+    # 判断是否合成成功
+    if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+        return True
+    else:
+        return False
+
+
+def tts_minimax(content_str, mp3_dst_path, topic):
     """调用minimax的tts接口，生成mp3文件"""
 
     if topic == "mama":
@@ -53,16 +125,17 @@ def controller_tts(topic):
     # remove .DS_Store using list comprehension
     all_channels = [channel for channel in all_channels if channel != ".DS_Store"]
     for channel in all_channels:
-        print(f"当前处理的频道是{channel}")
+        print(f"当前处理的频道是{channel}...")
         all_srt = os.listdir(os.path.join(zh_nowarp_srt_path, channel))
 
         # remove .DS_Store using list comprehension
         all_srt = [srt for srt in all_srt if srt != ".DS_Store"]
 
-        # create tts_mp3_path
+        # 创建目标tts mp3文件夹
         if not os.path.exists(os.path.join(tts_mp3_path, channel)):
             os.makedirs(os.path.join(tts_mp3_path, channel))
 
+        # 对每个中文字幕文件遍历，生成对应的mp3文件
         for srt_name in all_srt:
             srt_path = os.path.join(zh_nowarp_srt_path, channel, srt_name)
             srt_content = read_srt_file(srt_path)
@@ -76,21 +149,24 @@ def controller_tts(topic):
             # 生成字幕，并保存为mp3
             for sub_idx, subtitle in tqdm(enumerate(subtitles)):
                 tts_success = False
+
+                # 目标mp3 clip的路径
                 mp3_dst_path = os.path.join(
                     tts_mp3_path, channel, srt_basename, f"{sub_idx}.mp3"
                 )
-                # if mp3 already exists, skip
+
+                # 如果文件已经存在，则跳过
                 if os.path.exists(mp3_dst_path):
                     print(f"{srt_basename} {sub_idx} already exists!")
                     continue
 
                 while not tts_success:
-                    tts_success = tts(
+                    tts_success = tts_ms(
                         subtitle,
-                        os.path.join(
+                        clip_dst_path=os.path.join(
                             tts_mp3_path, channel, srt_basename, f"{sub_idx}.mp3"
                         ),
-                        topic,
+                        topic=topic,
                     )
                 print(f"{srt_basename} {sub_idx} tts done!")
 

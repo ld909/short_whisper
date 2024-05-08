@@ -119,7 +119,7 @@ def controller_srt(warp=False, topic="", jump30=True):
 
     exclude_channel = ["brocodez"]
 
-    # warp为True时，对过长的单条srt字幕进行切割，翻译的中文字幕保存在zh_srt/code文件夹下
+    # warp为True时，对过长的翻译后的中文srt字幕进行切割，翻译的中文字幕保存在zh_srt/code文件夹下
     if warp:
         print("warp为True，翻译的中文字幕进行split")
         dst_zh_srt_abs_path = f"/Users/donghaoliu/doc/video_material/zh_srt/{topic}"

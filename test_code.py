@@ -1,65 +1,64 @@
-from pydub import AudioSegment
+"""
+  For more samples please visit https://github.com/Azure-Samples/cognitive-services-speech-sdk 
+"""
+
+import azure.cognitiveservices.speech as speechsdk
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
 
 
-def cross_fade(pydub_audio):
-    """在音频的开头和结尾添加 cross fade 效果"""
-    # 设置 cross fade 时长 (以毫秒为单位)
-    fade_duration = 2000  # 1 秒
+def create_ssml_string(text, rate="1.05", yinse_name="zh-CN-YunjieNeural"):
+    # 创建根元素
+    speak = ET.Element(
+        "speak",
+        version="1.0",
+        xmlns="http://www.w3.org/2001/10/synthesis",
+        attrib={"xml:lang": "zh-CN"},
+    )
 
-    # 在开始和结束添加 cross fade 效果
-    audio_with_fade = pydub_audio.fade_in(fade_duration).fade_out(fade_duration)
-    return audio_with_fade
+    # 创建 voice 元素
+    voice = ET.SubElement(speak, "voice", name=yinse_name)
 
+    # 创建 prosody 元素
+    prosody = ET.SubElement(voice, "prosody", rate=rate)
 
-def truncate_or_repeat_audio(input_file, target_time):
-    """截断或重复 MP3 文件,以使其达到目标时长"""
-    # 读取 MP3 文件
-    audio = AudioSegment.from_file(input_file, format="mp3")
+    # 设置 prosody 元素的文本内容
+    prosody.text = text
 
-    # 获取 MP3 文件的原始时长
-    original_duration = audio.duration_seconds
+    # 创建 minidom 对象,用于格式化 XML
+    xml_str = ET.tostring(speak, "utf-8")
+    dom = minidom.parseString(xml_str)
 
-    # 如果目标时长小于或等于原始时长
-    if target_time <= original_duration:
-        # 截断 MP3 文件
-        audio = audio[: int(target_time * 1000)]  # 单位是毫秒
-    else:
-        # 重复 MP3 文件
-        num_repeats = int(target_time // original_duration)
-        remainder = target_time % original_duration
-        repeated_audio = audio * num_repeats
-        if remainder > 0:
-            repeated_audio += audio[: int(remainder * 1000)]
-        audio = repeated_audio
+    # 获取格式化后的 SSML 字符串
+    ssml_string = dom.toprettyxml(indent="    ", encoding="utf-8").decode("utf-8")
 
-    # 添加 cross fade 效果
-    audio = cross_fade(audio)
-
-    # 输出新的 MP3 文件
-    output_file = "./test_tts_mp3/bg.mp3"
-    audio.export(output_file, format="mp3")
-    return output_file
+    return ssml_string
 
 
-def combine_speech_bg(speech, background):
+def tts_ms(txt_string, topic):
+    # Creates an instance of a speech config with specified subscription key and service region.
+    speech_key = "cba10589e21e48dfb986f493e276b833"
+    service_region = "eastasia"
 
-    # 设置背景音乐的音量 (以 dB 为单位)
-    background_volume = -15  # 将背景音乐降低 10 dB
+    speech_config = speechsdk.SpeechConfig(
+        subscription=speech_key, region=service_region
+    )
 
-    # 合并 speech 和 background
-    combined = speech.overlay(background.apply_gain(background_volume))
+    speech_config.set_speech_synthesis_output_format(
+        speechsdk.SpeechSynthesisOutputFormat.Audio48Khz192KBitRateMonoMp3
+    )
 
-    # 保存合并后的音频
-    combined.export("./test_tts_mp3/combined.mp3", format="mp3")
+    speech_synthesizer = speechsdk.SpeechSynthesizer(
+        speech_config=speech_config, audio_config=None
+    )
+    # 示例用法
+    content = "如何学习python编程？今天我们来学习一下Python编程的基础知识。"
+    ssml_string = create_ssml_string(content)
 
+    # 将 SSML 字符串传递给语音合成函数
+    result = speech_synthesizer.speak_ssml_async(ssml_string).get()
+    # ssml_string = open("./test_ssml/ssml.xml", "r").read()
+    # result = speech_synthesizer.speak_ssml_async(ssml_string).get()
 
-# 使用示例
-# input_file = "/Users/donghaoliu/doc/video_material/tts_mp3/background/bg.mp3"
-# target_time = 14  # 目标时长为 120 秒
-# output_file = truncate_or_repeat_audio(input_file, target_time)
-# print(f"Output file: {output_file}")
-
-# 加载 speech 和 background 音乐
-speech = AudioSegment.from_file("./test_tts_mp3/output.mp3", format="mp3")
-background = AudioSegment.from_file("./test_tts_mp3/bg.mp3", format="mp3")
-combine_speech_bg(speech, background)
+    stream = speechsdk.AudioDataStream(result)
+    stream.save_to_wav_file("./file-Audio48Khz192KBitRateMonoMp3.mp3")

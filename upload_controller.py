@@ -57,9 +57,24 @@ def update_log(log_key, platform, date_time_str):
         file.write(json_data)
 
 
-def next_time_point(current_time):
+def next_time_point(current_time, chunk_split):
     # 检查当前时间的小时数
     hour = current_time.hour
+
+    # 开始时间是早上6点
+    start_hour = 6
+    # 结束时间是晚上22点
+    end_hour = 22
+
+    # 一共时间间隔
+    time_gap = (end_hour - start_hour) / chunk_split
+
+    # 四舍五入到最近的整数
+    time_gap = round(time_gap)
+    time_gap = int(time_gap)
+
+    # 计算从6点开始的所有时间点
+    all_time_points = [start_hour + time_gap * i for i in range(chunk_split)]
 
     # 如果当前时间小于当前时间
     if current_time < datetime.now():
@@ -67,20 +82,29 @@ def next_time_point(current_time):
         next_time = datetime.now().replace(
             hour=6, minute=0, second=0, microsecond=0
         ) + timedelta(days=1)
+    # 如果当前时间在所有时间点之前,除开最后一个时间点
+    if current_time.hour in all_time_points[:-1]:
+        next_time = current_time + timedelta(hours=time_gap)
 
-    # 如果当前时间是6点，+5小时，即11点
-    elif hour == 6:
-        next_time = current_time + timedelta(hours=5)
-    # 如果当前时间是11点，+7小时，即18点
-    elif hour == 11:
-        next_time = current_time + timedelta(hours=7)
-    # 如果当前时间是18点，+3小时，即21点
-    elif hour == 18:
-        next_time = current_time + timedelta(hours=3)
+    # 如果当前时间是最后一个时间点，设定下一个时间是明天早上6点
+    elif current_time.hour == all_time_points[-1]:
+        next_time = current_time.replace(
+            hour=6, minute=0, second=0, microsecond=0
+        ) + timedelta(days=1)
 
-    # 如果当前时间是21点，+9小时，即下一天6点
-    elif hour == 21:
-        next_time = current_time + timedelta(hours=9)
+    # # 如果当前时间是6点，+5小时，即11点
+    # elif hour == 6:
+    #     next_time = current_time + timedelta(hours=5)
+    # # 如果当前时间是11点，+7小时，即18点
+    # elif hour == 11:
+    #     next_time = current_time + timedelta(hours=7)
+    # # 如果当前时间是18点，+3小时，即21点
+    # elif hour == 18:
+    #     next_time = current_time + timedelta(hours=3)
+
+    # # 如果当前时间是21点，+9小时，即下一天6点
+    # elif hour == 21:
+    #     next_time = current_time + timedelta(hours=9)
 
     return next_time
 
@@ -97,7 +121,7 @@ def load_ref_json(topic):
     return json.load(open(ref_json_path))
 
 
-def get_upload_time(uploaded_platforms, upload_log, log_key):
+def get_upload_time(uploaded_platforms, upload_log, log_key, topic):
     """根据上传情况，返回下一次上传的时间。"""
     if 0 < len(uploaded_platforms) < 3:
         #  "部分上传"
@@ -108,32 +132,26 @@ def get_upload_time(uploaded_platforms, upload_log, log_key):
         # convert upload time str from 'year-month-day-hour-min' to datetime
         upload_time_obj = datetime.strptime(upload_time_str, "%Y-%m-%d-%H-%M")
 
-    # elif len(uploaded_platforms) == 3:
     else:
-        # "全部上传" 或全部未上传
-
+        # "全部上传" 或从未上传
         partial_upload_time_obj = get_the_latest_upload_time(upload_log)
         print(
             "最新已上传的视频上传时间：",
             partial_upload_time_obj.strftime("%Y-%m-%d %H:%M"),
         )
 
-        # add 3 hours to the latest upload time
-        upload_time_obj = next_time_point(partial_upload_time_obj)
-        # print("获取下一个视频上传时间：", upload_time_obj.strftime("%Y-%m-%d %H:%M")）
+        if topic == "code":
+            split_chunk = 12
+        elif topic == "mama":
+            split_chunk == 6
 
-    # elif len(uploaded_platforms) == 0:
-    #     # "未上传"
-    #     print("未上传")
-    #     # 设定上传时间:北京时间明天早上6点
-    #     upload_time_obj = datetime.now() + timedelta(days=1)
-    #     upload_time_obj = upload_time_obj.replace(hour=6, minute=0, second=0)
-    # print("为上传，下一个视频上传时间：", upload_time_obj.strftime("%Y-%m-%d %H:%M")
+        # 得到下一个视频上传时间
+        upload_time_obj = next_time_point(partial_upload_time_obj, split_chunk)
 
     return upload_time_obj
 
 
-def upload_all_platforms():
+def upload_all_platforms(topic):
 
     zh_mp4_path = "/Volumes/dhl/ytb-videos/tts_mp4"
     zh_title_path = "/Users/donghaoliu/doc/video_material/zh_title"
@@ -142,7 +160,6 @@ def upload_all_platforms():
     thumbnail_horizontal_path = (
         "/Users/donghaoliu/doc/video_material/thumbnail_horizontal"
     )
-    topic = "code"
     ref_dict = load_ref_json(topic)
     # get all channels from the ref.json file
     channels = read_channels_from_ref_json(topic)
@@ -222,7 +239,9 @@ def upload_all_platforms():
             )
 
             # get the upload time
-            upload_time_obj = get_upload_time(uploaded_platforms, upload_log, log_key)
+            upload_time_obj = get_upload_time(
+                uploaded_platforms, upload_log, log_key, topic
+            )
             print(
                 "获取下一个视频上传时间：", upload_time_obj.strftime("%Y-%m-%d %H:%M")
             )

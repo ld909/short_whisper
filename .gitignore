@@ -9,6 +9,6 @@
 /short/cookies/
 /short/driver/
 /test_tts_mp3/
-
+/test_ssml/
 # ignore all mp3 files
 *.mp3
