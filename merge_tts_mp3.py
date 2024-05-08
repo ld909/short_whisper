@@ -76,7 +76,7 @@ def combine_speech_bg(speech, background):
     return combined
 
 
-def merge_mp3tomp4(srt_file_path, video_file_path, chinese_audio_files):
+def merge_mp3tomp4(srt_file_path, video_file_path, chinese_audio_files, bg_music):
     """把mp3和mp4合成为新视频"""
 
     srt_content = read_srt_file(srt_file_path)
@@ -126,14 +126,16 @@ def merge_mp3tomp4(srt_file_path, video_file_path, chinese_audio_files):
     for audio in new_mp3_list:
         final_audio += audio
 
-    # 添加背景音乐
-    bg_audio = AudioSegment.from_file(
-        "/Users/donghaoliu/doc/video_material/tts_mp3/background/bg.mp3", format="mp3"
-    )
-    bg_audio = truncate_or_repeat_audio(bg_audio, final_video.duration)
+    if bg_music:
+        # 添加背景音乐
+        bg_audio = AudioSegment.from_file(
+            "/Users/donghaoliu/doc/video_material/tts_mp3/background/bg.mp3",
+            format="mp3",
+        )
+        bg_audio = truncate_or_repeat_audio(bg_audio, final_video.duration)
 
-    # 合并音频
-    final_audio = combine_speech_bg(final_audio, bg_audio)
+        # 合并音频
+        final_audio = combine_speech_bg(final_audio, bg_audio)
 
     # 保存音频为临时文件，使用后删除
     temp_audio = tempfile.NamedTemporaryFile()
@@ -182,11 +184,6 @@ def truncate_or_repeat_audio(audio, target_time):
 
     return audio
 
-    # 输出新的 MP3 文件
-    # output_file = "./test_tts_mp3/bg.mp3"
-    # audio.export(output_file, format="mp3")
-    # return output_file
-
 
 def merge_mp4_controller(topic):
     tts_path = f"/Users/donghaoliu/doc/video_material/tts_mp3/{topic}"
@@ -234,6 +231,34 @@ def merge_mp4_controller(topic):
             ]
             final_video = merge_mp3tomp4(cur_srt_path, mp4_path, chinese_audio_clips)
             final_video.write_videofile(dst_mp4_path)
+
+
+def merge_mp4_controller_single(
+    tts_mp3_path,
+    mp4_path,
+    channel,
+    tts_folder_name,
+    dst_mp4_path,
+    cur_zh_srt_path,
+    bg_music=True,
+):
+
+    # 合并mp3和mp4
+    # dst_mp4_path = os.path.join(dst_merged_mp4_path, channel, f"{tts_folder_name}.mp4")
+    # 如果文件已经存在，则跳过
+    # if os.path.exists(dst_mp4_path):
+    #     print(f"{dst_mp4_path} 已经存在，跳过...")
+    #     return
+    print(f"处理 {tts_folder_name} ，位于频道 {channel}")
+    # cur_zh_srt_path = os.path.join(srt_path, channel, f"{tts_done}.srt")
+    # mp4_path = os.path.join(video_path, channel, f"{tts_done}.mp4")
+    # tts_mp3_path = os.path.join(tts_channel_path, tts_done)
+    mp3 = get_sorted_mp3_list(tts_mp3_path)
+    chinese_audio_clips = [os.path.join(tts_mp3_path, mp3_file) for mp3_file in mp3]
+    final_video = merge_mp3tomp4(
+        cur_zh_srt_path, mp4_path, chinese_audio_clips, bg_music
+    )
+    final_video.write_videofile(dst_mp4_path)
 
 
 if __name__ == "__main__":

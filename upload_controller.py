@@ -58,6 +58,7 @@ def update_log(log_key, platform, date_time_str):
 
 
 def next_time_point(current_time, chunk_split):
+    """根据当前时间，返回下一个视频上传时间。"""
 
     # 开始时间是早上6点
     start_hour = 6

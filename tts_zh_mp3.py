@@ -171,6 +171,46 @@ def controller_tts(topic):
                 print(f"{srt_basename} {sub_idx} tts done!")
 
 
+def controller_tts_single(
+    zh_srt_path,
+    tts_mp3_path,
+    channel,
+):
+    srt_path = zh_srt_path
+    srt_content = read_srt_file(srt_path)
+    _, subtitles = parse_srt_with_re(srt_content)
+    srt_file_name = os.path.basename(srt_path)
+    srt_basename = os.path.splitext(srt_file_name)[0]
+
+    # 创建一个文件夹，用于存放每个字幕的mp3 clips
+    if not os.path.exists(os.path.join(tts_mp3_path, channel, srt_basename)):
+        os.makedirs(os.path.join(tts_mp3_path, channel, srt_basename))
+
+    # 生成字幕，并保存为mp3
+    for sub_idx, subtitle in tqdm(enumerate(subtitles)):
+        tts_success = False
+
+        # 目标mp3 clip的路径
+        mp3_dst_path = os.path.join(
+            tts_mp3_path, channel, srt_basename, f"{sub_idx}.mp3"
+        )
+
+        # 如果文件已经存在，则跳过
+        if os.path.exists(mp3_dst_path):
+            print(f"{srt_basename} {sub_idx} already exists!")
+            continue
+
+        while not tts_success:
+            tts_success = tts_ms(
+                subtitle,
+                clip_dst_path=os.path.join(
+                    tts_mp3_path, channel, srt_basename, f"{sub_idx}.mp3"
+                ),
+                topic=topic,
+            )
+        print(f"{srt_basename} {sub_idx} tts done!")
+
+
 def get_sorted_mp3_list(folder_path):
     # 获取文件夹内所有 MP3 文件
     mp3_files = [file for file in os.listdir(folder_path) if file.endswith(".mp3")]

@@ -156,6 +156,9 @@ def get_zh_title_tags(topic):
                         f.write(tag + "\n")
 
 
+def zh_title_tags_controller_single(topic):
+    
+
 if __name__ == "__main__":
     topic = "code"
     get_zh_title_tags(topic)
