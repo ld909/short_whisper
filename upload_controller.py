@@ -57,7 +57,7 @@ def update_log(log_key, platform, date_time_str):
         file.write(json_data)
 
 
-def next_time_point(current_time, chunk_split):
+def next_time_point(current_time, chunk_split=8):
     """根据当前时间和时间间隔，返回下一个时间点。"""
 
     # 开始时间是早上6点
@@ -127,7 +127,7 @@ def get_upload_time(uploaded_platforms, upload_log, log_key, topic):
         )
 
         if topic == "code":
-            split_chunk = 12
+            split_chunk = 8
         elif topic == "mama":
             split_chunk == 6
 
@@ -214,14 +214,14 @@ def upload_all_platforms(topic):
                 thumbnail_vertical_path,
                 topic,
                 channel,
-                thunbnail_basename + ".png",
+                thunbnail_basename + "_title.png",
             )
 
             thumbnail_png_horizontal = os.path.join(
                 thumbnail_horizontal_path,
                 topic,
                 channel,
-                thunbnail_basename + ".png",
+                thunbnail_basename + "_title.png",
             )
 
             # get the upload time
@@ -307,4 +307,5 @@ def upload_all_platforms(topic):
 
 
 if __name__ == "__main__":
-    upload_all_platforms()
+    topic = "code"
+    upload_all_platforms(topic=topic)

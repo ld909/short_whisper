@@ -302,6 +302,7 @@ def random_bg_horizontal():
 
 def read_zh_title(zh_title_path):
     """read chinese title corresponding file"""
+    print("Reading: ", zh_title_path)
     with open(zh_title_path, "r", encoding="utf-8") as f:
         return f.read().strip()
 
@@ -313,21 +314,23 @@ def create_zh_title_thumbnail_vertical():
     dst_thumbnail_path = "/Users/donghaoliu/doc/video_material/thumbnail_vertical"
 
     topic = "code"
-    # remove .DS_Store using list comprehension
-
-    ref_dict = load_ref_json("code")
 
     # read all channels from ref_dict
-    all_channels = read_channels_from_ref_json(topic)
+    all_channels = os.listdir(os.path.join(zh_title_src_path, topic))
+
+    # remove .DS_Store using list comprehension
+    all_channels = [channel for channel in all_channels if channel != ".DS_Store"]
 
     for channel in all_channels:
-        all_titles = list(ref_dict[channel].keys())
+        all_txt = os.listdir(os.path.join(zh_title_src_path, topic, channel))
+        # remove .DS_Store using list comprehension
+        all_txt = [txt for txt in all_txt if txt != ".DS_Store"]
 
         # 如果topic和channel文件夹不存在，创建他们
         if not os.path.exists(os.path.join(dst_thumbnail_path, topic, channel)):
             os.makedirs(os.path.join(dst_thumbnail_path, topic, channel))
 
-        for title in all_titles:
+        for title in all_txt:
             base_name = os.path.splitext(title)[0]
             dst_file_name = base_name + ".png"
             if os.path.exists(
@@ -337,11 +340,12 @@ def create_zh_title_thumbnail_vertical():
                 continue
             print("Creating thumbnail for: ", title)
 
-            map_title = ref_dict[channel][title]
-            map_base_name = os.path.splitext(map_title)[0]
+            # map_title = ref_dict[channel][title]
+            # map_base_name = os.path.splitext(map_title)[0]
 
             bg_image_path = random_bg()
-            map_title = ref_dict[channel][title]
+            map_title = title
+            # map_title = ref_dict[channel][title]
             map_base_name = os.path.splitext(map_title)[0]
 
             if "_clip_" in base_name:
@@ -352,7 +356,7 @@ def create_zh_title_thumbnail_vertical():
                             zh_title_src_path,
                             topic,
                             channel,
-                            map_base_name + "_title.txt",
+                            map_base_name + ".txt",
                         )
                     )
                     + f" - {clip_id}"
@@ -363,7 +367,7 @@ def create_zh_title_thumbnail_vertical():
                         zh_title_src_path,
                         topic,
                         channel,
-                        map_base_name + "_title.txt",
+                        map_base_name + ".txt",
                     )
                 )
             # Chinese title position on the thumbnail bg image
@@ -400,21 +404,20 @@ def create_zh_title_thumbnail_horizontal():
 
     topic = "code"
 
+    all_channels = os.listdir(os.path.join(zh_title_src_path, topic))
     # remove .DS_Store using list comprehension
-
-    ref_dict = load_ref_json(topic)
-
-    all_channels = read_channels_from_ref_json(topic)
+    all_channels = [channel for channel in all_channels if channel != ".DS_Store"]
 
     for channel in all_channels:
-
-        all_titles = ref_dict[channel].keys()
 
         # 如果topic和channel文件夹不存在，创建他们
         if not os.path.exists(os.path.join(dst_thumbnail_path, topic, channel)):
             os.makedirs(os.path.join(dst_thumbnail_path, topic, channel))
 
-        for title in all_titles:
+        all_txt = os.listdir(os.path.join(zh_title_src_path, topic, channel))
+        # remove .DS_Store using list comprehension
+        all_txt = [txt for txt in all_txt if txt != ".DS_Store"]
+        for title in all_txt:
             base_name = os.path.splitext(title)[0]
             dst_file_name = base_name + ".png"
             if os.path.exists(
@@ -422,12 +425,12 @@ def create_zh_title_thumbnail_horizontal():
             ):
                 print(f"{dst_file_name} 文件存在, 跳过继续...")
                 continue
-            print("Creating thumbnail for: ", title)
+            print("创建 thumbnail for: ", title, "频道:", channel)
 
             bg_image_path = random_bg_horizontal()
 
-            map_title = ref_dict[channel][title]
-            map_base_name = os.path.splitext(map_title)[0]
+            # map_title = ref_dict[channel][title]
+            map_base_name = base_name
 
             if "_clip_" in base_name:
                 clip_id = base_name.split("_clip_")[-1]
@@ -437,7 +440,7 @@ def create_zh_title_thumbnail_horizontal():
                             zh_title_src_path,
                             topic,
                             channel,
-                            map_base_name + "_title.txt",
+                            map_base_name + ".txt",
                         )
                     )
                     + f" - {clip_id}"
@@ -448,7 +451,7 @@ def create_zh_title_thumbnail_horizontal():
                         zh_title_src_path,
                         topic,
                         channel,
-                        map_base_name + "_title.txt",
+                        map_base_name + ".txt",
                     )
                 )
             # Chinese title position on the thumbnail bg image
