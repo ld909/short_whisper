@@ -3,6 +3,7 @@ import os
 from translate_srt import controller_translate_srt_single, get_duration
 from tts_zh_mp3 import controller_tts_single
 from merge_tts_mp3 import merge_mp4_controller_single
+from get_zh_title import zh_title_tags_controller_single
 
 
 def controller_after_whisper(topic):
@@ -16,6 +17,8 @@ def controller_after_whisper(topic):
     # 目标文件路径
     dst_zh_srt_abs_path = f"/Users/donghaoliu/doc/video_material/zh_srt_nowarp/{topic}"
     dst_merged_mp4_path = f"/Volumes/dhl/ytb-videos/tts_mp4/{topic}"
+    zh_title_dst_path = "/Users/donghaoliu/doc/video_material/zh_title"
+    zh_tag_dst_path = "/Users/donghaoliu/doc/video_material/zh_tag"
 
     # 所有频道，依赖fomat_srt文件夹
     all_channels = os.listdir(format_srt)
@@ -59,6 +62,12 @@ def controller_after_whisper(topic):
         # 创建mp4合并mp3的mp4存放目录，如果不存在
         if not os.path.exists(dst_merged_mp4_path):
             os.makedirs(dst_merged_mp4_path)
+
+        # 创建中文tag和title的文件夹
+        if not os.path.exists(os.path.join(zh_title_dst_path, topic, channel)):
+            os.makedirs(os.path.join(zh_title_dst_path, topic, channel))
+        if not os.path.exists(os.path.join(zh_tag_dst_path, topic, channel)):
+            os.makedirs(os.path.join(zh_tag_dst_path, topic, channel))
         ### 完成创建
 
         # 遍历所有的srt文件
@@ -111,3 +120,17 @@ def controller_after_whisper(topic):
                 cur_zh_srt_path=cur_zh_srt_path,
             )
 
+            ###### step4: get chinese tag and titles ######
+            title_dst_path = os.path.join(
+                zh_title_dst_path, topic, channel, tts_folder_name + ".txt"
+            )
+            tag_dst_path = os.path.join(
+                zh_tag_dst_path, topic, channel, tts_folder_name + ".txt"
+            )
+            zh_title_tags_controller_single(
+                srt_file_name=srt,
+                zh_title_dst_path=title_dst_path,
+                zh_tag_dst_path=tag_dst_path,
+            )
+
+            ###### step5: 创建封面 ######

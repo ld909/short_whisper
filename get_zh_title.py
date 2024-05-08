@@ -5,11 +5,7 @@ from tqdm import tqdm
 
 
 def translate_to_zh_title(eng_title, topic):
-    client = anthropic.Anthropic(
-        # defaults to os.environ.get("ANTHROPIC_API_KEY")
-        # api_key=api_key,
-        api_key=os.environ.get("ANTHROPIC_API_KEY")
-    )
+    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
     if topic == "code":
         prompt_txt = f"""我有一个英文视频的名称，视频是关于变成或者计算机科学的话题，请准确翻译相关专业词汇。请注意，英文名可能包含emoji等表情符号，返回的结果中请剔除这些emoji等符号，我要得到纯净的中文翻译结果。直接返回翻译后的中文标题，不需要其他多余信息。英文标题是：{eng_title}"""
     elif topic == "mama":
@@ -96,8 +92,6 @@ def get_zh_title_tags(topic):
 
             # if channel folder does not exist in dst path, create one
             if not os.path.exists(os.path.join(zh_title_dst_path, topic, channel)):
-
-                # make directory
                 os.makedirs(os.path.join(zh_title_dst_path, topic, channel))
 
             if not os.path.exists(os.path.join(zh_tag_dst_path, topic, channel)):
@@ -156,8 +150,41 @@ def get_zh_title_tags(topic):
                         f.write(tag + "\n")
 
 
-def zh_title_tags_controller_single(topic):
-    
+def zh_title_tags_controller_single(srt_file_name, zh_title_dst_path, zh_tag_dst_path):
+    """得到中文标题和中文tag，写入到指定的文件中"""
+
+    # get the base name of the srt file
+    base_name = os.path.splitext(srt_file_name)[0]
+    dst_file_name = base_name + ".txt"
+
+    # 得到英文标题，即srt文件的base name
+    eng_title = base_name
+
+    # using claude 3 to translate the eng title to zh title
+    title_zh = translate_to_zh_title(eng_title, topic)
+    print(f"英文标题：{eng_title}")
+    print(f"中文标题：{title_zh}")
+
+    tags_zh = claude3_zh_tag(title_zh)
+    # convert from string to json
+    tags_zh = eval(tags_zh)
+    print(f"中文tag：{tags_zh}")
+
+    # write the zh title to the dst file
+    with open(zh_title_dst_path, "w") as f:
+        f.write(title_zh)
+    print(f"write {title_zh} to {dst_file_name}")
+    print("*" * 50)
+
+    # write the zh tags to the dst file
+    with open(
+        zh_tag_dst_path,
+        "w",
+        encoding="utf-8",
+    ) as f:
+        for tag in tags_zh:
+            f.write(tag + "\n")
+
 
 if __name__ == "__main__":
     topic = "code"
