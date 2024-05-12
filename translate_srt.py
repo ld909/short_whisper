@@ -114,7 +114,9 @@ def wrap_srt_text_chinese(subtitle_text, max_length=25, timestamps=None):
 def controller_translate_srt_single(eng_srt_path, dst_zh_srt_path, topic):
     """Translate the formatted English srt files to Chinese srt files using Claude-3 Haiku."""
 
-    eng_srt_abs_path = f"/home/dhl/Documents/video_material/format_srt/{topic}"
+    if os.path.exists(dst_zh_srt_path):
+        print(f"{dst_zh_srt_path} 文件存在, 跳过继续...")
+        return
 
     # parse the srt file
     srt_read = read_srt_file(eng_srt_path)
@@ -149,11 +151,6 @@ def controller_translate_srt_single(eng_srt_path, dst_zh_srt_path, topic):
     # assert the number of translated subtitles is the same as the original subtitles
     assert len(zh_srt) == len(subtitles) == len(timestamps)
 
-    # save the translated subtitles and timestamps to a new file
-    # 检查目标folder是否存在，不存在就创建
-    if not os.path.exists(dst_zh_srt_path):
-        os.makedirs(dst_zh_srt_path)
-
     ts_list = timestamps
     srt_zh_list = zh_srt
 
@@ -161,16 +158,16 @@ def controller_translate_srt_single(eng_srt_path, dst_zh_srt_path, topic):
     assert len(ts_list) == len(srt_zh_list)
 
     # 写入目标srt文件
-    with open(eng_srt_abs_path, "w") as f:
+    with open(dst_zh_srt_path, "w") as f:
         for i in range(len(srt_zh_list)):
             f.write(str(i + 1) + "\n")
             f.write(ts_list[i][0] + " --> " + ts_list[i][1] + "\n")
             # if not the last sentence, add a \n\n
             if i != len(srt_zh_list) - 1:
-                f.write(srt_zh_list[i] + "\n\n")
+                f.write(srt_zh_list[i].replace(" ", "") + "\n\n")
             # if the last sentence, add nothing
             else:
-                f.write(srt_zh_list[i])
+                f.write(srt_zh_list[i].replace(" ", ""))
 
 
 def controller_srt(warp=False, topic="", jump30=True):

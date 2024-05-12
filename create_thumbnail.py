@@ -395,12 +395,10 @@ def create_zh_title_thumbnail_vertical_single(
 ):
     """针对一个srt文件创建竖直封面"""
 
-    # base_name = os.path.splitext(title)[0]
-    # dst_file_name = base_name + ".png"
     if os.path.exists(dst_thumbnail_path):
-        print(f"{dst_thumbnail_path} 封面存在, 跳过继续...")
+        print(f"@@@@@{dst_thumbnail_path} 封面存在, 跳过继续...")
         return
-    print(f"创建封面 for: {dst_thumbnail_path}....")
+    print(f"创建封面 @@@@@@@: {dst_thumbnail_path}....")
 
     bg_image_path = random_bg()
 

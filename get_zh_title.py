@@ -150,8 +150,15 @@ def get_zh_title_tags(topic):
                         f.write(tag + "\n")
 
 
-def zh_title_tags_controller_single(srt_file_name, zh_title_dst_path, zh_tag_dst_path):
+def zh_title_tags_controller_single(
+    srt_file_name, zh_title_dst_path, zh_tag_dst_path, topic
+):
     """得到中文标题和中文tag，写入到指定的文件中"""
+
+    # 如果文件已经存在，则跳过
+    if os.path.exists(zh_title_dst_path) and os.path.exists(zh_tag_dst_path):
+        print(f"{srt_file_name} 中文title和tag 存在，跳过继续!")
+        return
 
     # get the base name of the srt file
     base_name = os.path.splitext(srt_file_name)[0]

@@ -1,15 +1,17 @@
+from sys import argv
 import requests
 from srt_format import read_srt_file, parse_srt_with_re
 import os
 from tqdm import tqdm
 from srt_format import time_str_to_obj
-
+import time
 import azure.cognitiveservices.speech as speechsdk
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+from aliyun_tts import aliyun_tts_single
 
 
-def create_ssml_string(text, rate="1.05", yinse_name="zh-CN-YunjieNeural"):
+def create_ssml_string(text, rate="1.1", yinse_name="zh-CN-YunjieNeural"):
     """创建SSML字符串"""
     # 创建根元素
     speak = ET.Element(
@@ -57,7 +59,7 @@ def tts_ms(txt_string, topic, clip_dst_path):
         speech_config=speech_config, audio_config=None
     )
     if topic == "mama":
-        yinse_name = ""
+        yinse_name = "zh-CN-XiaochenNeural"
     elif topic == "code":
         yinse_name = "zh-CN-YunjieNeural"
     # 构造SSML字符串
@@ -171,11 +173,8 @@ def controller_tts(topic):
                 print(f"{srt_basename} {sub_idx} tts done!")
 
 
-def controller_tts_single(
-    zh_srt_path,
-    tts_mp3_path,
-    channel,
-):
+def controller_tts_single(zh_srt_path, tts_mp3_path, channel, topic):
+
     srt_path = zh_srt_path
     srt_content = read_srt_file(srt_path)
     _, subtitles = parse_srt_with_re(srt_content)
@@ -200,14 +199,22 @@ def controller_tts_single(
             print(f"{srt_basename} {sub_idx} already exists!")
             continue
 
-        while not tts_success:
-            tts_success = tts_ms(
-                subtitle,
-                clip_dst_path=os.path.join(
-                    tts_mp3_path, channel, srt_basename, f"{sub_idx}.mp3"
-                ),
-                topic=topic,
+        ## 使用azure tts
+        if topic == "mama":
+            while not tts_success:
+                tts_success = tts_ms(
+                    subtitle,
+                    clip_dst_path=os.path.join(
+                        tts_mp3_path, channel, srt_basename, f"{sub_idx}.mp3"
+                    ),
+                    topic=topic,
+                )
+        ## 使用aliyun tts
+        elif topic == "code":
+            aliyun_tts_single(
+                text=subtitle.replace(" ", ""), mp3_dst=mp3_dst_path, num=2, mp3_speed=0
             )
+            time.sleep(0.5)
         print(f"{srt_basename} {sub_idx} tts done!")
 
 
@@ -270,6 +277,6 @@ def ts_to_duration(ts_list):
 
 
 if __name__ == "__main__":
-    topic = "code"
+
     controller_tts(topic=topic)
     # controller_merge_single_mp3(topic)

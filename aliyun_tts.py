@@ -1,6 +1,6 @@
 import os
+import threading
 import nls
-
 
 URL = "wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1"
 TOKEN = "d14ca8b458664d089714dbce3ddf1347"  # 参考https://help.aliyun.com/document_detail/450255.html 获取token
@@ -79,7 +79,3 @@ def aliyun_tts_single(
         name = "task" + str(i)
         t = TestTts(name, mp3_dst, mp3_speed)
         t.start(text)
-
-
-if __name__ == "__main__":
-    aliyun_tts_single("在评论区留下你最喜欢的css框架", "./test_tts_mp3/aliyun.mp3", 0)

@@ -10,8 +10,8 @@ from srt_format import read_srt_file, parse_srt_with_re
 from tts_zh_mp3 import get_sorted_mp3_list
 from srt_format import time_str_to_obj
 from tqdm import tqdm
-
-
+from merge_srt_video import get_duration
+import time
 from moviepy.editor import VideoFileClip
 from datetime import timedelta
 
@@ -76,7 +76,13 @@ def combine_speech_bg(speech, background):
     return combined
 
 
-def merge_mp3tomp4(srt_file_path, video_file_path, chinese_audio_files, bg_music):
+def merge_mp3tomp4(
+    srt_file_path,
+    video_file_path,
+    chinese_audio_files,
+    bg_music,
+    merge_mp3_single_path=None,
+):
     """把mp3和mp4合成为新视频"""
 
     srt_content = read_srt_file(srt_file_path)
@@ -138,10 +144,12 @@ def merge_mp3tomp4(srt_file_path, video_file_path, chinese_audio_files, bg_music
         final_audio = combine_speech_bg(final_audio, bg_audio)
 
     # 保存音频为临时文件，使用后删除
-    temp_audio = tempfile.NamedTemporaryFile()
-    final_audio.export(temp_audio.name, format="mp3")
+    # temp_audio = tempfile.NamedTemporaryFile()
+    final_audio.export(merge_mp3_single_path, format="mp3")
+    time.sleep(3)
+
     # 从临时文件中加载音频，使用moviepy的AudioFileClip
-    final_audio = AudioFileClip(temp_audio.name)
+    final_audio = AudioFileClip(merge_mp3_single_path)
     # 将音频添加到视频中
     final_video = final_video.set_audio(final_audio)
 
@@ -241,22 +249,23 @@ def merge_mp4_controller_single(
     dst_mp4_path,
     cur_zh_srt_path,
     bg_music=True,
+    merge_mp3_single_path=None,
 ):
 
-    # 合并mp3和mp4
-    # dst_mp4_path = os.path.join(dst_merged_mp4_path, channel, f"{tts_folder_name}.mp4")
-    # 如果文件已经存在，则跳过
-    # if os.path.exists(dst_mp4_path):
-    #     print(f"{dst_mp4_path} 已经存在，跳过...")
-    #     return
+    # get merged mp3 duration
+    if os.path.exists(dst_mp4_path) and os.path.exists(merge_mp3_single_path):
+        mp3_merged_duraion = get_duration(merge_mp3_single_path)
+        pre_done_mp4_duration = get_duration(dst_mp4_path)
+        if pre_done_mp4_duration / mp3_merged_duraion > 0.98:
+            print(f"!@!@!@{dst_mp4_path} 视频合并完成,不进行重复合成，跳过继续...")
+            return
+
     print(f"处理 {tts_folder_name} ，位于频道 {channel}")
-    # cur_zh_srt_path = os.path.join(srt_path, channel, f"{tts_done}.srt")
-    # mp4_path = os.path.join(video_path, channel, f"{tts_done}.mp4")
-    # tts_mp3_path = os.path.join(tts_channel_path, tts_done)
+
     mp3 = get_sorted_mp3_list(tts_mp3_path)
     chinese_audio_clips = [os.path.join(tts_mp3_path, mp3_file) for mp3_file in mp3]
     final_video = merge_mp3tomp4(
-        cur_zh_srt_path, mp4_path, chinese_audio_clips, bg_music
+        cur_zh_srt_path, mp4_path, chinese_audio_clips, bg_music, merge_mp3_single_path
     )
     final_video.write_videofile(dst_mp4_path)
 
