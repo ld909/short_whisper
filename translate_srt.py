@@ -111,12 +111,10 @@ def wrap_srt_text_chinese(subtitle_text, max_length=25, timestamps=None):
         return new_lines, new_timestamps
 
 
-def controller_translate_srt_single(eng_srt_path, dst_zh_srt_path):
-    
-    
+def controller_translate_srt_single(eng_srt_path, dst_zh_srt_path, topic):
     """Translate the formatted English srt files to Chinese srt files using Claude-3 Haiku."""
 
-    eng_srt_abs_path = f"/Users/donghaoliu/doc/video_material/format_srt/{topic}"
+    eng_srt_abs_path = f"/home/dhl/Documents/video_material/format_srt/{topic}"
 
     # parse the srt file
     srt_read = read_srt_file(eng_srt_path)
@@ -178,18 +176,18 @@ def controller_translate_srt_single(eng_srt_path, dst_zh_srt_path):
 def controller_srt(warp=False, topic="", jump30=True):
     """Translate the formatted English srt files to Chinese srt files using Claude-3 Haiku."""
 
-    eng_srt_abs_path = f"/Users/donghaoliu/doc/video_material/format_srt/{topic}"
+    eng_srt_abs_path = f"/home/dhl/Documents/video_material/format_srt/{topic}"
     mp4_abs_path = f"/Volumes/dhl/ytb-videos/{topic}"
 
     # warp为True时，对过长的翻译后的中文srt字幕进行切割，翻译的中文字幕保存在zh_srt/code文件夹下
     if warp:
         print("warp为True，翻译的中文字幕进行split")
-        dst_zh_srt_abs_path = f"/Users/donghaoliu/doc/video_material/zh_srt/{topic}"
+        dst_zh_srt_abs_path = f"/home/dhl/Documents/video_material/zh_srt/{topic}"
     # warp为False时，不切割过长单条srt字幕，翻译的中文字幕保存在zh_srt_nowarp/code文件夹下
     else:
         print("warp为False，翻译的中文字幕不进行split")
         dst_zh_srt_abs_path = (
-            f"/Users/donghaoliu/doc/video_material/zh_srt_nowarp/{topic}"
+            f"/home/dhl/Documents/video_material/zh_srt_nowarp/{topic}"
         )
 
     all_channels = os.listdir(eng_srt_abs_path)
@@ -208,7 +206,7 @@ def controller_srt(warp=False, topic="", jump30=True):
             # 得到已经完成翻译的字幕列表
             formatted_srts_warp = os.listdir(
                 os.path.join(
-                    f"/Users/donghaoliu/doc/video_material/zh_srt/{topic}",
+                    f"/home/dhl/Documents/video_material/zh_srt/{topic}",
                     channel_single,
                 )
             )

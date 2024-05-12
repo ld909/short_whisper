@@ -390,6 +390,46 @@ def create_zh_title_thumbnail_vertical():
             )
 
 
+def create_zh_title_thumbnail_vertical_single(
+    dst_thumbnail_path, zh_title_path, vertical_font_path
+):
+    """针对一个srt文件创建竖直封面"""
+
+    # base_name = os.path.splitext(title)[0]
+    # dst_file_name = base_name + ".png"
+    if os.path.exists(dst_thumbnail_path):
+        print(f"{dst_thumbnail_path} 封面存在, 跳过继续...")
+        return
+    print(f"创建封面 for: {dst_thumbnail_path}....")
+
+    bg_image_path = random_bg()
+
+    # 读取中文标题
+    zh_title = read_zh_title(zh_title_path)
+
+    # Chinese title position on the thumbnail bg image
+    position = (160, 180)  # 文本的起始位置
+
+    # chinese font path
+    # font_path = "/Users/donghaoliu/doc/video_material/font/DottedSongtiCircleRegular.otf"  # 字体文件路径
+    font_size = 100  # 字体大小
+    right_padding = 100  # 文本到图像右边缘的距离
+
+    # 贴中文标题到背景图像上
+    merged_thumbnail_img = draw_ch_title_on_image(
+        bg_image_path,
+        zh_title,
+        position,
+        vertical_font_path,
+        font_size,
+        right_padding,
+    )
+
+    # save the image to the destination folder
+    merged_thumbnail_img.save(dst_thumbnail_path)
+    print(f"封面{dst_thumbnail_path}创建完成！")
+
+
 def create_zh_title_thumbnail_horizontal():
     """Create thumbnail for Chinese title"""
 

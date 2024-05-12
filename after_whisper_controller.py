@@ -1,24 +1,32 @@
-# 这个是运行在在linux上whisper识别srt之后，主要的逻辑都在这里
+##### 这个是运行在在linux上whisper识别srt之后
+##### 主要的逻辑都在这里
 import os
 from translate_srt import controller_translate_srt_single, get_duration
 from tts_zh_mp3 import controller_tts_single
 from merge_tts_mp3 import merge_mp4_controller_single
 from get_zh_title import zh_title_tags_controller_single
+from create_thumbnail import create_zh_title_thumbnail_vertical_single
 
 
 def controller_after_whisper(topic):
 
-    # 识别后的srt文件路径, 调用的起始依赖
-    format_srt = f"/Users/donghaoliu/doc/video_material/zh_srt_nowarp/{topic}"
-    tts_mp3_path = f"/Users/donghaoliu/doc/video_material/tts_mp3/{topic}"
-    mp4_abs_path = f"/Volumes/dhl/ytb-videos/{topic}"
+    # whisper识别后的srt文件路径, 调用的起始依赖
+    format_srt = f"/home/dhl/Documents/video_material/format_srt/{topic}"
+    tts_mp3_path = f"/home/dhl/Documents/video_material/tts_mp3/{topic}"
+    mp4_abs_path = f"/media/dhl/TOSHIBA/ytb-videos/{topic}"
     jump30 = True
 
     # 目标文件路径
-    dst_zh_srt_abs_path = f"/Users/donghaoliu/doc/video_material/zh_srt_nowarp/{topic}"
-    dst_merged_mp4_path = f"/Volumes/dhl/ytb-videos/tts_mp4/{topic}"
-    zh_title_dst_path = "/Users/donghaoliu/doc/video_material/zh_title"
-    zh_tag_dst_path = "/Users/donghaoliu/doc/video_material/zh_tag"
+    dst_zh_srt_abs_path = f"/home/dhl/Documents/video_material/zh_srt_nowarp/{topic}"
+    dst_merged_mp4_path = f"/media/dhl/TOSHIBA/tts_mp4/{topic}"
+    zh_title_dst_path = "/home/dhl/Documents/video_material/zh_title"
+    zh_tag_dst_path = "/home/dhl/Documents/video_material/zh_tag"
+    dst_vertical_thumbnail_path = (
+        "/home/dhl/Documents/video_material/zh_title_thumbnail_vertical"
+    )
+    vertical_thumbnail_font_path = (
+        "/home/dhl/Documents/video_material/font/SourceHanSansCN-Regular.otf"
+    )
 
     # 所有频道，依赖fomat_srt文件夹
     all_channels = os.listdir(format_srt)
@@ -37,12 +45,18 @@ def controller_after_whisper(topic):
         # 得到已经完成翻译的字幕列表
         formatted_srts_warp = os.listdir(
             os.path.join(
-                f"/Users/donghaoliu/doc/video_material/zh_srt/{topic}",
+                f"/home/dhl/Documents/video_material/zh_srt/{topic}",
                 channel,
             )
         )
         # remove .DS_Store using list comprehension
         formatted_srts_warp = [srt for srt in formatted_srts_warp if srt != ".DS_Store"]
+
+        # 得到whisper识别后的srt文件列表
+        formatted_srts = os.listdir(os.path.join(format_srt, channel))
+        # remove .DS_Store using list comprehension
+        formatted_srts = [srt for srt in formatted_srts if srt != ".DS_Store"]
+
         # 除去已经翻译的字幕
         formatted_srts = list(set(formatted_srts) - set(formatted_srts_warp))
         print(
@@ -94,6 +108,7 @@ def controller_after_whisper(topic):
             controller_translate_srt_single(
                 os.path.join(format_srt, channel, srt),
                 os.path.join(dst_zh_srt_abs_path, channel, srt),
+                topic=topic,
             )
 
             ###### step2： tts合成语音 ######
@@ -103,6 +118,7 @@ def controller_after_whisper(topic):
             )
 
             ###### step3： 合并mp3和mp4 ######
+            print(f"正在合并mp3和mp4，频道{channel}的{srt}...")
             tts_folder_name = srt.replace(".srt", "")
             tts_mp3_path = os.path.join(tts_mp3_path, channel, tts_folder_name)
             mp4_abs_path = os.path.join(mp4_abs_path, channel, f"{tts_folder_name}.mp4")
@@ -120,7 +136,8 @@ def controller_after_whisper(topic):
                 cur_zh_srt_path=cur_zh_srt_path,
             )
 
-            ###### step4: get chinese tag and titles ######
+            ###### step4: 得到中文标题和tags ######
+            print(f"正在得到中文标题和tags，频道{channel}的{srt}...")
             title_dst_path = os.path.join(
                 zh_title_dst_path, topic, channel, tts_folder_name + ".txt"
             )
@@ -134,3 +151,20 @@ def controller_after_whisper(topic):
             )
 
             ###### step5: 创建封面 ######
+            print(f"正在创建封面，频道{channel}的{srt}...")
+            vertical_thumbnail_dst_path = os.path.join(
+                dst_vertical_thumbnail_path, topic, channel, tts_folder_name + ".png"
+            )
+            zh_title_single_path = os.path.join(
+                zh_title_dst_path, topic, channel, tts_folder_name + ".txt"
+            )
+            create_zh_title_thumbnail_vertical_single(
+                zh_title_single_path,
+                vertical_thumbnail_dst_path,
+                vertical_thumbnail_font_path,
+            )
+
+
+if __name__ == "__main__":
+    topic = "code"
+    controller_after_whisper(topic)
