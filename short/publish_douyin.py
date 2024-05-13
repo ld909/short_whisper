@@ -285,7 +285,7 @@ def select_no_download(driver):
     father_element = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.CSS_SELECTOR, father_css))
     )
-
+    time.sleep(0.5)
     # 找到所有label，点击第二个
     labels = father_element.find_elements(By.CSS_SELECTOR, "label")
     labels[1].click()
@@ -341,7 +341,7 @@ def upload_douyin_video(
     in_xpath = '//*[@id="root"]/div/div/div[3]/div/div[1]/div/div[1]/div/label/input'
 
     # 设置显式等待时间为10秒
-    timeout = 30
+    timeout = 60
 
     # 等待元素id为"my_element"的元素出现
     element = WebDriverWait(driver, timeout).until(

@@ -44,8 +44,9 @@ def tts_ms(txt_string, topic, clip_dst_path):
     """调用微软的tts接口，生成mp3文件"""
 
     # 配置参数
-    speech_key = "cba10589e21e48dfb986f493e276b833"
-    service_region = "eastasia"
+    # speech_key = "cba10589e21e48dfb986f493e276b833"
+    speech_key = "5b65a4b5f0114c62accb7fc90f3d403b"
+    service_region = "japanwest"
 
     speech_config = speechsdk.SpeechConfig(
         subscription=speech_key, region=service_region
@@ -61,7 +62,7 @@ def tts_ms(txt_string, topic, clip_dst_path):
     if topic == "mama":
         yinse_name = "zh-CN-XiaochenNeural"
     elif topic == "code":
-        yinse_name = "zh-CN-YunjieNeural"
+        yinse_name = "zh-CN-XiaochenNeural"
     # 构造SSML字符串
     ssml_string = create_ssml_string(txt_string, yinse_name=yinse_name)
 
@@ -76,6 +77,12 @@ def tts_ms(txt_string, topic, clip_dst_path):
     if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
         return True
     else:
+        cancellation_details = result.cancellation_details
+        print("Speech synthesis canceled: {}".format(cancellation_details.reason))
+        if cancellation_details.reason == speechsdk.CancellationReason.Error:
+            if cancellation_details.error_details:
+                print("Error details: {}".format(cancellation_details.error_details))
+                print("Did you set the speech resource key and region values?")
         return False
 
 
@@ -200,7 +207,7 @@ def controller_tts_single(zh_srt_path, tts_mp3_path, channel, topic):
             continue
 
         ## 使用azure tts
-        if topic == "mama":
+        if topic == "mama" or topic == "code":
             while not tts_success:
                 tts_success = tts_ms(
                     subtitle,
@@ -210,11 +217,11 @@ def controller_tts_single(zh_srt_path, tts_mp3_path, channel, topic):
                     topic=topic,
                 )
         ## 使用aliyun tts
-        elif topic == "code":
-            aliyun_tts_single(
-                text=subtitle.replace(" ", ""), mp3_dst=mp3_dst_path, num=2, mp3_speed=0
-            )
-            time.sleep(0.5)
+        # elif topic == "code":
+        #     aliyun_tts_single(
+        #         text=subtitle.replace(" ", ""), mp3_dst=mp3_dst_path, num=2, mp3_speed=0
+        #     )
+        #     time.sleep(0.5)
         print(f"{srt_basename} {sub_idx} tts done!")
 
 

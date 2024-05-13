@@ -7,6 +7,7 @@ from short.publish_weixin import upload_weixin_video
 
 
 def read_upload_log():
+    """读取上传日志文件，返回一个字典。"""
     log_path = "./upload_log/upload_log.json"
     if not os.path.exists(log_path):
         return {}
@@ -137,8 +138,34 @@ def get_upload_time(uploaded_platforms, upload_log, log_key, topic):
     return upload_time_obj
 
 
-def upload_all_platforms(topic):
+def get_uploaded_mp4s():
+    log_dict = read_upload_log()
 
+    # 得到所有keys，作为一个list
+    all_keys = log_dict.keys()
+
+    upload_dict = {}
+    for single_key in all_keys:
+        topic, channel, mp4_name = single_key.split("~~~~")
+        print(f"主题: {topic}, 频道: {channel}, mp4文件名: {mp4_name}")
+
+        # 如果topic不在upload_dict的key中，添加topic
+        if topic not in upload_dict:
+            upload_dict[topic] = {}
+        # 如果topic在upload_dict的key中，添加channel
+        else:
+            # 添加channel
+            if channel not in upload_dict[topic]:
+                upload_dict[topic][channel] = {}
+            # 如果channel在upload_dict的key中，添加mp4_name对应的平台
+            else:
+                uploaded_platforms = log_dict[single_key]["platforms"]
+                # 如果channel在upload_dict的key中，添加mp4_name对应的平台
+                upload_dict[topic][channel][mp4_name] = uploaded_platforms
+
+
+def upload_all_platforms(topic):
+    # zh_mp4_path作为上传视频的路径读取依赖
     zh_mp4_path = "/Volumes/dhl/ytb-videos/tts_mp4"
     zh_title_path = "/Users/donghaoliu/doc/video_material/zh_title"
     zh_tags = "/Users/donghaoliu/doc/video_material/zh_tag"
@@ -146,13 +173,19 @@ def upload_all_platforms(topic):
     thumbnail_horizontal_path = (
         "/Users/donghaoliu/doc/video_material/thumbnail_horizontal"
     )
-    ref_dict = load_ref_json(topic)
-    # get all channels from the ref.json file
-    channels = read_channels_from_ref_json(topic)
+    # ref_dict = load_ref_json(topic)
+    # # get all channels from the ref.json file
+    # channels = read_channels_from_ref_json(topic)
+
+    channels = os.listdir(os.path.join(zh_mp4_path, topic))
+    # remove .DS_Store using list comprehension
+    channels = [channel for channel in channels if channel != ".DS_Store"]
 
     for channel in channels:
         # get all mp4 files from the ref_dict
-        all_mp4 = ref_dict[channel].keys()
+        all_mp4 = os.listdir(os.path.join(zh_mp4_path, topic, channel))
+        # remove .DS_Store using list comprehension
+        all_mp4 = [mp4 for mp4 in all_mp4 if mp4 != ".DS_Store"]
 
         for mp4_single in all_mp4:
 
@@ -167,13 +200,13 @@ def upload_all_platforms(topic):
             # if len(uploaded_platforms) == 3:
             #     continue
             if "douyin" in uploaded_platforms and "kuaishou" in uploaded_platforms:
-                print(f"mp4 {mp4_single} in the platforms...")
+                print(f"mp4 {mp4_single} 已经上传到抖音和快手，跳过...")
                 continue
 
             # preapre the video and upload
-            ref_mp4 = ref_dict[channel][mp4_single]
-            basename = os.path.basename(ref_mp4)
-            base_name_prefix = os.path.splitext(basename)[0]
+            # ref_mp4 = ref_dict[channel][mp4_single]
+            # basename = mp4_single
+            base_name_prefix = os.path.splitext(mp4_single)[0]
 
             # video path
             video_path = os.path.join(zh_mp4_path, topic, channel, mp4_single)
@@ -181,9 +214,8 @@ def upload_all_platforms(topic):
             print("上传视频路径：", video_path)
 
             # read zh title from the txt file
-
             video_zh_title_txt_path = os.path.join(
-                zh_title_path, topic, channel, base_name_prefix + "_title.txt"
+                zh_title_path, topic, channel, base_name_prefix + ".txt"
             )
 
             if "_clip_" in mp4_single:
@@ -199,7 +231,7 @@ def upload_all_platforms(topic):
 
             # read zh tags from the txt file
             video_zh_tags_txt_path = os.path.join(
-                zh_tags, topic, channel, base_name_prefix + "_title.txt"
+                zh_tags, topic, channel, base_name_prefix + ".txt"
             )
             video_tags_zh_lines = open(video_zh_tags_txt_path).readlines()
 
@@ -207,6 +239,7 @@ def upload_all_platforms(topic):
             video_tags_zh_str = (
                 " ".join(["#" + tag.strip() for tag in video_tags_zh_lines]) + " "
             )
+            print(f"视频标签：{video_tags_zh_str}")
 
             # thumbnail path
             thunbnail_basename = os.path.splitext(mp4_single)[0]
@@ -217,12 +250,13 @@ def upload_all_platforms(topic):
                 thunbnail_basename + ".png",
             )
 
-            thumbnail_png_horizontal = os.path.join(
-                thumbnail_horizontal_path,
-                topic,
-                channel,
-                thunbnail_basename + ".png",
-            )
+            # 微信使用横版缩略图
+            # thumbnail_png_horizontal = os.path.join(
+            #     thumbnail_horizontal_path,
+            #     topic,
+            #     channel,
+            #     thunbnail_basename + ".png",
+            # )
 
             # get the upload time
             upload_time_obj = get_upload_time(
@@ -307,4 +341,5 @@ def upload_all_platforms(topic):
 
 
 if __name__ == "__main__":
-    upload_all_platforms()
+    topic = "code"
+    upload_all_platforms(topic=topic)

@@ -132,9 +132,7 @@ def input_title_and_description(driver, title_and_description):
 
 def no_download_check(driver):
     """check the no download checkbox"""
-    no_download_xpath = (
-        '//*[@id="rc-tabs-0-panel-1"]/div/div[4]/div/div[4]/div[2]/div[3]/div/label[2]'
-    )
+    no_download_xpath = '//*[@id="rc-tabs-0-panel-1"]/div/div[4]/div/div[4]/div[2]/div[4]/div/label[2]/span[1]/input'
 
     # wait for the input element to be loaded for 10 seconds, if not loaded, just continue the next step
     timeout = 10
