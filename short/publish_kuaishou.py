@@ -10,7 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 
 
-def login_and_save_cookies():
+def login_and_save_cookies(topic):
     # a new webdriver instance
     driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
     service = Service(executable_path=driver_path)
@@ -25,13 +25,12 @@ def login_and_save_cookies():
 
     # save the cookies
     cookies = driver.get_cookies()
-    with open(
-        "/Users/donghaoliu/doc/short_whisper/short/cookies/kuaishou.json", "w"
-    ) as f:
+    dst_cookies = f"/Users/donghaoliu/doc/short_whisper/short/cookies/{topic}.json"
+    with open(dst_cookies, "w") as f:
         json.dump(cookies, f)
 
 
-def load_cookies():
+def load_cookies(topic):
     driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
     service = Service(executable_path=driver_path)
 
@@ -39,10 +38,10 @@ def load_cookies():
 
     # open the login page
     driver.get("https://cp.kuaishou.com/profile")
-
-    with open(
-        "/Users/donghaoliu/doc/short_whisper/short/cookies/kuaishou.json", "r"
-    ) as f:
+    cookie_path = (
+        f"/Users/donghaoliu/doc/short_whisper/short/cookies/{topic}/kuaishou.json"
+    )
+    with open(cookie_path, "r") as f:
         cookies = json.load(f)
         for cookie in cookies:
             driver.add_cookie(cookie)
@@ -221,10 +220,11 @@ def set_timedate(driver, time_str):
 
 
 def publish_kuaishou_video(
-    mp4_path, thumbnail_path, title_and_description_str, time_str
+    mp4_path, thumbnail_path, title_and_description_str, time_str, topic
 ):
+    """publish video to kuaishou"""
     # load the cookies
-    driver = load_cookies()
+    driver = load_cookies(topic=topic)
 
     time.sleep(3.5)
     # upload video

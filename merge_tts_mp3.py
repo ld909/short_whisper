@@ -14,6 +14,7 @@ from merge_srt_video import get_duration
 import time
 from moviepy.editor import VideoFileClip
 from datetime import timedelta
+from colorama import Fore, Back, Style, init
 
 
 def get_mp4_clip_list(video_path, ts_list, mp3_list):
@@ -251,9 +252,13 @@ def merge_mp4_controller_single(
     bg_music=True,
     merge_mp3_single_path=None,
 ):
-
+    # 初始化 colorama
+    init(autoreset=True)
     # get merged mp3 duration
     if os.path.exists(dst_mp4_path) and os.path.exists(merge_mp3_single_path):
+        print(f"!@!@!@{dst_mp4_path} 视频已经存在，检查是否需要重复合成...")
+        print(Fore.GREEN + f"合成的mp4路径：{dst_mp4_path}")
+        print(Fore.GREEN + f"合成的mp3路径：{merge_mp3_single_path}")
         mp3_merged_duraion = get_duration(merge_mp3_single_path)
         pre_done_mp4_duration = get_duration(dst_mp4_path)
         if pre_done_mp4_duration / mp3_merged_duraion > 0.98:

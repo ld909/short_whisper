@@ -12,7 +12,7 @@ from selenium.common.exceptions import TimeoutException
 import os
 
 
-def login_and_save_cookies():
+def login_and_save_cookies(topic):
     # a new webdriver instance
     driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
     service = Service(executable_path=driver_path)
@@ -28,14 +28,13 @@ def login_and_save_cookies():
     input("Press Enter after you have logged in")
 
     # save the cookies
+    dst_cookie_path = f"/Users/donghaoliu/doc/short_whisper/cookies/{topic}/douyin.json"
     cookies = driver.get_cookies()
-    with open(
-        "/Users/donghaoliu/doc/short_whisper/short/cookies/douyin.json", "w"
-    ) as f:
+    with open(dst_cookie_path, "w") as f:
         json.dump(cookies, f)
 
 
-def load_cookies():
+def load_cookies(topic):
     driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
     service = Service(executable_path=driver_path)
 
@@ -43,10 +42,10 @@ def load_cookies():
 
     # open the login page
     driver.get("https://creator.douyin.com/creator-micro/content/upload")
-
-    with open(
-        "/Users/donghaoliu/doc/short_whisper/short/cookies/douyin.json", "r"
-    ) as f:
+    cookie_path = (
+        f"/Users/donghaoliu/doc/short_whisper/short/cookies/{topic}/douyin.json"
+    )
+    with open(cookie_path, "r") as f:
         cookies = json.load(f)
         for cookie in cookies:
             driver.add_cookie(cookie)
@@ -72,7 +71,8 @@ def input_video_title(driver, title):
     element = WebDriverWait(driver, timeout).until(
         EC.presence_of_element_located((By.XPATH, title_xpath))
     )
-
+    element.click()
+    time.sleep(0.5)
     # input the title
     element.send_keys(title)
 
@@ -328,14 +328,9 @@ def check_css_element_exist(driver, css_selector):
 
 
 def upload_douyin_video(
-    mp4_path,
-    title_zh,
-    tags,
-    thumbnail_path,
-    date_time,
-    description_zh="",
+    mp4_path, title_zh, tags, thumbnail_path, date_time, description_zh="", topic=""
 ):
-    driver = load_cookies()
+    driver = load_cookies(topic=topic)
 
     # input xpath
     in_xpath = '//*[@id="root"]/div/div/div[3]/div/div[1]/div/div[1]/div/label/input'
@@ -377,7 +372,10 @@ def upload_douyin_video(
     # 通过css检查是否div.download-content--1EwjI存在
     if check_css_element_exist(driver, "div.download-content--1EwjI"):
         # 点击 no download
-        select_no_download(driver)
+        try:
+            select_no_download(driver)
+        except:
+            print("没点击下载按钮了。。。")
     else:
         print("无download 选项，跳过...")
 

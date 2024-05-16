@@ -9,6 +9,16 @@ from get_zh_title import zh_title_tags_controller_single
 from create_thumbnail import create_zh_title_thumbnail_vertical_single
 
 
+def load_bad_json(data):
+    """载入bad.json文件，返回字典"""
+    import json
+
+    # 载入bad.json文件
+    with open("./upload_log/bad.json", "r") as file:
+        data = json.load(file)
+    return data
+
+
 def controller_after_whisper(topic):
 
     # whisper识别后的srt文件路径, 调用的起始依赖
@@ -116,6 +126,23 @@ def controller_after_whisper(topic):
                 if mp4_duration > 1800:
                     print(f"频道{channel}的{srt} 超过30min，跳过...")
                     continue
+            ###### step0: 读取bad.json文件，如果存在，跳过 ######
+            data = {}
+            if os.path.exists("./upload_log/bad.json"):
+                data = load_bad_json(data)
+                print(f"bad.json文件已经载入...")
+                if topic in data:
+                    print(f"话题{topic}在bad.json中...")
+                    if channel in data[topic]:
+                        print(f"频道{channel}在bad.json中...")
+                        print(data[topic][channel])
+                        # 得到无后缀的srt文件名
+                        srt_basename = srt.replace(".srt", "")
+                        if srt_basename in data[topic][channel]:
+                            print(
+                                f"话题{topic},频道{channel}的{srt}在bad.json中，跳过..."
+                            )
+                            continue
 
             ###### step1： 翻译srt文件 ######
             print(f"正在翻译频道{channel}的{srt}...")

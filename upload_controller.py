@@ -1,6 +1,7 @@
 import os
 import json
 from datetime import datetime, timedelta
+import sys
 from short.publish_douyin import upload_douyin_video
 from short.publish_kuaishou import publish_kuaishou_video
 from short.publish_weixin import upload_weixin_video
@@ -61,37 +62,68 @@ def update_log(log_key, platform, date_time_str):
 def next_time_point(current_time, chunk_split):
     """根据当前时间，返回下一个视频上传时间。"""
 
-    # 开始时间是早上6点
-    start_hour = 6
-    # 结束时间是晚上22点
-    end_hour = 22
-
-    # 一共时间间隔
-    time_gap = (end_hour - start_hour) / chunk_split
-
-    # 四舍五入到最近的整数
-    time_gap = round(time_gap)
-    time_gap = int(time_gap)
-
-    # 计算从6点开始的所有时间点,包括6点和22点
-    all_time_points = [start_hour + i * time_gap for i in range(chunk_split + 1)]
-
-    # 如果当前时间小于当前时间
+    # 如果当前时间小于计算机得到的linux当前时间
     if current_time < datetime.now():
         # 返回当前时间的明早6点
         next_time = datetime.now().replace(
             hour=6, minute=0, second=0, microsecond=0
         ) + timedelta(days=1)
 
-    # 如果当前时间在所有时间点之前,除开最后一个时间点
-    elif current_time > datetime.now() and current_time.hour in all_time_points[:-1]:
-        next_time = current_time + timedelta(hours=time_gap)
+    # 如果当前时间的hour是6，把hour设定为7
+    elif current_time.hour == 6:
+        next_time = current_time.replace(hour=7, minute=0, second=0, microsecond=0)
 
-    # 如果当前时间是最后一个时间点，设定下一个时间是明天早上6点
-    elif current_time > datetime.now() and current_time.hour == all_time_points[-1]:
+    # 如果当前时间hour是7，把hour设定为8
+    elif current_time.hour == 7:
+        next_time = current_time.replace(hour=8, minute=0, second=0, microsecond=0)
+
+    # 如果当前时间hour是8，把hour设定为11
+    elif current_time.hour == 8:
+        next_time = current_time.replace(hour=11, minute=0, second=0, microsecond=0)
+
+    # 如果当前时间hour是11，把hour设定为12
+    elif current_time.hour == 11:
+        next_time = current_time.replace(hour=12, minute=0, second=0, microsecond=0)
+
+    # 如果当前时间hour是12，把hour设定为13
+    elif current_time.hour == 12:
+        next_time = current_time.replace(hour=13, minute=0, second=0, microsecond=0)
+
+    # 如果当前时间hour是13，把hour设定为晚上7点
+    elif current_time.hour == 13:
+        next_time = current_time.replace(hour=19, minute=0, second=0, microsecond=0)
+
+    # 如果当前时间hour是19，把hour设定为晚上20点
+    elif current_time.hour == 19:
+        next_time = current_time.replace(hour=20, minute=0, second=0, microsecond=0)
+
+    # 如果当前时间hour是20，把hour设定为晚上21点
+    elif current_time.hour == 20:
+        next_time = current_time.replace(hour=21, minute=0, second=0, microsecond=0)
+
+    # 如果当前时间hour是21，把hour设定为晚上22点
+    elif current_time.hour == 21:
+        next_time = current_time.replace(hour=22, minute=0, second=0, microsecond=0)
+
+    # 如果当前时间hour是22，把hour设定为22点30分
+    elif current_time.hour == 22 and current_time.minute != 30:
+        next_time = current_time.replace(hour=22, minute=30, second=0, microsecond=0)
+
+    # 如果当前时间是22点30分，设定下一个时间是明天早上6点
+    elif current_time.hour == 22 and current_time.minute == 30:
         next_time = current_time.replace(
             hour=6, minute=0, second=0, microsecond=0
         ) + timedelta(days=1)
+
+    # # 如果当前时间在所有时间点之前,除开最后一个时间点
+    # elif current_time > datetime.now() and current_time.hour in all_time_points[:-1]:
+    #     next_time = current_time + timedelta(hours=time_gap)
+
+    # # 如果当前时间是最后一个时间点，设定下一个时间是明天早上6点
+    # elif current_time > datetime.now() and current_time.hour == all_time_points[-1]:
+    #     next_time = current_time.replace(
+    #         hour=6, minute=0, second=0, microsecond=0
+    #     ) + timedelta(days=1)
 
     return next_time
 
@@ -284,6 +316,7 @@ def upload_all_platforms(topic):
                     video_tags_zh_str,
                     thumbnail_png_vertical,
                     upload_time_str,
+                    topic=topic,
                 )
 
                 # update the log
@@ -308,6 +341,7 @@ def upload_all_platforms(topic):
                     thumbnail_png_vertical,
                     title_add_description,
                     kuaishou_time_str,
+                    topic,
                 )
                 # 更新日志
                 update_log(
@@ -341,5 +375,6 @@ def upload_all_platforms(topic):
 
 
 if __name__ == "__main__":
-    topic = "code"
+    # read topic from first argument
+    topic = sys.argv[1]
     upload_all_platforms(topic=topic)
