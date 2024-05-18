@@ -8,7 +8,8 @@ import time
 import azure.cognitiveservices.speech as speechsdk
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-from aliyun_tts import aliyun_tts_single
+
+# from aliyun_tts import aliyun_tts_single
 
 
 def create_ssml_string(text, rate="1.1", yinse_name="zh-CN-YunjieNeural"):
@@ -45,7 +46,7 @@ def tts_ms(txt_string, topic, clip_dst_path):
 
     # 配置参数
     # speech_key = "cba10589e21e48dfb986f493e276b833"
-    speech_key = "5b65a4b5f0114c62accb7fc90f3d403b"
+    speech_key = "2de1f6961d394116a8a5b0ff5bd22845"
     service_region = "japanwest"
 
     speech_config = speechsdk.SpeechConfig(
@@ -180,7 +181,14 @@ def controller_tts(topic):
                 print(f"{srt_basename} {sub_idx} tts done!")
 
 
-def controller_tts_single(zh_srt_path, tts_mp3_path, channel, topic):
+def controller_tts_single(
+    zh_srt_path, tts_mp3_path, channel, topic, merge_single_mp3_path
+):
+
+    # 如果merge_single_mp3_path存在，return
+    if os.path.exists(merge_single_mp3_path):
+        print(f"{merge_single_mp3_path} mp3文件已存在，无需重复合成mp3 clips，跳过")
+        return
 
     srt_path = zh_srt_path
     srt_content = read_srt_file(srt_path)

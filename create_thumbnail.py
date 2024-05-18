@@ -282,7 +282,7 @@ def draw_ch_title_on_image(
 
 def random_bg():
     """randomly select a background image"""
-    bg_path = "/Users/donghaoliu/doc/video_material/thumbnail_material/white2"
+    bg_path = "/media/dhl/TOSHIBA/video_material/thumbnail_material/white2"
     all_bg_images = os.listdir(bg_path)
     all_bg_images = [bg for bg in all_bg_images if bg != ".DS_Store"]
 
@@ -394,11 +394,10 @@ def create_zh_title_thumbnail_vertical_single(
     dst_thumbnail_path, zh_title_path, vertical_font_path
 ):
     """针对一个srt文件创建竖直封面"""
-
     if os.path.exists(dst_thumbnail_path):
-        print(f"@@@@@{dst_thumbnail_path} 封面存在, 跳过继续...")
+        print(f"{dst_thumbnail_path} 封面存在, 跳过继续...")
         return
-    print(f"创建封面 @@@@@@@: {dst_thumbnail_path}....")
+    print(f"创建封面 {dst_thumbnail_path}....")
 
     bg_image_path = random_bg()
 
@@ -408,8 +407,7 @@ def create_zh_title_thumbnail_vertical_single(
     # Chinese title position on the thumbnail bg image
     position = (160, 180)  # 文本的起始位置
 
-    # chinese font path
-    # font_path = "/Users/donghaoliu/doc/video_material/font/DottedSongtiCircleRegular.otf"  # 字体文件路径
+    # chinese font
     font_size = 100  # 字体大小
     right_padding = 100  # 文本到图像右边缘的距离
 

@@ -10,7 +10,7 @@ from srt_format import format_srt, break_srt_txt_into_sentences
 
 
 def controller_mp3_to_format_srt(topic):
-    mp3_abs_path = f"/home/dhl/Documents/video_materials/mp3/{topic}"  # fill in the absolute path of the mp3 folder
+    mp3_abs_path = f"/home/dhl/Documents/video_materials_linux/mp3/{topic}"  # fill in the absolute path of the mp3 folder
     dst_srt_abs_path = f"/home/dhl/Documents/video_materials/format_srt/{topic}"  # fill in the absolute path of the srt folder
 
     # check if the dst_srt_abs_path exists, if not create it
@@ -60,5 +60,5 @@ def controller_mp3_to_format_srt(topic):
 
 
 if __name__ == "__main__":
-    topic = "code"
+    topic = "food"
     controller_mp3_to_format_srt(topic=topic)
