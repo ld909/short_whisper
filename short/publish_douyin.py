@@ -14,7 +14,7 @@ import os
 
 def login_and_save_cookies(topic):
     # a new webdriver instance
-    driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
+    driver_path = "/home/dhl/Downloads/chromedriver-linux64/chromedriver"
     service = Service(executable_path=driver_path)
 
     driver = webdriver.Chrome(service=service)
@@ -28,23 +28,21 @@ def login_and_save_cookies(topic):
     input("Press Enter after you have logged in")
 
     # save the cookies
-    dst_cookie_path = f"/Users/donghaoliu/doc/short_whisper/cookies/{topic}/douyin.json"
+    dst_cookie_path = f"./short/{topic}/douyin.json"
     cookies = driver.get_cookies()
     with open(dst_cookie_path, "w") as f:
         json.dump(cookies, f)
 
 
 def load_cookies(topic):
-    driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
+    driver_path = "/home/dhl/Downloads/chromedriver-linux64/chromedriver"
     service = Service(executable_path=driver_path)
 
     driver = webdriver.Chrome(service=service)
 
     # open the login page
     driver.get("https://creator.douyin.com/creator-micro/content/upload")
-    cookie_path = (
-        f"/Users/donghaoliu/doc/short_whisper/short/cookies/{topic}/douyin.json"
-    )
+    cookie_path = f"./short/{topic}/douyin.json"
     with open(cookie_path, "r") as f:
         cookies = json.load(f)
         for cookie in cookies:
@@ -397,7 +395,8 @@ if __name__ == "__main__":
     # read parameters from the command line
     # get the first parameter
     action = sys.argv[1]
+    topic = sys.argv[2]
     if action == "login":
-        login_and_save_cookies()
+        login_and_save_cookies(topic)
 #     elif action == "upload":
 #         upload_douyin_video()

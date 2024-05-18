@@ -1,5 +1,9 @@
 {
     "code": {
-        "fireship": "Add Toast Message Notifications to your Angular App"
+        "fireship": [
+            "Add Toast Message Notifications to your Angular App",
+            "Zig in 100 Seconds",
+            "VS Code Top-Ten Pro Tips"
+        ]
     }
 }

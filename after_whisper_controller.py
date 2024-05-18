@@ -6,7 +6,10 @@ from translate_srt import controller_translate_srt_single, get_duration
 from tts_zh_mp3 import controller_tts_single
 from merge_tts_mp3 import merge_mp4_controller_single
 from get_zh_title import zh_title_tags_controller_single
-from create_thumbnail import create_zh_title_thumbnail_vertical_single
+from create_thumbnail import (
+    create_zh_title_thumbnail_vertical_single,
+    create_thumbnail_from_original_vertical_single,
+)
 from tqdm import tqdm
 
 
@@ -27,6 +30,14 @@ def set_clash_proxy():
     os.environ["https_proxy"] = "http://127.0.0.1:7890"
     os.environ["all_proxy"] = "socks5://127.0.0.1:7891"
     print("成功设定clash环境proxy...")
+
+
+def unset_clash_proxy():
+    # 删除环境变量
+    os.environ.pop("http_proxy", None)
+    os.environ.pop("https_proxy", None)
+    os.environ.pop("all_proxy", None)
+    print("成功取消clash环境proxy...")
 
 
 def retain_pipe_status(
@@ -85,14 +96,6 @@ def retain_pipe_status(
             lookup_dict[srt_basename]["mp4"] = True
         else:
             lookup_dict[srt_basename]["mp4"] = False
-        # if srt_basename in done_zh_title:
-        #     lookup_dict[srt_basename]["zh_title"] = True
-        # else:
-        #     lookup_dict[srt_basename]["zh_title"] = False
-        # if srt_basename in done_zh_tag:
-        #     lookup_dict[srt_basename]["zh_tag"] = True
-        # else:
-        #     lookup_dict[srt_basename]["zh_tag"] = False
         if srt_basename in done_zh_title and srt_basename in done_zh_tag:
             lookup_dict[srt_basename]["zh_title_tag"] = True
         else:
@@ -117,9 +120,6 @@ def retain_pipe_status(
 
 def controller_after_whisper(topic):
 
-    # 设定clash环境
-    set_clash_proxy()
-
     hard_dive_path = "/media/dhl/TOSHIBA"
     # whisper识别后的srt文件路径, 调用的起始依赖
     format_srt_path = f"{hard_dive_path}/video_material/format_srt/{topic}"
@@ -136,9 +136,9 @@ def controller_after_whisper(topic):
     dst_vertical_thumbnail_path = (
         f"{hard_dive_path}/video_material/thumbnail_vertical/{topic}"
     )
-    vertical_thumbnail_font_path = (
-        f"{hard_dive_path}/video_material/font/DottedSongtiCircleRegular.otf"
-    )
+
+    if topic == "code" or topic == "mama":
+        bg_mp3_path = f"{hard_dive_path}/video_material/tts_mp3/background/bg.mp3"
 
     # 所有频道，依赖fomat_srt文件夹
     all_channels = os.listdir(format_srt_path)
@@ -235,6 +235,9 @@ def controller_after_whisper(topic):
 
             ###### step1： 翻译srt文件 ######
             if not lookup_dict[srt_basename]["srt"]:
+                # 设定代理
+                set_clash_proxy()
+
                 print(f"正在翻译频道{channel}的{srt}...")
                 controller_translate_srt_single(
                     os.path.join(format_srt_path, channel, srt),
@@ -243,6 +246,8 @@ def controller_after_whisper(topic):
                 )
                 print(f"翻译{channel}的{srt}完成！")
                 print("#" * 20)
+                # 取消代理
+                unset_clash_proxy()
 
             ###### step2： tts合成语音 ######
             tts_folder_name = srt.replace(".srt", "")
@@ -258,6 +263,7 @@ def controller_after_whisper(topic):
                 mp3_merge_path, channel, f"{tts_folder_name}.mp3"
             )
             if not lookup_dict[srt_basename]["merge_mp3"]:
+                unset_clash_proxy()
                 print(f"正在合并mp3和mp4，频道{channel}的{srt}...")
                 controller_tts_single(
                     os.path.join(dst_zh_srt_abs_path, channel, srt),
@@ -280,12 +286,12 @@ def controller_after_whisper(topic):
                     dst_mp4_path=dst_mp4_path,
                     cur_zh_srt_path=cur_zh_srt_path,
                     merge_mp3_single_path=merge_mp3_single_path,
+                    bg_mp3_path=bg_mp3_path,
                 )
                 print(f"合并mp3和mp4{channel}的{srt}完成！")
                 print("#" * 20)
 
             ###### step4: 得到中文标题和tags ######
-
             title_dst_path = os.path.join(
                 zh_title_dst_path, channel, tts_folder_name + ".txt"
             )
@@ -295,6 +301,8 @@ def controller_after_whisper(topic):
 
             # 如果没有中文标题和tags，就生成
             if not lookup_dict[srt_basename]["zh_title_tag"]:
+                # set clash
+                set_clash_proxy()
                 print(f"正在得到中文标题和tags，频道{channel}的{srt}...")
                 zh_title_tags_controller_single(
                     srt_file_name=srt,
@@ -304,21 +312,47 @@ def controller_after_whisper(topic):
                 )
                 print(f"中文标题和tags{channel}的{srt}完成！")
                 print("#" * 20)
+                # unset clash
+                unset_clash_proxy()
 
             ###### step5: 创建封面 ######
-            vertical_thumbnail_dst_path = os.path.join(
-                dst_vertical_thumbnail_path, channel, tts_folder_name + ".png"
-            )
-            zh_title_single_path = os.path.join(
-                zh_title_dst_path, channel, tts_folder_name + ".txt"
-            )
-            if not lookup_dict[srt_basename]["thumbnail"]:
+            if topic == "code" and not lookup_dict[srt_basename]["thumbnail"]:
+
                 print(f"正在创建封面，频道{channel}的{srt}...")
+                vertical_thumbnail_dst_path = os.path.join(
+                    dst_vertical_thumbnail_path, channel, tts_folder_name + ".png"
+                )
+                zh_title_single_path = os.path.join(
+                    zh_title_dst_path, channel, tts_folder_name + ".txt"
+                )
+                # webp_path = os.path.join(
+                #     eng_mp4_abs_path, channel, f"{tts_folder_name}.webp"
+                # )
+                # 如果没有webp，就用自创背景
+                # if not os.path.exists(webp_path):
+                vertical_thumbnail_font_path = f"{hard_dive_path}/video_material/font/DottedSongtiCircleRegular.otf"
+                bg_thumbnail_path = (
+                    f"{hard_dive_path}/video_material/thumbnail_material/white2"
+                )
                 create_zh_title_thumbnail_vertical_single(
                     dst_thumbnail_path=vertical_thumbnail_dst_path,
                     zh_title_path=zh_title_single_path,
                     vertical_font_path=vertical_thumbnail_font_path,
+                    bg_path=bg_thumbnail_path,
                 )
+                # 如果有webp，就用youtube的背景
+                # else:
+                #     bg_thumbnail_path = f"{hard_dive_path}/video_material/thumbnail_material/bg/{topic}/bg1.png"
+                #     vertical_thumbnail_font_path = (
+                #         f"{hard_dive_path}/video_material/font/GenJyuuGothic-Bold-2.ttf"
+                #     )
+                #     create_thumbnail_from_original_vertical_single(
+                #         dst_thumbnail_path=vertical_thumbnail_dst_path,
+                #         zh_title_path=zh_title_single_path,
+                #         vertical_font_path=vertical_thumbnail_font_path,
+                #         bg_path=bg_thumbnail_path,
+                #         ytb_thumbnail_path=webp_path,
+                # )
                 print(f"封面{channel}的{srt}完成！")
                 print("#" * 20)
 

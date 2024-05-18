@@ -1,5 +1,6 @@
 import os
 import tempfile
+import ffmpeg
 from pydub import AudioSegment
 from moviepy.editor import (
     VideoFileClip,
@@ -83,6 +84,7 @@ def merge_mp3tomp4(
     chinese_audio_files,
     bg_music,
     merge_mp3_single_path=None,
+    bg_mp3_path="",
 ):
     """把mp3和mp4合成为新视频"""
 
@@ -136,7 +138,7 @@ def merge_mp3tomp4(
     if bg_music:
         # 添加背景音乐
         bg_audio = AudioSegment.from_file(
-            "/Users/donghaoliu/doc/video_material/tts_mp3/background/bg.mp3",
+            bg_mp3_path,
             format="mp3",
         )
         bg_audio = truncate_or_repeat_audio(bg_audio, final_video.duration)
@@ -155,6 +157,99 @@ def merge_mp3tomp4(
     final_video = final_video.set_audio(final_audio)
 
     return final_video
+
+
+def merge_mp3tomp4_gpu(
+    srt_file_path,
+    video_file_path,
+    chinese_audio_files,
+    bg_music,
+    merge_mp3_single_path=None,
+    bg_mp3_path="",
+    dst_mp4_path="",
+):
+    """把mp3和mp4合成为新视频"""
+    print(f"使用gpu合成！")
+    srt_content = read_srt_file(srt_file_path)
+    ts_list, _ = parse_srt_with_re(srt_content)
+
+    mp4_list, mp3_list = get_mp4_clip_list(
+        video_file_path, ts_list, chinese_audio_files
+    )
+    assert len(mp4_list) == len(mp3_list)
+
+    new_mp4_list = []
+    new_mp3_list = []
+
+    for mp3, mp4 in tqdm(zip(mp3_list, mp4_list)):
+        if mp3[0] == 1 and mp4[0] == 1:
+
+            # 比较音频和视频的长度
+            mp3_duration = mp3[1].duration_seconds
+            mp4_duration = mp4[1].duration
+
+            # 如果音频长度小于视频长度，则在音频后面添加silence
+            if mp3_duration < mp4_duration:
+                silence_duration = mp4_duration - mp3_duration
+                silence = AudioSegment.silent(duration=int(silence_duration * 1000))
+                new_mp3_clip = mp3[1] + silence
+                new_mp3_list.append(new_mp3_clip)
+                new_mp4_list.append(mp4[1])
+
+            # 如果音频长度大于视频长度，延长视频长度
+            else:
+                new_mp3_list.append(mp3[1])
+                new_mp4_list.append(mp4[1].set_duration(mp3_duration))
+
+        # 此部分存在视频但没有对应音频,此时mp3是silence
+        elif mp3[0] == 0 and mp4[0] == 1:
+            mp3_duration = mp3[1].duration_seconds
+            mp4_duration = mp4[1].duration
+            # 两个片段长度比例不能小于0.98
+            assert mp3_duration / mp4_duration > 0.98
+            new_mp4_list.append(mp4[1])
+            new_mp3_list.append(mp3[1])
+
+    # 合并视频
+    final_video = concatenate_videoclips(new_mp4_list)
+    # 合并音频
+    final_audio = AudioSegment.empty()
+    for audio in new_mp3_list:
+        final_audio += audio
+
+    if bg_music:
+        # 添加背景音乐
+        bg_audio = AudioSegment.from_file(
+            bg_mp3_path,
+            format="mp3",
+        )
+        bg_audio = truncate_or_repeat_audio(bg_audio, final_video.duration)
+
+        # 合并音频
+        final_audio = combine_speech_bg(final_audio, bg_audio)
+
+    # 保存音频为临时文件，使用后删除
+    final_audio.export(merge_mp3_single_path, format="mp3")
+    print(f"合成mp3完成，路径为：{merge_mp3_single_path}")
+    time.sleep(3)
+
+    # 加载合成的mp3，使用moviepy的AudioFileClip
+    final_audio = AudioFileClip(merge_mp3_single_path)
+    # 将音频添加到视频中
+    final_video = final_video.set_audio(final_audio)
+
+    # 保存合并后的文件
+    final_video_path = "output_video.mp4"
+    final_video.write_videofile(final_video_path, codec="libx264")
+
+    # 使用 ffmpeg 进行 GPU 加速的音视频合成
+    input_video = ffmpeg.input(final_video_path)
+    input_audio = ffmpeg.input(merge_mp3_single_path)
+    # output_file = "output_video_with_gpu.mp4"
+
+    ffmpeg.output(input_video, input_audio, dst_mp4_path, vcodec="h264_nvenc").run()
+
+    # return output_file
 
 
 def cross_fade(pydub_audio):
@@ -251,6 +346,7 @@ def merge_mp4_controller_single(
     cur_zh_srt_path,
     bg_music=True,
     merge_mp3_single_path=None,
+    bg_mp3_path="",
 ):
     # 初始化 colorama
     init(autoreset=True)
@@ -270,7 +366,12 @@ def merge_mp4_controller_single(
     mp3 = get_sorted_mp3_list(tts_mp3_path)
     chinese_audio_clips = [os.path.join(tts_mp3_path, mp3_file) for mp3_file in mp3]
     final_video = merge_mp3tomp4(
-        cur_zh_srt_path, mp4_path, chinese_audio_clips, bg_music, merge_mp3_single_path
+        cur_zh_srt_path,
+        mp4_path,
+        chinese_audio_clips,
+        bg_music,
+        merge_mp3_single_path,
+        bg_mp3_path=bg_mp3_path,
     )
     final_video.write_videofile(dst_mp4_path)
 

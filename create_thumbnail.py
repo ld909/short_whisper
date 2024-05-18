@@ -236,12 +236,95 @@ def white_temp2_controller():
         result_image.save(os.path.join(dst_white_path, png))
 
 
+def draw_ch_title_on_image_rect(
+    image_path,
+    text,
+    position,
+    font_path,
+    font_size,
+    right_padding,
+    box_color=(0, 255, 128),
+    box_thickness=15,
+    padding=20,  # 新增的padding参数
+    line_spacing=30,  # 新增的line_spacing参数
+):
+    """在图像上绘制文本并在文本周围绘制矩形框"""
+    # 打开图像
+    if isinstance(image_path, Image.Image):
+        image = image_path
+        text_color = (255, 255, 255)
+    else:
+        image = Image.open(image_path)
+        text_color = (0, 255, 0)
+
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.truetype(font_path, font_size)
+
+    # 计算文本宽度的最大值
+    max_width = image.width - position[0] - right_padding
+
+    # 使用 jieba 进行中文分词
+    words = list(jieba.cut(text, cut_all=False))
+
+    # 自动换行
+    lines = []
+    while words:
+        line = ""
+        while words:
+            word = words[0]
+            test_line = line + word if line else word
+            (width, baseline), (offset_x, offset_y) = font.font.getsize(test_line)
+            if width <= max_width:
+                line = test_line
+                words.pop(0)
+            else:
+                break
+        lines.append(line)
+
+    # 计算文本块的总高度
+    total_height = 0
+    max_line_width = 0
+    for line in lines:
+        (width, baseline), (offset_x, offset_y) = font.font.getsize(line)
+        total_height += baseline + offset_y + line_spacing
+        max_line_width = max(max_line_width, width)
+
+    # 绘制矩形框
+    box_top_left = (
+        position[0] - padding - box_thickness,
+        position[1] - padding - box_thickness,
+    )
+    box_bottom_right = (
+        position[0] + max_line_width + padding + box_thickness,
+        position[1] + total_height + padding + box_thickness - line_spacing,
+    )
+    draw.rectangle(
+        [box_top_left, box_bottom_right], outline=box_color, width=box_thickness
+    )
+
+    # 绘制文本
+    y = position[1]
+    for line in lines:
+        draw.text((position[0], y), line, font=font, fill=text_color)
+        (width, baseline), (offset_x, offset_y) = font.font.getsize(line)
+        y += baseline + offset_y + line_spacing
+
+    return image
+
+
 def draw_ch_title_on_image(
     image_path, text, position, font_path, font_size, right_padding
 ):
     """在图像上绘制文本"""
     # 打开图像
-    image = Image.open(image_path)
+    # 如果image_path是一个PIL图像对象，则直接使用它
+    if isinstance(image_path, Image.Image):
+        image = image_path
+        color = (255, 255, 255)
+    else:
+        image = Image.open(image_path)
+        color = (0, 255, 0)
+
     draw = ImageDraw.Draw(image)
     font = ImageFont.truetype(font_path, font_size)
 
@@ -272,7 +355,7 @@ def draw_ch_title_on_image(
     # 绘制文本
     y = position[1]
     for line in lines:
-        draw.text((position[0], y), line, font=font, fill=(0, 255, 0))
+        draw.text((position[0], y), line, font=font, fill=color)
         # 获取行高以更新y坐标
         (width, baseline), (offset_x, offset_y) = font.font.getsize(line)
         y += baseline + offset_y
@@ -280,9 +363,9 @@ def draw_ch_title_on_image(
     return image
 
 
-def random_bg():
+def random_bg(bg_path):
     """randomly select a background image"""
-    bg_path = "/media/dhl/TOSHIBA/video_material/thumbnail_material/white2"
+    # bg_path = "/media/dhl/TOSHIBA/video_material/thumbnail_material/white2"
     all_bg_images = os.listdir(bg_path)
     all_bg_images = [bg for bg in all_bg_images if bg != ".DS_Store"]
 
@@ -391,7 +474,7 @@ def create_zh_title_thumbnail_vertical():
 
 
 def create_zh_title_thumbnail_vertical_single(
-    dst_thumbnail_path, zh_title_path, vertical_font_path
+    dst_thumbnail_path, zh_title_path, vertical_font_path, bg_path
 ):
     """针对一个srt文件创建竖直封面"""
     if os.path.exists(dst_thumbnail_path):
@@ -399,7 +482,7 @@ def create_zh_title_thumbnail_vertical_single(
         return
     print(f"创建封面 {dst_thumbnail_path}....")
 
-    bg_image_path = random_bg()
+    bg_image_path = random_bg(bg_path)
 
     # 读取中文标题
     zh_title = read_zh_title(zh_title_path)
@@ -509,6 +592,84 @@ def create_zh_title_thumbnail_horizontal():
             merged_thumbnail_img.save(
                 os.path.join(dst_thumbnail_path, topic, channel, dst_file_name)
             )
+
+
+def read_bg(bg_path):
+    # read bg image using pillow
+    bg_img = Image.open(bg_path)
+    return bg_img
+
+
+def paste_youtube_to_bg(bg, thumbnail_path):
+    """把youtube封面图粘贴到背景图上"""
+
+    # 打开封面图片 (WebP格式)
+    thumbnail = Image.open(thumbnail_path)
+
+    # 获取背景图片的尺寸
+    bg_width, bg_height = bg.size
+
+    # 计算调整后的封面图片高度,保持宽高比
+    thumbnail_width = 1080
+    thumbnail_height = int(thumbnail.size[1] * (thumbnail_width / thumbnail.size[0]))
+
+    # 调整封面图片大小
+    thumbnail = thumbnail.resize(
+        (thumbnail_width, thumbnail_height), Image.Resampling.LANCZOS
+    )
+
+    # 创建一个新的图像,大小为1080x1464,用于放置背景图和封面图
+    new_img = Image.new("RGB", (1080, 1464), color="white")
+
+    # 计算背景图片在新图像中的位置,使其居中
+    bg_x = 0
+    bg_y = 0
+
+    # 将背景图片粘贴到新图像中
+    new_img.paste(bg, (bg_x, bg_y))
+
+    # 计算封面图片在新图像中的位置,使其底部对齐
+    thumbnail_x = 0
+    thumbnail_y = bg_height - thumbnail_height
+
+    # 将封面图片粘贴到新图像中
+    new_img.paste(thumbnail, (thumbnail_x, thumbnail_y))
+
+    # # 保存最终的图片
+    # new_img.save(dst_thumbnail_path)
+    return new_img
+
+
+def create_thumbnail_from_original_vertical_single(
+    dst_thumbnail_path, zh_title_path, vertical_font_path, bg_path, ytb_thumbnail_path
+):
+    """创建从原始封面图和中文标题创建竖直封面图"""
+    bg_img = read_bg(bg_path)
+    merged_bg = paste_youtube_to_bg(bg_img, ytb_thumbnail_path)
+
+    # 读取中文标题
+    zh_title = read_zh_title(zh_title_path)
+
+    # Chinese title position on the thumbnail bg image
+    position = (160, 180)  # 文本的起始位置
+
+    # chinese font
+    font_size = 100  # 字体大小
+    right_padding = 100  # 文本到图像右边缘的距离
+
+    # 贴中文标题到背景图像上
+    merged_thumbnail_img = draw_ch_title_on_image_rect(
+        merged_bg,
+        zh_title,
+        position,
+        vertical_font_path,
+        font_size,
+        right_padding,
+    )
+
+    # save the image to the destination folder
+    merged_thumbnail_img.save(dst_thumbnail_path)
+    print(f"封面{dst_thumbnail_path}创建完成！")
 
 
 if __name__ == "__main__":

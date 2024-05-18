@@ -130,6 +130,10 @@ def controller_translate_srt_single(eng_srt_path, dst_zh_srt_path, topic):
     zh_srt = []
     # everytime get 3 subtitles and corresponding timestamps
     for i in tqdm(range(0, len(subtitles), 3)):
+
+        # 打印当前进度
+        print(f"当前进度：{i}/{len(subtitles)}", f"一共{len(subtitles)}个字幕")
+
         # get 3 subtitles
         sentences = subtitles[i : i + 3]
         # format the 3 subtitles into a list, each item is a sentence, surrounded by double quotes
@@ -141,7 +145,6 @@ def controller_translate_srt_single(eng_srt_path, dst_zh_srt_path, topic):
             translated_sentences, success = translate_srt(sentences, topic)
 
         # assert the number of translated subtitles is the same as the original subtitles
-        print(len(translated_sentences), len(sentences))
         assert len(translated_sentences) == len(sentences)
 
         # append the translated subtitles to the list

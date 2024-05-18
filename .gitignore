@@ -12,3 +12,4 @@
 /test_ssml/
 # ignore all mp3 files
 *.mp3
+*.mp4

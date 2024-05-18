@@ -7,6 +7,16 @@ from short.publish_kuaishou import publish_kuaishou_video
 from short.publish_weixin import upload_weixin_video
 
 
+def load_bad_json():
+    """载入bad.json文件，返回字典"""
+    import json
+
+    # 载入bad.json文件
+    with open("./upload_log/bad.json", "r") as file:
+        data = json.load(file)
+    return data
+
+
 def read_upload_log():
     """读取上传日志文件，返回一个字典。"""
     log_path = "./upload_log/upload_log.json"
@@ -52,7 +62,7 @@ def update_log(log_key, platform, date_time_str):
 
     # 将 JSON 数据写入文件
     with open(
-        "/Users/donghaoliu/doc/short_whisper/upload_log/upload_log.json",
+        "./upload_log/upload_log.json",
         "w",
         encoding="utf-8",
     ) as file:
@@ -70,60 +80,17 @@ def next_time_point(current_time, chunk_split):
         ) + timedelta(days=1)
 
     # 如果当前时间的hour是6，把hour设定为7
-    elif current_time.hour == 6:
-        next_time = current_time.replace(hour=7, minute=0, second=0, microsecond=0)
+    elif current_time.hour in [6, 8, 10, 12, 14, 16]:
+        next_time = current_time + timedelta(hours=2)
 
-    # 如果当前时间hour是7，把hour设定为8
-    elif current_time.hour == 7:
-        next_time = current_time.replace(hour=8, minute=0, second=0, microsecond=0)
+    elif current_time.hour in [18, 19, 20, 21]:
+        next_time = current_time + timedelta(hours=1)
 
-    # 如果当前时间hour是8，把hour设定为11
-    elif current_time.hour == 8:
-        next_time = current_time.replace(hour=11, minute=0, second=0, microsecond=0)
-
-    # 如果当前时间hour是11，把hour设定为12
-    elif current_time.hour == 11:
-        next_time = current_time.replace(hour=12, minute=0, second=0, microsecond=0)
-
-    # 如果当前时间hour是12，把hour设定为13
-    elif current_time.hour == 12:
-        next_time = current_time.replace(hour=13, minute=0, second=0, microsecond=0)
-
-    # 如果当前时间hour是13，把hour设定为晚上7点
-    elif current_time.hour == 13:
-        next_time = current_time.replace(hour=19, minute=0, second=0, microsecond=0)
-
-    # 如果当前时间hour是19，把hour设定为晚上20点
-    elif current_time.hour == 19:
-        next_time = current_time.replace(hour=20, minute=0, second=0, microsecond=0)
-
-    # 如果当前时间hour是20，把hour设定为晚上21点
-    elif current_time.hour == 20:
-        next_time = current_time.replace(hour=21, minute=0, second=0, microsecond=0)
-
-    # 如果当前时间hour是21，把hour设定为晚上22点
-    elif current_time.hour == 21:
-        next_time = current_time.replace(hour=22, minute=0, second=0, microsecond=0)
-
-    # 如果当前时间hour是22，把hour设定为22点30分
-    elif current_time.hour == 22 and current_time.minute != 30:
-        next_time = current_time.replace(hour=22, minute=30, second=0, microsecond=0)
-
-    # 如果当前时间是22点30分，设定下一个时间是明天早上6点
-    elif current_time.hour == 22 and current_time.minute == 30:
+    elif current_time.hour == 22:
+        # 设定为明天早上六点
         next_time = current_time.replace(
             hour=6, minute=0, second=0, microsecond=0
         ) + timedelta(days=1)
-
-    # # 如果当前时间在所有时间点之前,除开最后一个时间点
-    # elif current_time > datetime.now() and current_time.hour in all_time_points[:-1]:
-    #     next_time = current_time + timedelta(hours=time_gap)
-
-    # # 如果当前时间是最后一个时间点，设定下一个时间是明天早上6点
-    # elif current_time > datetime.now() and current_time.hour == all_time_points[-1]:
-    #     next_time = current_time.replace(
-    #         hour=6, minute=0, second=0, microsecond=0
-    #     ) + timedelta(days=1)
 
     return next_time
 
@@ -197,14 +164,14 @@ def get_uploaded_mp4s():
 
 
 def upload_all_platforms(topic):
+
+    hard_drive_path = "/media/dhl/TOSHIBA"
     # zh_mp4_path作为上传视频的路径读取依赖
-    zh_mp4_path = "/Volumes/dhl/ytb-videos/tts_mp4"
-    zh_title_path = "/Users/donghaoliu/doc/video_material/zh_title"
-    zh_tags = "/Users/donghaoliu/doc/video_material/zh_tag"
-    thumbnail_vertical_path = "/Users/donghaoliu/doc/video_material/thumbnail_vertical"
-    thumbnail_horizontal_path = (
-        "/Users/donghaoliu/doc/video_material/thumbnail_horizontal"
-    )
+    zh_mp4_path = f"{hard_drive_path}/ytb-videos/tts_mp4"
+    zh_title_path = f"{hard_drive_path}/video_material/zh_title"
+    zh_tags = f"{hard_drive_path}/video_material/zh_tag"
+    thumbnail_vertical_path = f"{hard_drive_path}/video_material/thumbnail_vertical"
+    thumbnail_horizontal_path = f"{hard_drive_path}/video_material/thumbnail_horizontal"
     # ref_dict = load_ref_json(topic)
     # # get all channels from the ref.json file
     # channels = read_channels_from_ref_json(topic)
@@ -212,6 +179,8 @@ def upload_all_platforms(topic):
     channels = os.listdir(os.path.join(zh_mp4_path, topic))
     # remove .DS_Store using list comprehension
     channels = [channel for channel in channels if channel != ".DS_Store"]
+
+    bad_json_data = load_bad_json()
 
     for channel in channels:
         # get all mp4 files from the ref_dict
@@ -234,6 +203,22 @@ def upload_all_platforms(topic):
             if "douyin" in uploaded_platforms and "kuaishou" in uploaded_platforms:
                 print(f"mp4 {mp4_single} 已经上传到抖音和快手，跳过...")
                 continue
+            mp4_basename = os.path.splitext(mp4_single)[0]
+            if topic in bad_json_data:
+                if channel in bad_json_data[topic]:
+                    # 得到无后缀的srt文件名
+                    if mp4_basename in bad_json_data[topic][channel]:
+                        print(
+                            f"话题{topic},频道{channel}的{mp4_single}在bad.json中，跳过..."
+                        )
+                        continue
+            print(f"正在上传{mp4_single}")
+            print("已经上传的平台：", uploaded_platforms)
+            # print(
+            #     f"key是{log_key}",
+            #     log_key in upload_log,
+            #     upload_log[log_key]["platforms"],
+            # )
 
             # preapre the video and upload
             # ref_mp4 = ref_dict[channel][mp4_single]

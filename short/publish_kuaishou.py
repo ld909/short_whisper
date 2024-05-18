@@ -1,3 +1,4 @@
+import sys
 import random
 import time
 from selenium import webdriver
@@ -12,7 +13,7 @@ from selenium.webdriver.common.keys import Keys
 
 def login_and_save_cookies(topic):
     # a new webdriver instance
-    driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
+    driver_path = "/home/dhl/Downloads/chromedriver-linux64/chromedriver"
     service = Service(executable_path=driver_path)
 
     driver = webdriver.Chrome(service=service)
@@ -25,22 +26,20 @@ def login_and_save_cookies(topic):
 
     # save the cookies
     cookies = driver.get_cookies()
-    dst_cookies = f"/Users/donghaoliu/doc/short_whisper/short/cookies/{topic}.json"
+    dst_cookies = f"./short/{topic}/kuaishou.json"
     with open(dst_cookies, "w") as f:
         json.dump(cookies, f)
 
 
 def load_cookies(topic):
-    driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
+    driver_path = "/home/dhl/Downloads/chromedriver-linux64/chromedriver"
     service = Service(executable_path=driver_path)
 
     driver = webdriver.Chrome(service=service)
 
     # open the login page
     driver.get("https://cp.kuaishou.com/profile")
-    cookie_path = (
-        f"/Users/donghaoliu/doc/short_whisper/short/cookies/{topic}/kuaishou.json"
-    )
+    cookie_path = f"./short/{topic}/kuaishou.json"
     with open(cookie_path, "r") as f:
         cookies = json.load(f)
         for cookie in cookies:
@@ -254,5 +253,6 @@ def publish_kuaishou_video(
 
 
 if __name__ == "__main__":
-    login_and_save_cookies()
+    topic = sys.argv[1]
+    login_and_save_cookies(topic=topic)
 # publish_video()
