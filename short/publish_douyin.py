@@ -63,7 +63,7 @@ def input_video_title(driver, title):
     )
 
     # 设置显式等待时间为10秒
-    timeout = 10
+    timeout = 30
 
     # wait for the element to be present
     element = WebDriverWait(driver, timeout).until(
@@ -83,7 +83,7 @@ def input_video_description_tags(driver, description, tags):
     )
 
     # 设置显式等待时间为10秒
-    timeout = 10
+    timeout = 20
 
     # wait for the element to be present
     element = WebDriverWait(driver, timeout).until(
@@ -105,9 +105,11 @@ def set_datetime(driver, date_time):
     date_time_xpath = "//div[@class='container--2urnP']"
 
     # wait for the element to be present
-    element = WebDriverWait(driver, 10).until(
+    element = WebDriverWait(driver, 20).until(
         EC.presence_of_element_located((By.XPATH, date_time_xpath))
     )
+
+    time.sleep(2)
 
     # click the 定时发布 button
     element.click()

@@ -141,8 +141,8 @@ def controller_translate_srt_single(eng_srt_path, dst_zh_srt_path, topic):
 
         # translate the 3 subtitles
         success = False
-        while not success:
-            translated_sentences, success = translate_srt(sentences, topic)
+        # while not success:
+        translated_sentences, success = translate_srt(sentences, topic)
 
         # assert the number of translated subtitles is the same as the original subtitles
         assert len(translated_sentences) == len(sentences)
@@ -405,10 +405,12 @@ def translate_srt(eng_srt_str, topic):
     client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
     len_eng_srt = len(eng_srt_str)
     text = f"我会给你一个字幕的list，list每个item是一条英文字幕，帮我翻译为中文。返回一个list，长度和输入的list长度一致，当前输入list长度为{len_eng_srt},你必须返回当度为{len_eng_srt}的list，每个item是对应翻译后的中文字幕。除了翻译后的结果list外，不用返回任何多余的文字和额外说明。英文字幕list是: {eng_srt_str}"
+
     if topic == "code":
         prompt_txt = "你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于计算机科学/编程/数学相关话题的，请注意你的专业用语。"
     elif topic == "mama":
         prompt_txt = "你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于育儿/早教/母婴相关话题的，请注意你的专业用语。"
+    print("创建message")
     message = client.messages.create(
         model="claude-3-haiku-20240307",
         max_tokens=1000,
@@ -426,7 +428,9 @@ def translate_srt(eng_srt_str, topic):
             }
         ],
     )
+    print("开始翻译")
     translate_srt_str = message.content[0].text
+    print("翻译完成")
     try:
         translate_srt_list = ast.literal_eval(translate_srt_str)
         success = message.stop_reason == "end_turn"

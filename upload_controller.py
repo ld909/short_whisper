@@ -5,6 +5,7 @@ import sys
 from short.publish_douyin import upload_douyin_video
 from short.publish_kuaishou import publish_kuaishou_video
 from short.publish_weixin import upload_weixin_video
+from create_thumbnail import create_zh_title_thumbnail_horizontal_single
 
 
 def load_bad_json():
@@ -172,9 +173,9 @@ def upload_all_platforms(topic):
     zh_tags = f"{hard_drive_path}/video_material/zh_tag"
     thumbnail_vertical_path = f"{hard_drive_path}/video_material/thumbnail_vertical"
     thumbnail_horizontal_path = f"{hard_drive_path}/video_material/thumbnail_horizontal"
-    # ref_dict = load_ref_json(topic)
-    # # get all channels from the ref.json file
-    # channels = read_channels_from_ref_json(topic)
+    thumbnail_font_path = (
+        f"{hard_drive_path}/video_material/font/DottedSongtiCircleRegular.otf"
+    )
 
     channels = os.listdir(os.path.join(zh_mp4_path, topic))
     # remove .DS_Store using list comprehension
@@ -200,8 +201,12 @@ def upload_all_platforms(topic):
 
             # if len(uploaded_platforms) == 3:
             #     continue
-            if "douyin" in uploaded_platforms and "kuaishou" in uploaded_platforms:
-                print(f"mp4 {mp4_single} 已经上传到抖音和快手，跳过...")
+            if (
+                "douyin" in uploaded_platforms
+                and "kuaishou" in uploaded_platforms
+                and "weixin" in uploaded_platforms
+            ):
+                print(f"mp4 {mp4_single} 已经上传到抖音和快手\微信，跳过...")
                 continue
             mp4_basename = os.path.splitext(mp4_single)[0]
             if topic in bad_json_data:
@@ -214,15 +219,7 @@ def upload_all_platforms(topic):
                         continue
             print(f"正在上传{mp4_single}")
             print("已经上传的平台：", uploaded_platforms)
-            # print(
-            #     f"key是{log_key}",
-            #     log_key in upload_log,
-            #     upload_log[log_key]["platforms"],
-            # )
 
-            # preapre the video and upload
-            # ref_mp4 = ref_dict[channel][mp4_single]
-            # basename = mp4_single
             base_name_prefix = os.path.splitext(mp4_single)[0]
 
             # video path
@@ -268,12 +265,12 @@ def upload_all_platforms(topic):
             )
 
             # 微信使用横版缩略图
-            # thumbnail_png_horizontal = os.path.join(
-            #     thumbnail_horizontal_path,
-            #     topic,
-            #     channel,
-            #     thunbnail_basename + ".png",
-            # )
+            thumbnail_png_horizontal = os.path.join(
+                thumbnail_horizontal_path,
+                topic,
+                channel,
+                thunbnail_basename + ".png",
+            )
 
             # get the upload time
             upload_time_obj = get_upload_time(
@@ -335,28 +332,58 @@ def upload_all_platforms(topic):
                 print("kuaishou上传完成,已更新日志...")
                 print("*" * 50)
 
-            # if "weixin" not in uploaded_platforms:
-            #     print("uploading to weixin...")
-            # # upload to weixin
-            # title_add_description = video_title_zh + " " + video_tags_zh_str
+            if "weixin" not in uploaded_platforms:
 
-            # weixin_time_str = upload_time_obj.strftime("%Y-%m-%d %H:%M")
+                # 如果微信的缩略图不存在，生成一个
+                if not os.path.exists(thumbnail_png_horizontal):
+                    print("微信的缩略图不存在，生成一个...")
+                    bg_thumbnail_path_horizontal = f"{hard_drive_path}/video_material/thumbnail_material/white2_horizontal"
+                    zh_title_dst_path = (
+                        f"{hard_drive_path}/video_material/zh_title/{topic}"
+                    )
+                    zh_title_single_path = os.path.join(
+                        zh_title_dst_path, channel, thunbnail_basename + ".txt"
+                    )
+                    create_zh_title_thumbnail_horizontal_single(
+                        dst_thumbnail_path=thumbnail_png_horizontal,
+                        zh_title_path=zh_title_single_path,
+                        font_path=thumbnail_font_path,
+                        bg_path=bg_thumbnail_path_horizontal,
+                    )
+                else:
+                    print(f"微信的横版缩略图已经存在：{thumbnail_png_horizontal}")
 
-            # # upload to weixin
-            # upload_weixin_video(
-            #     video_path,
-            #     thumbnail_png_horizontal,
-            #     video_title_zh.replace("#", "sharp"),
-            #     title_add_description,
-            #     weixin_time_str,
-            # )
+                print("uploading to weixin...")
+                # upload to weixin
+                title_add_description = video_title_zh + " " + video_tags_zh_str
 
-            # # 更新日志
-            # update_log(
-            #     log_key, "weixin", upload_time_obj.strftime("%Y-%m-%d-%H-%M")
-            # )
-            # print("weixin上传完成,已更新日志...")
-            # print("*" * 50)
+                weixin_time_str = upload_time_obj.strftime("%Y-%m-%d %H:%M")
+                wx_zh_title = (
+                    video_title_zh.replace("#", "sharp")
+                    .replace("/", "")
+                    .replace("-", "")
+                    .replace(",", "")
+                    .replace(".", "")
+                )
+                if len(wx_zh_title) > 20:
+                    wx_zh_title = wx_zh_title[:17]
+
+                # upload to weixin
+                upload_weixin_video(
+                    video_path,
+                    thumbnail_png_horizontal,
+                    wx_zh_title,
+                    title_add_description,
+                    weixin_time_str,
+                    topic=topic,
+                )
+
+                # 更新日志
+                update_log(
+                    log_key, "weixin", upload_time_obj.strftime("%Y-%m-%d-%H-%M")
+                )
+                print("weixin上传完成,已更新日志...")
+                print("*" * 50)
 
 
 if __name__ == "__main__":

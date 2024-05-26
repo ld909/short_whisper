@@ -5,7 +5,8 @@ import random
 import jieba
 from PIL import Image, ImageDraw, ImageFont
 import cv2
-from upload_controller import read_channels_from_ref_json, load_ref_json
+
+# from upload_controller import read_channels_from_ref_json, load_ref_json
 
 Image.MAX_IMAGE_PIXELS = None
 
@@ -336,6 +337,12 @@ def draw_ch_title_on_image(
 
     # 自动换行
     lines = []
+    # print(words)
+    # replace space with '' empty string
+    words = [word.replace(" ", "") for word in words]
+    # remove empty string
+    words = [word for word in words if word]
+    print(words)
     while words:
         line = ""
         # 根据您提供的方式获取文本尺寸
@@ -372,11 +379,9 @@ def random_bg(bg_path):
     return os.path.join(bg_path, random.choice(all_bg_images))
 
 
-def random_bg_horizontal():
+def random_bg_horizontal(bg_path):
     """randomly select a background image"""
-    bg_path = (
-        "/Users/donghaoliu/doc/video_material/thumbnail_material/white2_horizontal"
-    )
+    # bg_path = "/media/dhl/TOSHIBA/video_material/thumbnail_material/white2_horizontal"
     all_bg_images = os.listdir(bg_path)
     all_bg_images = [bg for bg in all_bg_images if bg != ".DS_Store"]
 
@@ -592,6 +597,42 @@ def create_zh_title_thumbnail_horizontal():
             merged_thumbnail_img.save(
                 os.path.join(dst_thumbnail_path, topic, channel, dst_file_name)
             )
+
+
+def create_zh_title_thumbnail_horizontal_single(
+    dst_thumbnail_path, zh_title_path, font_path, bg_path
+):
+    """针对一个srt文件创建竖直封面"""
+    if os.path.exists(dst_thumbnail_path):
+        print(f"{dst_thumbnail_path} 封面存在, 跳过继续...")
+        return
+    print(f"创建封面 {dst_thumbnail_path}....")
+
+    bg_image_path = random_bg_horizontal(bg_path)
+
+    # 读取中文标题
+    zh_title = read_zh_title(zh_title_path)
+
+    # Chinese title position on the thumbnail bg image
+    position = (700, 100)  # 文本的起始位置
+
+    # chinese font path
+    font_size = 100  # 字体大小
+    right_padding = 600  # 主标题到图像右边缘的距离
+
+    # 贴中文标题到背景图像上
+    merged_thumbnail_img = draw_ch_title_on_image(
+        bg_image_path,
+        zh_title,
+        position,
+        font_path,
+        font_size,
+        right_padding,
+    )
+
+    # save the image to the destination folder
+    merged_thumbnail_img.save(dst_thumbnail_path)
+    print(f"封面{dst_thumbnail_path}创建完成！")
 
 
 def read_bg(bg_path):

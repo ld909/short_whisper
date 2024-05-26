@@ -8,12 +8,12 @@ from merge_tts_mp3 import merge_mp4_controller_single
 from get_zh_title import zh_title_tags_controller_single
 from create_thumbnail import (
     create_zh_title_thumbnail_vertical_single,
-    create_thumbnail_from_original_vertical_single,
+    create_zh_title_thumbnail_horizontal_single,
 )
 from tqdm import tqdm
 
 
-def load_bad_json(data):
+def load_bad_json():
     """载入bad.json文件，返回字典"""
     import json
 
@@ -49,6 +49,7 @@ def retain_pipe_status(
     zh_title_dst_path,
     zh_tag_dst_path,
     dst_vertical_thumbnail_path,
+    dst_horizontal_thumbnail_path,
     eng_mp4_abs_path,
     jump30,
 ):
@@ -74,11 +75,24 @@ def retain_pipe_status(
     done_zh_tag = [tag for tag in done_zh_tag if tag != ".DS_Store"]
     done_zh_tag = [tag.replace(".txt", "") for tag in done_zh_tag]
 
-    done_thumbnail = os.listdir(os.path.join(dst_vertical_thumbnail_path, channel))
-    done_thumbnail = [
-        thumbnail for thumbnail in done_thumbnail if thumbnail != ".DS_Store"
+    done_thumbnail_vertical = os.listdir(
+        os.path.join(dst_vertical_thumbnail_path, channel)
+    )
+    done_thumbnail_horizontal = os.listdir(
+        os.path.join(dst_horizontal_thumbnail_path, channel)
+    )
+    done_thumbnail_vertical = [
+        thumbnail for thumbnail in done_thumbnail_vertical if thumbnail != ".DS_Store"
     ]
-    done_thumbnail = [thumbnail.replace(".png", "") for thumbnail in done_thumbnail]
+    done_thumbnail_horizontal = [
+        thumbnail for thumbnail in done_thumbnail_horizontal if thumbnail != ".DS_Store"
+    ]
+    done_thumbnail_vertical = [
+        thumbnail.replace(".png", "") for thumbnail in done_thumbnail_vertical
+    ]
+    done_thumbnail_horizontal = [
+        thumbnail.replace(".png", "") for thumbnail in done_thumbnail_horizontal
+    ]
 
     print(f"正在生成lookup_dict...")
     for srt in tqdm(all_format_srts):
@@ -101,7 +115,10 @@ def retain_pipe_status(
         else:
             lookup_dict[srt_basename]["zh_title_tag"] = False
 
-        if srt_basename in done_thumbnail:
+        if (
+            srt_basename in done_thumbnail_vertical
+            and srt_basename in done_thumbnail_horizontal
+        ):
             lookup_dict[srt_basename]["thumbnail"] = True
         else:
             lookup_dict[srt_basename]["thumbnail"] = False
@@ -118,7 +135,7 @@ def retain_pipe_status(
     return lookup_dict
 
 
-def controller_after_whisper(topic):
+def controller_after_whisper(topic, all_channels):
 
     hard_dive_path = "/media/dhl/TOSHIBA"
     # whisper识别后的srt文件路径, 调用的起始依赖
@@ -136,16 +153,19 @@ def controller_after_whisper(topic):
     dst_vertical_thumbnail_path = (
         f"{hard_dive_path}/video_material/thumbnail_vertical/{topic}"
     )
+    dst_horizontal_thumbnail_path = (
+        f"{hard_dive_path}/video_material/thumbnail_horizontal/{topic}"
+    )
 
     if topic == "code" or topic == "mama":
         bg_mp3_path = f"{hard_dive_path}/video_material/tts_mp3/background/bg.mp3"
 
-    # 所有频道，依赖fomat_srt文件夹
-    all_channels = os.listdir(format_srt_path)
-    #  .DS_Store using list comprehension
-    all_channels = [channel for channel in all_channels if channel != ".DS_Store"]
+    # # 所有频道，依赖fomat_srt文件夹
+    # all_channels = os.listdir(format_srt_path)
+    # #  .DS_Store using list comprehension
+    # all_channels = [channel for channel in all_channels if channel != ".DS_Store"]
 
-    data = load_bad_json("./upload_log/bad.json")
+    data = load_bad_json()
 
     # 遍历所有频道
     for channel in all_channels:
@@ -202,8 +222,10 @@ def controller_after_whisper(topic):
         # 创建封面的文件夹
         if not os.path.exists(os.path.join(dst_vertical_thumbnail_path, channel)):
             os.makedirs(os.path.join(dst_vertical_thumbnail_path, channel))
-        ### 完成创建
+        if not os.path.exists(os.path.join(dst_horizontal_thumbnail_path, channel)):
+            os.makedirs(os.path.join(dst_horizontal_thumbnail_path, channel))
 
+        ### 完成创建
         lookup_dict = retain_pipe_status(
             channel,
             formatted_srts,
@@ -213,6 +235,7 @@ def controller_after_whisper(topic):
             zh_title_dst_path,
             zh_tag_dst_path,
             dst_vertical_thumbnail_path,
+            dst_horizontal_thumbnail_path,
             eng_mp4_abs_path,
             jump30,
         )
@@ -325,34 +348,27 @@ def controller_after_whisper(topic):
                 zh_title_single_path = os.path.join(
                     zh_title_dst_path, channel, tts_folder_name + ".txt"
                 )
-                # webp_path = os.path.join(
-                #     eng_mp4_abs_path, channel, f"{tts_folder_name}.webp"
-                # )
-                # 如果没有webp，就用自创背景
-                # if not os.path.exists(webp_path):
                 vertical_thumbnail_font_path = f"{hard_dive_path}/video_material/font/DottedSongtiCircleRegular.otf"
-                bg_thumbnail_path = (
+                bg_thumbnail_path_vertical = (
                     f"{hard_dive_path}/video_material/thumbnail_material/white2"
                 )
                 create_zh_title_thumbnail_vertical_single(
                     dst_thumbnail_path=vertical_thumbnail_dst_path,
                     zh_title_path=zh_title_single_path,
                     vertical_font_path=vertical_thumbnail_font_path,
-                    bg_path=bg_thumbnail_path,
+                    bg_path=bg_thumbnail_path_vertical,
                 )
-                # 如果有webp，就用youtube的背景
-                # else:
-                #     bg_thumbnail_path = f"{hard_dive_path}/video_material/thumbnail_material/bg/{topic}/bg1.png"
-                #     vertical_thumbnail_font_path = (
-                #         f"{hard_dive_path}/video_material/font/GenJyuuGothic-Bold-2.ttf"
-                #     )
-                #     create_thumbnail_from_original_vertical_single(
-                #         dst_thumbnail_path=vertical_thumbnail_dst_path,
-                #         zh_title_path=zh_title_single_path,
-                #         vertical_font_path=vertical_thumbnail_font_path,
-                #         bg_path=bg_thumbnail_path,
-                #         ytb_thumbnail_path=webp_path,
-                # )
+                print("创建微信封面")
+                horizontal_thumbnail_dst_path = os.path.join(
+                    dst_horizontal_thumbnail_path, channel, tts_folder_name + ".png"
+                )
+                bg_thumbnail_path_horizontal = f"{hard_dive_path}/video_material/thumbnail_material/white2_horizontal"
+                create_zh_title_thumbnail_horizontal_single(
+                    dst_thumbnail_path=horizontal_thumbnail_dst_path,
+                    zh_title_path=zh_title_single_path,
+                    font_path=vertical_thumbnail_font_path,
+                    bg_path=bg_thumbnail_path_horizontal,
+                )
                 print(f"封面{channel}的{srt}完成！")
                 print("#" * 20)
 
@@ -360,4 +376,5 @@ def controller_after_whisper(topic):
 if __name__ == "__main__":
     # 从命令行第一个参数得到topic
     topic = argv[1]
-    controller_after_whisper(topic)
+    all_channels = ["fireship"]
+    controller_after_whisper(topic, all_channels)

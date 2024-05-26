@@ -7,11 +7,13 @@ import os
 from tqdm import tqdm
 from mp3toscripts import mp3totxt, save_srt
 from srt_format import format_srt, break_srt_txt_into_sentences
+from after_whisper_controller import load_bad_json
 
 
 def controller_mp3_to_format_srt(topic):
-    mp3_abs_path = f"/home/dhl/Documents/video_materials_linux/mp3/{topic}"  # fill in the absolute path of the mp3 folder
-    dst_srt_abs_path = f"/home/dhl/Documents/video_materials/format_srt/{topic}"  # fill in the absolute path of the srt folder
+    hard_dive_path = "/media/dhl/TOSHIBA"
+    mp3_abs_path = f"{hard_dive_path}/ytb-videos_toshiba/mp3/{topic}"  # fill in the absolute path of the mp3 folder
+    dst_srt_abs_path = f"{hard_dive_path}/video_materials/format_srt/{topic}"  # fill in the absolute path of the srt folder
 
     # check if the dst_srt_abs_path exists, if not create it
     if not os.path.exists(dst_srt_abs_path):
@@ -20,6 +22,12 @@ def controller_mp3_to_format_srt(topic):
     all_channels = os.listdir(mp3_abs_path)
     # remove .DS_store
     all_channels = [folder for folder in all_channels if folder != ".DS_Store"]
+
+    #
+    all_channels = ["networkchuck"]
+
+    # read bad.json from
+    bad_data = load_bad_json()
 
     # read all mp3 files in the folder
     for channel in tqdm(all_channels):
@@ -30,6 +38,11 @@ def controller_mp3_to_format_srt(topic):
             if mp3_file.endswith(".mp3"):
                 # check if base_name +'.srt' exists in the dst_srt
                 base_name = os.path.splitext(mp3_file)[0]
+                if topic in bad_data:
+                    if channel in bad_data[topic]:
+                        if base_name in bad_data[topic][channel]:
+                            print(f"Bad corrept, skip {base_name} in {channel}")
+                            continue
                 dst_srt = os.path.join(dst_srt_abs_path, channel, base_name + ".srt")
                 # check if os.path.join(dst_srt_abs_path, channel) exists
                 if not os.path.exists(os.path.join(dst_srt_abs_path, channel)):
@@ -60,5 +73,5 @@ def controller_mp3_to_format_srt(topic):
 
 
 if __name__ == "__main__":
-    topic = "food"
+    topic = "code"
     controller_mp3_to_format_srt(topic=topic)
