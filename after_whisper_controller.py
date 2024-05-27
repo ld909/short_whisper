@@ -11,6 +11,33 @@ from create_thumbnail import (
     create_zh_title_thumbnail_horizontal_single,
 )
 from tqdm import tqdm
+import platform
+
+
+def delete_all_trash_files():
+    """删除hard drive下的所有._开头的文件"""
+    print("正在删除hard drive下的所有._开头的文件...")
+    cur_os = detect_os()
+    if cur_os == "mac":
+        hard_dive_path = "/Volumes/TOSHIBA"
+    else:
+        hard_dive_path = "/media/dhl/TOSHIBA"
+
+    # 删除hard drive下的所有._开头的文件
+    for root, dirs, files in os.walk(hard_dive_path):
+        for file in files:
+            if file.startswith("._"):
+                os.remove(os.path.join(root, file))
+                print(f"删除{file}成功！")
+
+    if cur_os == "mac":
+        # 删除hard drive下的所有.DS_Store文件
+        for root, dirs, files in os.walk(hard_dive_path):
+            for file in files:
+                if file == ".DS_Store":
+                    os.remove(os.path.join(root, file))
+                    print(f"删除{file}成功！")
+    print("删除hard drive下的所有._开头的文件完成！")
 
 
 def load_bad_json():
@@ -136,8 +163,12 @@ def retain_pipe_status(
 
 
 def controller_after_whisper(topic, all_channels):
+    cur_os = detect_os()
+    if cur_os == "mac":
+        hard_dive_path = "/Volumes/TOSHIBA"
+    else:
+        hard_dive_path = "/media/dhl/TOSHIBA"
 
-    hard_dive_path = "/media/dhl/TOSHIBA"
     # whisper识别后的srt文件路径, 调用的起始依赖
     format_srt_path = f"{hard_dive_path}/video_material/format_srt/{topic}"
     tts_mp3_path = f"{hard_dive_path}/video_material/tts_mp3/{topic}"
@@ -259,7 +290,8 @@ def controller_after_whisper(topic, all_channels):
             ###### step1： 翻译srt文件 ######
             if not lookup_dict[srt_basename]["srt"]:
                 # 设定代理
-                set_clash_proxy()
+                if cur_os == "linux":
+                    set_clash_proxy()
 
                 print(f"正在翻译频道{channel}的{srt}...")
                 controller_translate_srt_single(
@@ -270,7 +302,8 @@ def controller_after_whisper(topic, all_channels):
                 print(f"翻译{channel}的{srt}完成！")
                 print("#" * 20)
                 # 取消代理
-                unset_clash_proxy()
+                if cur_os == "linux":
+                    unset_clash_proxy()
 
             ###### step2： tts合成语音 ######
             tts_folder_name = srt.replace(".srt", "")
@@ -299,6 +332,7 @@ def controller_after_whisper(topic, all_channels):
                 print("#" * 20)
 
             ###### step3： 合并mp3和mp4 ######
+            delete_all_trash_files()
             cur_zh_srt_path = os.path.join(dst_zh_srt_abs_path, channel, srt)
             if not lookup_dict[srt_basename]["mp4"]:
                 merge_mp4_controller_single(
@@ -325,7 +359,8 @@ def controller_after_whisper(topic, all_channels):
             # 如果没有中文标题和tags，就生成
             if not lookup_dict[srt_basename]["zh_title_tag"]:
                 # set clash
-                set_clash_proxy()
+                if cur_os == "linux":
+                    set_clash_proxy()
                 print(f"正在得到中文标题和tags，频道{channel}的{srt}...")
                 zh_title_tags_controller_single(
                     srt_file_name=srt,
@@ -336,7 +371,8 @@ def controller_after_whisper(topic, all_channels):
                 print(f"中文标题和tags{channel}的{srt}完成！")
                 print("#" * 20)
                 # unset clash
-                unset_clash_proxy()
+                if cur_os == "linux":
+                    unset_clash_proxy()
 
             ###### step5: 创建封面 ######
             if topic == "code" and not lookup_dict[srt_basename]["thumbnail"]:
@@ -373,8 +409,19 @@ def controller_after_whisper(topic, all_channels):
                 print("#" * 20)
 
 
+def detect_os():
+    os_name = platform.system()
+    if os_name == "Darwin":
+        print("You are using macOS.")
+        return "mac"
+    elif os_name == "Linux":
+        print("You are using Linux.")
+        return "linux"
+
+
 if __name__ == "__main__":
     # 从命令行第一个参数得到topic
     topic = argv[1]
     all_channels = ["fireship"]
+    delete_all_trash_files()
     controller_after_whisper(topic, all_channels)

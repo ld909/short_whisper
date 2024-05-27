@@ -111,6 +111,7 @@ def wrap_srt_text_chinese(subtitle_text, max_length=25, timestamps=None):
         return new_lines, new_timestamps
 
 
+
 def controller_translate_srt_single(eng_srt_path, dst_zh_srt_path, topic):
     """Translate the formatted English srt files to Chinese srt files using Claude-3 Haiku."""
 
@@ -136,13 +137,14 @@ def controller_translate_srt_single(eng_srt_path, dst_zh_srt_path, topic):
 
         # get 3 subtitles
         sentences = subtitles[i : i + 3]
+
         # format the 3 subtitles into a list, each item is a sentence, surrounded by double quotes
         sentences = [f"{sentence}" for sentence in sentences]
 
         # translate the 3 subtitles
         success = False
-        # while not success:
-        translated_sentences, success = translate_srt(sentences, topic)
+        while not success:
+            translated_sentences, success = translate_srt(sentences, topic)
 
         # assert the number of translated subtitles is the same as the original subtitles
         assert len(translated_sentences) == len(sentences)
