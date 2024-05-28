@@ -41,7 +41,7 @@ def create_ssml_string(text, rate="1.1", yinse_name="zh-CN-YunjieNeural"):
     return ssml_string
 
 
-def tts_ms(txt_string, topic, clip_dst_path):
+def tts_ms(txt_string, topic, clip_dst_path, channel):
     """调用微软的tts接口，生成mp3文件"""
 
     # 配置参数
@@ -62,8 +62,11 @@ def tts_ms(txt_string, topic, clip_dst_path):
     )
     if topic == "mama":
         yinse_name = "zh-CN-XiaochenNeural"
-    elif topic == "code":
+    elif topic == "code" and channel == "fireship":
         yinse_name = "zh-CN-XiaochenNeural"
+    elif topic == "code" and channel == "networkchuck":
+        yinse_name = "zh-CN-YunyangNeural"
+
     # 构造SSML字符串
     ssml_string = create_ssml_string(txt_string, yinse_name=yinse_name)
 
@@ -223,6 +226,7 @@ def controller_tts_single(
                         tts_mp3_path, channel, srt_basename, f"{sub_idx}.mp3"
                     ),
                     topic=topic,
+                    channel=channel,
                 )
         ## 使用aliyun tts
         # elif topic == "code":

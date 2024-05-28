@@ -73,6 +73,12 @@ def upload_video_thumbnail(driver, thumbnail_path):
     # find the input element and send the thumbnail path to it
     # wait for the input element to be loaded for 10 seconds
     timeout = 10
+
+    # press esc key
+    # 按下Esc键
+    driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+    time.sleep(1)
+
     bianji_element = WebDriverWait(driver, timeout).until(
         EC.presence_of_element_located((By.XPATH, input_xpath))
     )

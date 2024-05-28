@@ -424,4 +424,11 @@ if __name__ == "__main__":
     topic = argv[1]
     all_channels = ["fireship"]
     delete_all_trash_files()
-    controller_after_whisper(topic, all_channels)
+    # infinte loop to run controller_after_whisper even if there is an error
+    while True:
+        try:
+            controller_after_whisper(topic, all_channels)
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
+    # controller_after_whisper(topic, all_channels)

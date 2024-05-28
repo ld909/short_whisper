@@ -1,3 +1,5 @@
+import pyautogui
+from selenium.webdriver.common.keys import Keys
 from datetime import datetime, timedelta
 import random
 import sys
@@ -11,6 +13,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import os
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.action_chains import ActionChains
 
 
 def login_and_save_cookies(topic):
@@ -273,7 +276,7 @@ def set_time_program(driver, time_str):
     target_month = time_list[1]
     target_day = time_list[2]
     target_hour, target_minute = hour_minute.split(":")
-    # set time xpath
+
     # 点击设定时间按钮
     set_time_xpath = "/html/body/div[1]/div/div[2]/div[2]/div/div/div[1]/div[3]/div/div[2]/div[2]/div[7]/div/div[2]/div/label[2]/i"
     timeout = 10
@@ -293,6 +296,7 @@ def set_time_program(driver, time_str):
 
     # default year
     year_full_xpath = "/html/body/div[1]/div/div[2]/div[2]/div/div/div[1]/div[3]/div/div[2]/div[2]/div[7]/div[2]/div[2]/dl/dd/div/div[1]/span[1]"
+
     # wait for the year text to be loaded
     year_full_ele = WebDriverWait(driver, timeout).until(
         EC.presence_of_element_located((By.XPATH, year_full_xpath))
@@ -364,14 +368,19 @@ def set_time_program(driver, time_str):
     # 日
     # date_picker_css = "div.weui-desktop-picker__panel__bd"
     all_dates = driver.find_elements(
-        By.CSS_SELECTOR, "div.weui-desktop-picker__panel__bd a"
+        By.CSS_SELECTOR, "div.weui-desktop-picker__panel__bd td a"
     )
     for date in all_dates:
+        print("当前date:", date.text.strip())
         date_text = date.text.strip()
         if date_text == target_day:
-            print(f"找到目标日期：{target_day}")
+            print(f"找到目标日期：{date_text}")
+            # double click the date
+            # get date x, y
             date.click()
             break
+
+    time.sleep(100000)
 
     # 时+分
     # 点击i元素，这个元素是class为weui-desktop-icon__time，用css定位
@@ -455,6 +464,13 @@ def upload_weixin_video(
     if time_str_obj < datetime.now():
         time_str = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M")
         print(f"微信时间设置错误，新设定为1小时后发布：{time_str}")
+
+    # 使用pyautogui按下page down键，滚动到页面底部
+    time.sleep(0.5)
+    pyautogui.press("pagedown")
+    time.sleep(1)
+    print("滚动到页面底部...")
+
     set_time_program(driver=driver, time_str=time_str)
 
     # input the title

@@ -105,11 +105,14 @@ def set_datetime(driver, date_time):
     date_time_xpath = "//div[@class='container--2urnP']"
 
     # wait for the element to be present
-    element = WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.XPATH, date_time_xpath))
-    )
+    # element = WebDriverWait(driver, 50).until(
+    #     EC.presence_of_element_located((By.XPATH, date_time_xpath))
+    # )
 
-    time.sleep(2)
+    # 用显式等待，等待元素可见
+    element = WebDriverWait(driver, 80).until(
+        EC.visibility_of_element_located((By.XPATH, date_time_xpath))
+    )
 
     # click the 定时发布 button
     element.click()

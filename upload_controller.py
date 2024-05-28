@@ -369,14 +369,14 @@ def upload_all_platforms(topic):
                     wx_zh_title = wx_zh_title[:17]
 
                 # upload to weixin
-                upload_weixin_video(
-                    video_path,
-                    thumbnail_png_horizontal,
-                    wx_zh_title,
-                    title_add_description,
-                    weixin_time_str,
-                    topic=topic,
-                )
+                # upload_weixin_video(
+                #     video_path,
+                #     thumbnail_png_horizontal,
+                #     wx_zh_title,
+                #     title_add_description,
+                #     weixin_time_str,
+                #     topic=topic,
+                # )
 
                 # 更新日志
                 update_log(

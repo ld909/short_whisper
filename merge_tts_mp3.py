@@ -88,7 +88,6 @@ def merge_mp3tomp4(
     bg_mp3_path="",
 ):
     """把mp3和mp4合成为新视频"""
-
     srt_content = read_srt_file(srt_file_path)
     ts_list, _ = parse_srt_with_re(srt_content)
 
@@ -131,6 +130,7 @@ def merge_mp3tomp4(
 
     # 合并视频
     final_video = concatenate_videoclips(new_mp4_list)
+
     # 合并音频
     final_audio = AudioSegment.empty()
     for audio in new_mp3_list:
@@ -374,7 +374,7 @@ def merge_mp4_controller_single(
         merge_mp3_single_path,
         bg_mp3_path=bg_mp3_path,
     )
-    final_video.write_videofile(dst_mp4_path)
+    final_video.write_videofile(dst_mp4_path, threads=12, codec="libx264")
 
 
 if __name__ == "__main__":

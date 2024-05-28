@@ -626,7 +626,8 @@
     "code~~~~fireship~~~~SVG Explained in 100 Seconds.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-06-21-00"
@@ -635,7 +636,8 @@
     "code~~~~fireship~~~~Top 10 Programming Languages in 90 Seconds.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-07-06-00"
@@ -644,7 +646,8 @@
     "code~~~~fireship~~~~Transactional Email 101 📧 with SendGrid & Firebase Cloud Functions.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-07-11-00"
@@ -653,7 +656,8 @@
     "code~~~~fireship~~~~TypeScript - The Basics.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-07-18-00"
@@ -1081,7 +1085,8 @@
     "code~~~~fireship~~~~High-school student makes React a million times faster.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-16-16-00"
@@ -1090,7 +1095,8 @@
     "code~~~~fireship~~~~How to OVER Engineer a Website ⧸⧸ What is a Tech Stack？.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-16-17-00"
@@ -1099,7 +1105,8 @@
     "code~~~~fireship~~~~Is AI really getting dumber？ Llama2 vs GPT-4.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-16-18-00"
@@ -1108,7 +1115,8 @@
     "code~~~~fireship~~~~Is ＂edge＂ computing really faster？.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-17-06-00"
@@ -1716,7 +1724,8 @@
     "code~~~~fireship~~~~Loading Spinners for Asynchronous Firebase Data.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-22-14-00"
@@ -1725,7 +1734,8 @@
     "code~~~~fireship~~~~My Bleeding Edge Tech Stack for 2025.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-22-16-00"
@@ -1734,7 +1744,8 @@
     "code~~~~fireship~~~~Progressive Web Apps in 100 Seconds ⧸⧸ Build a PWA from Scratch.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-22-18-00"
@@ -1743,7 +1754,8 @@
     "code~~~~fireship~~~~RESTful APIs in 100 Seconds ⧸⧸ Build an API from Scratch with Node.js Express.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-22-19-00"
@@ -1752,7 +1764,8 @@
     "code~~~~fireship~~~~Terraform in 100 Seconds.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-22-20-00"
@@ -1761,7 +1774,8 @@
     "code~~~~fireship~~~~The Parallax Effect ⧸⧸ 5 Minute WebDev Project.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-22-21-00"
@@ -1770,7 +1784,8 @@
     "code~~~~fireship~~~~The sad truth about Twitter’s rate limit.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-22-22-00"
@@ -1779,7 +1794,8 @@
     "code~~~~fireship~~~~Visualize 140k Gun Violence Incidents with Deck.gl & Google Maps.mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-22-22-00"
@@ -2223,6 +2239,306 @@
         ],
         "upload_time": [
             "2024-05-26-22-00"
+        ]
+    },
+    "code~~~~fireship~~~~Custom Ionic Splash + Animation.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-28-06-00"
+        ]
+    },
+    "code~~~~fireship~~~~Cypress in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-28-08-00"
+        ]
+    },
+    "code~~~~fireship~~~~Computer Networking in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-28-10-00"
+        ]
+    },
+    "code~~~~fireship~~~~Dart in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-28-12-00"
+        ]
+    },
+    "code~~~~fireship~~~~Deno in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-28-14-00"
+        ]
+    },
+    "code~~~~fireship~~~~Collection Group Queries in Firestore.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-28-16-00"
+        ]
+    },
+    "code~~~~fireship~~~~Claude 3 just destroyed GPT-4 and Gemini... AGI is near？.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-28-18-00"
+        ]
+    },
+    "code~~~~fireship~~~~Cloud Scheduler - Time Triggers for Cloud Functions.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-28-19-00"
+        ]
+    },
+    "code~~~~fireship~~~~Custom RxJS Operators by Example.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-28-20-00"
+        ]
+    },
+    "code~~~~fireship~~~~Custom Usernames with Firebase Authentication.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-28-21-00"
+        ]
+    },
+    "code~~~~fireship~~~~Contentful - CMS for Angular Progressive Web Apps.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-28-22-00"
+        ]
+    },
+    "code~~~~fireship~~~~Cypress End-to-End Testing.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-29-06-00"
+        ]
+    },
+    "code~~~~fireship~~~~Build a Curvaceous Homepage ⧸⧸ Wavy Background Tutorial with SVG & CSS.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-29-08-00"
+        ]
+    },
+    "code~~~~fireship~~~~Build a Mindblowing 3D Portfolio Website ⧸⧸ Three.js Beginner’s Tutorial.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-29-10-00"
+        ]
+    },
+    "code~~~~fireship~~~~DNS Explained in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-29-12-00"
+        ]
+    },
+    "code~~~~fireship~~~~Docker in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-29-14-00"
+        ]
+    },
+    "code~~~~fireship~~~~DevOps CI⧸CD Explained in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-29-16-00"
+        ]
+    },
+    "code~~~~fireship~~~~Dgraph Graph Database in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-29-18-00"
+        ]
+    },
+    "code~~~~fireship~~~~Draggable Sortable Firestore.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-29-19-00"
+        ]
+    },
+    "code~~~~fireship~~~~Closures Explained in 100 Seconds ⧸⧸ Tricky JavaScript Interview Prep.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-29-20-00"
+        ]
+    },
+    "code~~~~fireship~~~~Drizzle ORM in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-29-21-00"
+        ]
+    },
+    "code~~~~fireship~~~~Content Platforms Explained in 100 Seconds ⧸⧸ Build your own with Sanity.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-29-22-00"
+        ]
+    },
+    "code~~~~fireship~~~~Electron JS in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-30-06-00"
+        ]
+    },
+    "code~~~~fireship~~~~DALL-E is coming... World-changing AI image generator.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-30-08-00"
+        ]
+    },
+    "code~~~~fireship~~~~Elixir in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-30-10-00"
+        ]
+    },
+    "code~~~~fireship~~~~Elon wants GPT-5 stopped NOW… 5 reasons AI kinda sucks.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-30-12-00"
+        ]
+    },
+    "code~~~~fireship~~~~Elon's bombshell lawsuit against OpenAI.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-30-14-00"
+        ]
+    },
+    "code~~~~networkchuck~~~~2 cool (web) things to do in Linux ⧸⧸ Linux for Hackers ⧸⧸ EP 8.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-30-16-00"
+        ]
+    },
+    "code~~~~networkchuck~~~~3 HACKING gadgets you have to TRY!!.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-30-18-00"
+        ]
+    },
+    "code~~~~networkchuck~~~~3 Hacking Skills EVERYONE has ⧸⧸ FREE Security+ ⧸⧸ EP 1.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-05-30-19-00"
         ]
     }
 }
