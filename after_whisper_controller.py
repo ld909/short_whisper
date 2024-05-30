@@ -12,6 +12,7 @@ from create_thumbnail import (
 )
 from tqdm import tqdm
 import platform
+import time
 
 
 def delete_all_trash_files():
@@ -224,7 +225,8 @@ def controller_after_whisper(topic, all_channels):
         print(f"移除前：{len(formatted_srts_all)}个，移除后：{len(formatted_srts)}个")
 
         # sort formatted_srts
-        formatted_srts.sort()
+        # formatted_srts.sort()
+
         ### 以上代码是为了除去已经翻译的字幕
 
         ### 创建相关channel文件夹，如果不存在的话
@@ -332,7 +334,7 @@ def controller_after_whisper(topic, all_channels):
                 print("#" * 20)
 
             ###### step3： 合并mp3和mp4 ######
-            delete_all_trash_files()
+            # delete_all_trash_files()
             cur_zh_srt_path = os.path.join(dst_zh_srt_abs_path, channel, srt)
             if not lookup_dict[srt_basename]["mp4"]:
                 merge_mp4_controller_single(

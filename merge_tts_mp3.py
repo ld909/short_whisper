@@ -1,4 +1,5 @@
 import os
+import platform
 import tempfile
 
 import ffmpeg
@@ -17,6 +18,16 @@ import time
 from moviepy.editor import VideoFileClip
 from datetime import timedelta
 from colorama import Fore, Back, Style, init
+
+
+def detect_os():
+    os_name = platform.system()
+    if os_name == "Darwin":
+        print("You are using macOS.")
+        return "mac"
+    elif os_name == "Linux":
+        print("You are using Linux.")
+        return "linux"
 
 
 def get_mp4_clip_list(video_path, ts_list, mp3_list):
@@ -374,7 +385,12 @@ def merge_mp4_controller_single(
         merge_mp3_single_path,
         bg_mp3_path=bg_mp3_path,
     )
-    final_video.write_videofile(dst_mp4_path, threads=12, codec="libx264")
+    os_str = detect_os()
+    if os_str == "mac":
+        thread_num = 4
+    elif os_str == "linux":
+        thread_num = 12
+    final_video.write_videofile(dst_mp4_path, threads=thread_num, codec="libx264")
 
 
 if __name__ == "__main__":

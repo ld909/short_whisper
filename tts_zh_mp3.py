@@ -203,6 +203,15 @@ def controller_tts_single(
     if not os.path.exists(os.path.join(tts_mp3_path, channel, srt_basename)):
         os.makedirs(os.path.join(tts_mp3_path, channel, srt_basename))
 
+    # 循环并删除size为0的mp3文件
+    for sub_idx, subtitle in enumerate(subtitles):
+        mp3_dst_path = os.path.join(
+            tts_mp3_path, channel, srt_basename, f"{sub_idx}.mp3"
+        )
+        if os.path.exists(mp3_dst_path) and os.path.getsize(mp3_dst_path) == 0:
+            os.remove(mp3_dst_path)
+            print(f"{mp3_dst_path} size 为0，已删除")
+
     # 生成字幕，并保存为mp3
     for sub_idx, subtitle in tqdm(enumerate(subtitles)):
         tts_success = False
