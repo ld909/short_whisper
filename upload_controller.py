@@ -369,14 +369,14 @@ def upload_all_platforms(topic):
                     wx_zh_title = wx_zh_title[:17]
 
                 # upload to weixin
-                # upload_weixin_video(
-                #     video_path,
-                #     thumbnail_png_horizontal,
-                #     wx_zh_title,
-                #     title_add_description,
-                #     weixin_time_str,
-                #     topic=topic,
-                # )
+                upload_weixin_video(
+                    video_path,
+                    thumbnail_png_horizontal,
+                    wx_zh_title,
+                    title_add_description,
+                    weixin_time_str,
+                    topic=topic,
+                )
 
                 # 更新日志
                 update_log(
@@ -389,4 +389,12 @@ def upload_all_platforms(topic):
 if __name__ == "__main__":
     # read topic from first argument
     topic = sys.argv[1]
-    upload_all_platforms(topic=topic)
+    upload_all_platforms(topic)
+
+    # 无限循环upload_all_platforms
+    # while True:
+    # try:
+    #     upload_all_platforms(topic=topic)
+    # except Exception as e:
+    #     print("出现错误：", e)
+    #     continue

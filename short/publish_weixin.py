@@ -242,7 +242,8 @@ def add_collection(driver, collection):
 
 def add_title(driver, title):
     """input title"""
-    title_xpath = "/html/body/div[1]/div/div[2]/div[2]/div/div/div[1]/div[3]/div/div[2]/div[2]/div[8]/div[2]/div/div/span/input"
+    # title_xpath = "/html/body/div[1]/div/div[2]/div[2]/div/div/div[1]/div[3]/div/div[2]/div[2]/div[8]/div[2]/div/div/span/input"
+    title_xpath = '//*[@id="container-wrap"]/div[2]/div/div/div[1]/div[3]/div/div[2]/div[2]/div[8]/div[2]/div/div/span/input'
 
     # wait for the title element to be loaded for 10 seconds
     timeout = 10
@@ -471,7 +472,7 @@ def upload_weixin_video(
     time.sleep(1)
     print("滚动到页面底部...")
 
-    set_time_program(driver=driver, time_str=time_str)
+    # set_time_program(driver=driver, time_str=time_str)
 
     # input the title
     if len(title) <= 6:
