@@ -11,10 +11,27 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 import os
 
+import platform
+
+
+def detect_os():
+    os_name = platform.system()
+    if os_name == "Darwin":
+        print("You are using macOS.")
+        return "mac"
+    elif os_name == "Linux":
+        print("You are using Linux.")
+        return "linux"
+
 
 def login_and_save_cookies(topic):
+
     # a new webdriver instance
-    driver_path = "/home/dhl/Downloads/chromedriver-linux64/chromedriver"
+    cur_os = detect_os()
+    if cur_os == "linux":
+        driver_path = "/home/dhl/Downloads/chromedriver-linux64/chromedriver"
+    elif cur_os == "mac":
+        driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
     service = Service(executable_path=driver_path)
 
     driver = webdriver.Chrome(service=service)
@@ -35,7 +52,11 @@ def login_and_save_cookies(topic):
 
 
 def load_cookies(topic):
-    driver_path = "/home/dhl/Downloads/chromedriver-linux64/chromedriver"
+    cur_os = detect_os()
+    if cur_os == "linux":
+        driver_path = "/home/dhl/Downloads/chromedriver-linux64/chromedriver"
+    elif cur_os == "mac":
+        driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
     service = Service(executable_path=driver_path)
 
     driver = webdriver.Chrome(service=service)
@@ -69,7 +90,7 @@ def input_video_title(driver, title):
     element = WebDriverWait(driver, timeout).until(
         EC.presence_of_element_located((By.XPATH, title_xpath))
     )
-    element.click()
+    # element.click()
     time.sleep(0.5)
     # input the title
     element.send_keys(title)
@@ -335,27 +356,28 @@ def upload_douyin_video(
 ):
     driver = load_cookies(topic=topic)
 
-    # input xpath
-    in_xpath = '//*[@id="root"]/div/div/div[3]/div/div[1]/div/div[1]/div/label/input'
-
     # 设置显式等待时间为10秒
     timeout = 60
 
-    # 等待元素id为"my_element"的元素出现
-    element = WebDriverWait(driver, timeout).until(
-        EC.presence_of_element_located((By.XPATH, in_xpath))
+    label_css = "label.upload-btn--9eZLd.button--1pFK2"
+    label_element = WebDriverWait(driver, timeout).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, label_css))
     )
 
-    # 指定你想上传的视频文件路径
-    # get absolute path of current folder
-    # abs_path = os.path.abspath(os.path.dirname(__file__))
-    # file_path = f"{abs_path}/test_videos/1.webm"
-    # test_file_path = mp4_path
-    # test_thumbnail_path = thumbnail_path
+    # 在label元素的上下文中查找input元素
+    input_element = label_element.find_element(By.TAG_NAME, "input")
 
     # 上传文件
-    element.send_keys(mp4_path)
+    print(f"上传路径{mp4_path}")
+    input_element.send_keys(mp4_path)
+    # input_element.send_keys(
+    #     "/Users/donghaoliu/doc/short_whisper/test_mp4_clips/output.mp4"
+    # )
 
+    print("upload done")
+    # import time
+
+    # time.sleep(10000)
     # input the title
     input_video_title(driver, title_zh)
 

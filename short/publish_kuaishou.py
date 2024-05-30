@@ -9,11 +9,26 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
+import platform
+
+
+def detect_os():
+    os_name = platform.system()
+    if os_name == "Darwin":
+        print("You are using macOS.")
+        return "mac"
+    elif os_name == "Linux":
+        print("You are using Linux.")
+        return "linux"
 
 
 def login_and_save_cookies(topic):
     # a new webdriver instance
-    driver_path = "/home/dhl/Downloads/chromedriver-linux64/chromedriver"
+    cur_os = detect_os()
+    if cur_os == "linux":
+        driver_path = "/home/dhl/Downloads/chromedriver-linux64/chromedriver"
+    elif cur_os == "mac":
+        driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
     service = Service(executable_path=driver_path)
 
     driver = webdriver.Chrome(service=service)
@@ -32,7 +47,11 @@ def login_and_save_cookies(topic):
 
 
 def load_cookies(topic):
-    driver_path = "/home/dhl/Downloads/chromedriver-linux64/chromedriver"
+    cur_os = detect_os()
+    if cur_os == "linux":
+        driver_path = "/home/dhl/Downloads/chromedriver-linux64/chromedriver"
+    elif cur_os == "mac":
+        driver_path = "/Users/donghaoliu/doc/short_whisper/short/driver/chromedriver"
     service = Service(executable_path=driver_path)
 
     driver = webdriver.Chrome(service=service)
@@ -259,6 +278,6 @@ def publish_kuaishou_video(
 
 
 if __name__ == "__main__":
-    topic = sys.argv[1]
+    topic = sys.argv[2]
     login_and_save_cookies(topic=topic)
 # publish_video()

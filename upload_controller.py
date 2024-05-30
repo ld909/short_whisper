@@ -6,6 +6,17 @@ from short.publish_douyin import upload_douyin_video
 from short.publish_kuaishou import publish_kuaishou_video
 from short.publish_weixin import upload_weixin_video
 from create_thumbnail import create_zh_title_thumbnail_horizontal_single
+import platform
+
+
+def detect_os():
+    os_name = platform.system()
+    if os_name == "Darwin":
+        print("You are using macOS.")
+        return "mac"
+    elif os_name == "Linux":
+        print("You are using Linux.")
+        return "linux"
 
 
 def load_bad_json():
@@ -165,8 +176,11 @@ def get_uploaded_mp4s():
 
 
 def upload_all_platforms(topic):
-
-    hard_drive_path = "/media/dhl/TOSHIBA"
+    os_str = detect_os()
+    if os_str == "mac":
+        hard_drive_path = "/Volumes/TOSHIBA"
+    else:
+        hard_drive_path = "/media/dhl/TOSHIBA"
     # zh_mp4_path作为上传视频的路径读取依赖
     zh_mp4_path = f"{hard_drive_path}/ytb-videos/tts_mp4"
     zh_title_path = f"{hard_drive_path}/video_material/zh_title"
