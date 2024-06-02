@@ -424,8 +424,9 @@ def detect_os():
 if __name__ == "__main__":
     # 从命令行第一个参数得到topic
     topic = argv[1]
-    all_channels = ["fireship"]
+    all_channels = ["emmahubbard"]
     delete_all_trash_files()
+    # controller_after_whisper(topic, all_channels)
     # infinte loop to run controller_after_whisper even if there is an error
     while True:
         try:
@@ -433,4 +434,4 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Error: {e}")
             continue
-    # controller_after_whisper(topic, all_channels)
+    controller_after_whisper(topic, all_channels)
