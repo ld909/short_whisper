@@ -6,12 +6,23 @@
             "VS Code Top-Ten Pro Tips",
             "Autocomplete Search with Angular4 and Firebase",
             "AWS CodeWhisperer… The Copilot Killer？",
-            "Firebase Database Performance Profiling"
+            "Firebase Database Performance Profiling",
+            "Qwik… the world's first O(1) JavaScript framework？",
+            "SEO for Developers in 100 Seconds",
+            "Host Multiple Apps or Websites on Firebase",
+            "The Weird History of JavaScript",
+            "WASM + React... Easily build video editing software with JS & FFmpeg",
+            "The JavaScript Survival Guide"
         ],
         "networkchuck": [
             "Adding stuff to a Python List",
             "Cryptocurrency Mining on a Raspberry Pi (it's fun....trust me)",
             "What is a SWITCH？ ⧸⧸ FREE CCNA ⧸⧸ Day 1"
+        ]
+    },
+    "mama": {
+        "emmahubbard": [
+            "You Don't Need to Burp Your Baby! Here's Why"
         ]
     }
 }

@@ -8,12 +8,13 @@ from tqdm import tqdm
 from mp3toscripts import mp3totxt, save_srt
 from srt_format import format_srt, break_srt_txt_into_sentences
 from after_whisper_controller import load_bad_json
+from translate_srt import get_duration
 
 
 def controller_mp3_to_format_srt(topic):
     hard_dive_path = "/media/dhl/TOSHIBA"
-    mp3_abs_path = f"{hard_dive_path}/ytb-videos_toshiba/mp3/{topic}"  # fill in the absolute path of the mp3 folder
-    dst_srt_abs_path = f"{hard_dive_path}/video_materials/format_srt/{topic}"  # fill in the absolute path of the srt folder
+    mp3_abs_path = f"{hard_dive_path}/ytb-videos/mp3/{topic}"  # fill in the absolute path of the mp3 folder
+    dst_srt_abs_path = f"{hard_dive_path}/video_material/format_srt/{topic}"  # fill in the absolute path of the srt folder
 
     # check if the dst_srt_abs_path exists, if not create it
     if not os.path.exists(dst_srt_abs_path):
@@ -24,7 +25,9 @@ def controller_mp3_to_format_srt(topic):
     all_channels = [folder for folder in all_channels if folder != ".DS_Store"]
 
     #
-    all_channels = ["networkchuck"]
+    # all_channels = ["networkchuck"]
+
+    print("all chanels are", all_channels)
 
     # read bad.json from
     bad_data = load_bad_json()
@@ -44,6 +47,7 @@ def controller_mp3_to_format_srt(topic):
                             print(f"Bad corrept, skip {base_name} in {channel}")
                             continue
                 dst_srt = os.path.join(dst_srt_abs_path, channel, base_name + ".srt")
+
                 # check if os.path.join(dst_srt_abs_path, channel) exists
                 if not os.path.exists(os.path.join(dst_srt_abs_path, channel)):
                     os.makedirs(os.path.join(dst_srt_abs_path, channel))
@@ -51,6 +55,14 @@ def controller_mp3_to_format_srt(topic):
                 # 检查之前是否完成过此任务，完成就跳过
                 if os.path.exists(dst_srt):
                     print("srt file exists, skip")
+                    continue
+
+                # if mp3 duration is larger than 30 minutes, skip
+                mp3_duration_seconds = get_duration(
+                    os.path.join(mp3_abs_path, channel, mp3_file)
+                )
+                if mp3_duration_seconds > 1800:
+                    print(f"mp3 {mp3_file} duration is larger than 30 minutes, skip")
                     continue
 
                 mp3_path = os.path.join(mp3_abs_path, channel, mp3_file)
@@ -73,5 +85,6 @@ def controller_mp3_to_format_srt(topic):
 
 
 if __name__ == "__main__":
-    topic = "code"
+    # topic = "code"
+    topic = "mama"
     controller_mp3_to_format_srt(topic=topic)

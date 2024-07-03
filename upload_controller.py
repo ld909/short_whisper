@@ -332,13 +332,13 @@ def upload_all_platforms(topic):
                 kuaishou_time_str = upload_time_obj.strftime("%Y-%m-%d %H:%M:00")
 
                 # upload to kuaishou
-                publish_kuaishou_video(
-                    video_path,
-                    thumbnail_png_vertical,
-                    title_add_description,
-                    kuaishou_time_str,
-                    topic,
-                )
+                # publish_kuaishou_video(
+                #     video_path,
+                #     thumbnail_png_vertical,
+                #     title_add_description,
+                #     kuaishou_time_str,
+                #     topic,
+                # )
                 # 更新日志
                 update_log(
                     log_key, "kuaishou", upload_time_obj.strftime("%Y-%m-%d-%H-%M")
@@ -383,14 +383,14 @@ def upload_all_platforms(topic):
                     wx_zh_title = wx_zh_title[:17]
 
                 # upload to weixin
-                upload_weixin_video(
-                    video_path,
-                    thumbnail_png_horizontal,
-                    wx_zh_title,
-                    title_add_description,
-                    weixin_time_str,
-                    topic=topic,
-                )
+                # upload_weixin_video(
+                #     video_path,
+                #     thumbnail_png_horizontal,
+                #     wx_zh_title,
+                #     title_add_description,
+                #     weixin_time_str,
+                #     topic=topic,
+                # )
 
                 # 更新日志
                 update_log(
@@ -407,8 +407,8 @@ if __name__ == "__main__":
 
     # 无限循环upload_all_platforms
     # while True:
-    # try:
-    #     upload_all_platforms(topic=topic)
-    # except Exception as e:
-    #     print("出现错误：", e)
-    #     continue
+    #     try:
+    #         upload_all_platforms(topic=topic)
+    #     except Exception as e:
+    #         print("出现错误：", e)
+    #         continue

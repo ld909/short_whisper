@@ -333,6 +333,9 @@ def draw_ch_title_on_image(
     max_width = image.width - position[0] - right_padding
 
     # 使用 jieba 进行中文分词
+    if len(text) > 20:
+        # return the first 20 characters
+        text = text[:20] + "..."
     words = list(jieba.cut(text, cut_all=False))
 
     # 自动换行
@@ -342,7 +345,7 @@ def draw_ch_title_on_image(
     words = [word.replace(" ", "") for word in words]
     # remove empty string
     words = [word for word in words if word]
-    print(words)
+    print(f"current words {words}")
     while words:
         line = ""
         # 根据您提供的方式获取文本尺寸

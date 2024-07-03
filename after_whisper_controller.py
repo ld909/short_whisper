@@ -11,8 +11,26 @@ from create_thumbnail import (
     create_zh_title_thumbnail_horizontal_single,
 )
 from tqdm import tqdm
-import platform
+import sys
 import time
+from moviepy.editor import VideoFileClip
+import platform
+
+
+def delete_zero_size_mp3s(directory, extension=".mp3"):
+    """
+    删除指定目录及其子目录下所有大小为0的指定扩展名文件。
+
+    :param directory: 目标目录路径
+    :param extension: 指定文件的扩展名，默认为 .mp3
+    """
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(extension):
+                file_path = os.path.join(root, file)
+                if os.path.getsize(file_path) == 0:
+                    print(f"Deleting {file_path} ...")
+                    os.remove(file_path)
 
 
 def delete_all_trash_files():
@@ -152,8 +170,10 @@ def retain_pipe_status(
             lookup_dict[srt_basename]["thumbnail"] = False
 
         if jump30:
+
             mp4_file = os.path.join(eng_mp4_abs_path, channel, srt_basename + ".mp4")
             mp4_duration = get_duration(mp4_file)
+
             # 超过30min的视频，跳过
             if mp4_duration > 1800:
                 lookup_dict[srt_basename]["jump30"] = True
@@ -161,6 +181,29 @@ def retain_pipe_status(
                 lookup_dict[srt_basename]["jump30"] = False
     print(f"生成lookup_dict完成！")
     return lookup_dict
+
+
+def is_valid_mp4(file_path):
+    """Check if an MP4 file is valid."""
+    try:
+        video = VideoFileClip(file_path)
+        # Try to read a frame from the video to check if it's read correctly
+        video.reader.nframes
+        video.close()
+        return True
+    except Exception:
+        return False
+
+
+def remove_invalid_mp4_files(directory):
+    """Remove invalid MP4 files in the specified directory and its subdirectories."""
+    for root, _, files in os.walk(directory):
+        for filename in files:
+            if filename.endswith(".mp4"):
+                file_path = os.path.join(root, filename)
+                if not is_valid_mp4(file_path):
+                    print(f"Deleting invalid MP4 file: {file_path}")
+                    os.remove(file_path)
 
 
 def controller_after_whisper(topic, all_channels):
@@ -198,6 +241,18 @@ def controller_after_whisper(topic, all_channels):
     # all_channels = [channel for channel in all_channels if channel != ".DS_Store"]
 
     data = load_bad_json()
+
+    # delete all mp3s with 0 size
+    print("开始删除size=0的mp3")
+    target_directory = "/media/dhl/TOSHIBA/video_material/tts_mp3"
+    delete_zero_size_mp3s(target_directory)
+    print("删除mp3完成")
+
+    # delete all bad mp4 files
+    print("开始删除bad mp4")
+    target_directory = "/media/dhl/TOSHIBA/ytb-videos/tts_mp4"
+    remove_invalid_mp4_files(target_directory)
+    print("删除bad mp4完成")
 
     # 遍历所有频道
     for channel in all_channels:
@@ -424,14 +479,18 @@ def detect_os():
 if __name__ == "__main__":
     # 从命令行第一个参数得到topic
     topic = argv[1]
-    all_channels = ["emmahubbard"]
+    if topic == "code":
+        # all_channels = ["fireship"]
+        all_channels = ""
+    elif topic == "mama":
+        all_channels = ["emmahubbard"]
     delete_all_trash_files()
-    # controller_after_whisper(topic, all_channels)
-    # infinte loop to run controller_after_whisper even if there is an error
-    while True:
-        try:
-            controller_after_whisper(topic, all_channels)
-        except Exception as e:
-            print(f"Error: {e}")
-            continue
     controller_after_whisper(topic, all_channels)
+    # infinte loop to run controller_after_whisper even if there is an error
+    # while True:
+    #     try:
+    #         controller_after_whisper(topic, all_channels)
+    #     except Exception as e:
+    #         print(f"Error: {e}")
+    #         continue
+    # controller_after_whisper(topic, all_channels)
