@@ -111,7 +111,6 @@ def wrap_srt_text_chinese(subtitle_text, max_length=25, timestamps=None):
         return new_lines, new_timestamps
 
 
-
 def controller_translate_srt_single(eng_srt_path, dst_zh_srt_path, topic):
     """Translate the formatted English srt files to Chinese srt files using Claude-3 Haiku."""
 
@@ -412,9 +411,11 @@ def translate_srt(eng_srt_str, topic):
         prompt_txt = "你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于计算机科学/编程/数学相关话题的，请注意你的专业用语。"
     elif topic == "mama":
         prompt_txt = "你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于育儿/早教/母婴相关话题的，请注意你的专业用语。"
+    elif topic == "history":
+        prompt_txt = "你是一个优秀的翻译家，能够精确优雅准确精炼地把英文视频字幕翻译为中文字幕，原视频是关于历史/历史名人/文化等相关话题，请注意专业用语。"
     print("创建message")
     message = client.messages.create(
-        model="claude-3-haiku-20240307",
+        model="claude-3-5-sonnet-20240620",
         max_tokens=1000,
         temperature=0,
         system=prompt_txt,
@@ -432,9 +433,10 @@ def translate_srt(eng_srt_str, topic):
     )
     print("开始翻译")
     translate_srt_str = message.content[0].text
-    print("翻译完成")
+
     try:
         translate_srt_list = ast.literal_eval(translate_srt_str)
+        print("使用eval格式返回，结果：", translate_srt_list)
         success = message.stop_reason == "end_turn"
     except:
         translate_srt_list, success = translate_return_json(eng_srt_str, topic)

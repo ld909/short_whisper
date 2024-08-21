@@ -542,7 +542,8 @@
     "code~~~~brocodez~~~~C compile and run a C program with cmd 🏗️ (optional video).mp4": {
         "platforms": [
             "douyin",
-            "kuaishou"
+            "kuaishou",
+            "weixin"
         ],
         "upload_time": [
             "2024-05-01-06-00"
@@ -5718,6 +5719,796 @@
         ],
         "upload_time": [
             "2024-07-04-22-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C calculator program 🖩.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-07-06-00"
+        ]
+    },
+    "code~~~~brocodez~~~~MySQL： AUTOCOMMIT, COMMIT, ROLLBACK.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-07-08-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Learn HTML lists in 4 minutes 📋.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-07-10-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C++ nested loops explained ➿.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-07-12-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Python lists, sets, and tuples explained 🍍.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-07-14-00"
+        ]
+    },
+    "code~~~~brocodez~~~~JavaFX communication between controllers 📣.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-07-16-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Learn JavaScript KEY EVENTS in 10+ minutes! ⌨.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-07-18-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Java JOptionPane 🛑.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-07-19-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Java anonymous objects 🃏.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-07-20-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Learn HTML audio in 2 minutes 🔊.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-07-21-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Java method chaining ⛓️.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-07-22-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Format specifiers in Python are awesome 💬.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-08-06-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Java inner classes 👩‍🏫.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-08-08-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C++ const parameters explained 🧱.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-08-10-00"
+        ]
+    },
+    "code~~~~brocodez~~~~HTML list tutorial 📋 #5.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-08-12-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C# arithmetic operators 🧮.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-08-14-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Learn C memory addresses in 7 minutes 📬.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-08-16-00"
+        ]
+    },
+    "code~~~~brocodez~~~~JavaFX install Scene Builder 🛠️.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-08-18-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C++ CONSTRUCTOR OVERLOADING explained easy 👨‍🍳.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-08-19-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Java MouseListener 🖱️.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-08-20-00"
+        ]
+    },
+    "code~~~~brocodez~~~~JavaScript forEach() method in 8 minutes! ➿.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-08-21-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Python GUI keyboard events ⌨️.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-08-22-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C# tutorial for beginners.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-09-06-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C# array of objects 🏬.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-09-08-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Learn Recursion in 8 minutes 😵.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-09-10-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Java generics ❓.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-09-12-00"
+        ]
+    },
+    "code~~~~brocodez~~~~How to FETCH data from an API using JavaScript ↩️.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-09-14-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Java overloaded constructors 🍕.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-09-16-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Const in JavaScript 🚫【3 minutes】.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-09-18-00"
+        ]
+    },
+    "code~~~~brocodez~~~~A game of Rock Paper Scissors written in JavaScript ✋.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-09-19-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Java 2D animation 🎞️.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-09-20-00"
+        ]
+    },
+    "code~~~~brocodez~~~~If statements in Python are easy (if, elif, else) 🤔.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-09-21-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Python GUI colorchooser 🎨.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-09-22-00"
+        ]
+    },
+    "code~~~~brocodez~~~~arithmetic expressions in Java 🧮【4 minutes】.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-10-06-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Learn CSS borders in 4 minutes! 🖼.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-10-08-00"
+        ]
+    },
+    "code~~~~brocodez~~~~MySQL： PRIMARY KEYS are easy.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-10-10-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C user input ⌨️.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-10-12-00"
+        ]
+    },
+    "code~~~~brocodez~~~~DICE ROLLER program in Python ⚂.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-10-14-00"
+        ]
+    },
+    "code~~~~brocodez~~~~CSS icons (#13) 💯.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-10-16-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Java ArrayList 🧾.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-10-18-00"
+        ]
+    },
+    "code~~~~brocodez~~~~MySQL： STORED PROCEDURES.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-10-19-00"
+        ]
+    },
+    "code~~~~brocodez~~~~PHP password hashing explained.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-10-20-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Learn Python list comprehensions 📃.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-10-21-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C typedef 📛.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-10-22-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Python animations 🛸.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-11-06-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C++ console calculator program 🖩.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-11-08-00"
+        ]
+    },
+    "code~~~~brocodez~~~~java for-each loop 🔃.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-11-10-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C swap values of two variables 🥤.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-11-12-00"
+        ]
+    },
+    "code~~~~brocodez~~~~C++ for loops explained 🔂.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-11-14-00"
+        ]
+    },
+    "code~~~~brocodez~~~~Python filter 🍺.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-11-16-00"
+        ]
+    },
+    "code~~~~fireship~~~~NGXS - Angular State Management.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-11-18-00"
+        ]
+    },
+    "code~~~~fireship~~~~Twitter-Inspired Follow Unfollow Feature with Firebase and Angular 4.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-11-19-00"
+        ]
+    },
+    "code~~~~fireship~~~~Multiple Concurrent File Uploads with Firebase Storage + Angular.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-11-20-00"
+        ]
+    },
+    "code~~~~fireship~~~~Stripe Elements & Checkout with Angular - Monetize your PWA.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-11-21-00"
+        ]
+    },
+    "code~~~~fireship~~~~Stripe Payments Basics -  Including New 3D Secure Requirements for EU Customers.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-11-22-00"
+        ]
+    },
+    "code~~~~fireship~~~~What will we build next？ Channel Update.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-12-06-00"
+        ]
+    },
+    "code~~~~fireship~~~~Is FAANG f＊＊ked？.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-12-08-00"
+        ]
+    },
+    "code~~~~fireship~~~~Seefood - Ionic + Firebase + Cloud Vision.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-12-10-00"
+        ]
+    },
+    "code~~~~fireship~~~~Google's Gemini just made GPT-4 look like a baby’s toy？.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-12-12-00"
+        ]
+    },
+    "code~~~~fireship~~~~RxFire - Firebase meets RxJS.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-12-14-00"
+        ]
+    },
+    "code~~~~fireship~~~~Native Desktop Apps with Angular and Electron.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-12-16-00"
+        ]
+    },
+    "code~~~~fireship~~~~Haskell in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-12-18-00"
+        ]
+    },
+    "code~~~~fireship~~~~The ruthless forking of Terraform.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-12-19-00"
+        ]
+    },
+    "code~~~~fireship~~~~JavaScript： How It's Made.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-12-20-00"
+        ]
+    },
+    "code~~~~fireship~~~~I built a react app… but with a visual editor.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-12-21-00"
+        ]
+    },
+    "code~~~~fireship~~~~Unity in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-12-22-00"
+        ]
+    },
+    "code~~~~fireship~~~~WebRTC in 100 Seconds ⧸⧸ Build a Video Chat app from Scratch.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-13-06-00"
+        ]
+    },
+    "code~~~~fireship~~~~TensorFlow.js Quick Start.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-13-08-00"
+        ]
+    },
+    "code~~~~fireship~~~~Ionic 4： Should you Build a Hybrid App？.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-13-10-00"
+        ]
+    },
+    "code~~~~fireship~~~~PayPal Checkout 2.0 - Monetize React, Angular, & Vue Quickly.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-13-12-00"
+        ]
+    },
+    "code~~~~fireship~~~~What is THIS in JavaScript？ in 100 seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-13-14-00"
+        ]
+    },
+    "code~~~~fireship~~~~How to Connect Firebase Users to their Data - 3 Methods.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-13-16-00"
+        ]
+    },
+    "code~~~~fireship~~~~The Gemini Lie.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-13-18-00"
+        ]
+    },
+    "code~~~~fireship~~~~Scheduled Cloud Functions - NOT for Robocallers.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-13-19-00"
+        ]
+    },
+    "code~~~~fireship~~~~Solid in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-13-20-00"
+        ]
+    },
+    "code~~~~fireship~~~~Role-Based Authorization with Firestore.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-13-21-00"
+        ]
+    },
+    "code~~~~fireship~~~~gzip file compression in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-13-22-00"
+        ]
+    },
+    "code~~~~fireship~~~~HTML in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-14-06-00"
+        ]
+    },
+    "code~~~~fireship~~~~Kafka in 100 Seconds.mp4": {
+        "platforms": [
+            "douyin",
+            "kuaishou",
+            "weixin"
+        ],
+        "upload_time": [
+            "2024-07-14-08-00"
         ]
     }
 }

@@ -1,3 +1,4 @@
+from get_zh_title import translate_to_zh_title
 import os
 import json
 from datetime import datetime, timedelta
@@ -254,7 +255,9 @@ def upload_all_platforms(topic):
                     open(video_zh_title_txt_path).read().strip() + f"{clip_id}"
                 )
             else:
+                # try open video_zh_title_txt_path
                 video_title_zh = open(video_zh_title_txt_path).read().strip()
+
             print("视频标题：", video_title_zh)
 
             # read zh tags from the txt file

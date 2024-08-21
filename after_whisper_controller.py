@@ -72,9 +72,9 @@ def load_bad_json():
 def set_clash_proxy():
 
     # 设置环境变量
-    os.environ["http_proxy"] = "http://127.0.0.1:7890"
-    os.environ["https_proxy"] = "http://127.0.0.1:7890"
-    os.environ["all_proxy"] = "socks5://127.0.0.1:7891"
+    os.environ["http_proxy"] = "http://127.0.0.1:7897"
+    os.environ["https_proxy"] = "http://127.0.0.1:7897"
+    # os.environ["all_proxy"] = "socks5://127.0.0.1:7891"
     print("成功设定clash环境proxy...")
 
 
@@ -82,7 +82,7 @@ def unset_clash_proxy():
     # 删除环境变量
     os.environ.pop("http_proxy", None)
     os.environ.pop("https_proxy", None)
-    os.environ.pop("all_proxy", None)
+    # os.environ.pop("all_proxy", None)
     print("成功取消clash环境proxy...")
 
 
@@ -232,8 +232,10 @@ def controller_after_whisper(topic, all_channels):
         f"{hard_dive_path}/video_material/thumbnail_horizontal/{topic}"
     )
 
-    if topic == "code" or topic == "mama":
+    if topic in ["code", "mama"]:
         bg_mp3_path = f"{hard_dive_path}/video_material/tts_mp3/background/bg.mp3"
+    else:
+        bg_mp3_path = None
 
     # # 所有频道，依赖fomat_srt文件夹
     # all_channels = os.listdir(format_srt_path)
@@ -250,7 +252,7 @@ def controller_after_whisper(topic, all_channels):
 
     # delete all bad mp4 files
     print("开始删除bad mp4")
-    target_directory = "/media/dhl/TOSHIBA/ytb-videos/tts_mp4"
+    target_directory = f"/media/dhl/TOSHIBA/ytb-videos/tts_mp4/{topic}"
     remove_invalid_mp4_files(target_directory)
     print("删除bad mp4完成")
 
@@ -263,13 +265,16 @@ def controller_after_whisper(topic, all_channels):
         all_eng_srt = [srt for srt in all_eng_srt if srt != ".DS_Store"]
 
         ### warp=True已经翻译的字幕，也就是已经发布的纯英文mp4对应的中文srt
-        zh_srts_warp = os.listdir(
-            os.path.join(
-                f"{hard_dive_path}/video_material/zh_srt/{topic}",
-                channel,
+        if topic in ["code", "mama"]:
+            zh_srts_warp = os.listdir(
+                os.path.join(
+                    f"{hard_dive_path}/video_material/zh_srt/{topic}",
+                    channel,
+                )
             )
-        )
-        zh_srts_warp_done = [srt for srt in zh_srts_warp if srt != ".DS_Store"]
+            zh_srts_warp_done = [srt for srt in zh_srts_warp if srt != ".DS_Store"]
+        else:
+            zh_srts_warp_done = []
 
         # 得到whisper识别后的英文srt文件列表
         formatted_srts_all = os.listdir(os.path.join(format_srt_path, channel))
@@ -375,9 +380,10 @@ def controller_after_whisper(topic, all_channels):
             merge_mp3_single_path = os.path.join(
                 mp3_merge_path, channel, f"{tts_folder_name}.mp3"
             )
+            print(not lookup_dict[srt_basename]["merge_mp3"])
             if not lookup_dict[srt_basename]["merge_mp3"]:
                 unset_clash_proxy()
-                print(f"正在合并mp3和mp4，频道{channel}的{srt}...")
+                print(f"正在合成mp3，频道{channel}的{srt}...")
                 controller_tts_single(
                     os.path.join(dst_zh_srt_abs_path, channel, srt),
                     tts_mp3_path,
@@ -391,6 +397,8 @@ def controller_after_whisper(topic, all_channels):
             ###### step3： 合并mp3和mp4 ######
             # delete_all_trash_files()
             cur_zh_srt_path = os.path.join(dst_zh_srt_abs_path, channel, srt)
+            if topic == "history":
+                bg_music = False
             if not lookup_dict[srt_basename]["mp4"]:
                 merge_mp4_controller_single(
                     tts_mp3_path=tts_mp3_path_single,
@@ -401,6 +409,7 @@ def controller_after_whisper(topic, all_channels):
                     cur_zh_srt_path=cur_zh_srt_path,
                     merge_mp3_single_path=merge_mp3_single_path,
                     bg_mp3_path=bg_mp3_path,
+                    bg_music=bg_music,
                 )
                 print(f"合并mp3和mp4{channel}的{srt}完成！")
                 print("#" * 20)
@@ -481,14 +490,17 @@ if __name__ == "__main__":
     topic = argv[1]
     if topic == "code":
         # all_channels = ["fireship"]
-        all_channels = ""
+        all_channels = ["brocodez"]
     elif topic == "mama":
         all_channels = ["emmahubbard"]
+    elif topic == "history":
+        all_channels = ["ai"]
     delete_all_trash_files()
     controller_after_whisper(topic, all_channels)
     # infinte loop to run controller_after_whisper even if there is an error
     # while True:
     #     try:
+    #         delete_all_trash_files()
     #         controller_after_whisper(topic, all_channels)
     #     except Exception as e:
     #         print(f"Error: {e}")

@@ -10,6 +10,9 @@ def translate_to_zh_title(eng_title, topic):
         prompt_txt = f"""我有一个英文视频的名称，视频是关于变成或者计算机科学的话题，请准确翻译相关专业词汇。请注意，英文名可能包含emoji等表情符号，返回的结果中请剔除这些emoji等符号，我要得到纯净的中文翻译结果。直接返回翻译后的中文标题，不需要其他多余信息。英文标题是：{eng_title}"""
     elif topic == "mama":
         prompt_txt = f"""我有一个英文视频的名称，视频是母婴类的标题，请准确翻译相关专业词汇。请注意，英文名可能包含emoji等表情符号，返回的结果中请剔除这些emoji等符号，我要得到纯净的中文翻译结果。直接返回翻译后的中文标题，不需要其他多余信息。英文标题是：{eng_title}"""
+    elif topic == "history":
+        prompt_txt = f"""我有一个英文视频的名称，视频是历史/时政类的标题，请准确翻译相关专业词汇。请注意，英文名可能包含emoji等表情符号，返回的结果中请剔除这些emoji等符号，我要得到纯净的中文翻译结果。直接返回翻译后的中文标题，不需要其他多余信息。英文标题是：{eng_title}"""
+
     message = client.messages.create(
         model="claude-3-sonnet-20240229",
         max_tokens=1000,

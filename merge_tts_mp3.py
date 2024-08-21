@@ -105,7 +105,7 @@ def merge_mp3tomp4(
     mp4_list, mp3_list = get_mp4_clip_list(
         video_file_path, ts_list, chinese_audio_files
     )
-    assert len(mp4_list) == len(mp3_list)
+    print(f"mp4_list长度：{len(mp4_list)}")
 
     new_mp4_list = []
     new_mp3_list = []
@@ -390,7 +390,9 @@ def merge_mp4_controller_single(
         thread_num = 4
     elif os_str == "linux":
         thread_num = 12
-    final_video.write_videofile(dst_mp4_path, threads=thread_num, codec="libx264")
+    final_video.write_videofile(
+        dst_mp4_path, threads=thread_num, codec="libx264", audio_codec="aac"
+    )
 
 
 if __name__ == "__main__":

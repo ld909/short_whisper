@@ -4,6 +4,7 @@
 # ！！！！此脚本需要Nividai GPU上运行，否则whisper模型会很慢！！！！
 
 import os
+import sys
 from tqdm import tqdm
 from mp3toscripts import mp3totxt, save_srt
 from srt_format import format_srt, break_srt_txt_into_sentences
@@ -86,5 +87,6 @@ def controller_mp3_to_format_srt(topic):
 
 if __name__ == "__main__":
     # topic = "code"
-    topic = "mama"
+    topic = sys.argv[1]
+    # topic = "mama"
     controller_mp3_to_format_srt(topic=topic)

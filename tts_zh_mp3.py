@@ -66,6 +66,10 @@ def tts_ms(txt_string, topic, clip_dst_path, channel):
         yinse_name = "zh-CN-XiaochenNeural"
     elif topic == "code" and channel == "networkchuck":
         yinse_name = "zh-CN-YunyangNeural"
+    elif topic == "code" and channel == "brocodez":
+        yinse_name = "zh-CN-XiaochenNeural"
+    elif topic == "history":
+        yinse_name = "zh-CN-YunyangNeural"
 
     # 构造SSML字符串
     ssml_string = create_ssml_string(txt_string, yinse_name=yinse_name)
@@ -187,7 +191,6 @@ def controller_tts(topic):
 def controller_tts_single(
     zh_srt_path, tts_mp3_path, channel, topic, merge_single_mp3_path
 ):
-
     # 如果merge_single_mp3_path存在，return
     if os.path.exists(merge_single_mp3_path):
         print(f"{merge_single_mp3_path} mp3文件已存在，无需重复合成mp3 clips，跳过")
@@ -213,6 +216,7 @@ def controller_tts_single(
             print(f"{mp3_dst_path} size 为0，已删除")
 
     # 生成字幕，并保存为mp3
+    print(f"一共有{len(subtitles)}个字幕待合成tts")
     for sub_idx, subtitle in tqdm(enumerate(subtitles)):
         tts_success = False
 
@@ -227,16 +231,15 @@ def controller_tts_single(
             continue
 
         ## 使用azure tts
-        if topic == "mama" or topic == "code":
-            while not tts_success:
-                tts_success = tts_ms(
-                    subtitle,
-                    clip_dst_path=os.path.join(
-                        tts_mp3_path, channel, srt_basename, f"{sub_idx}.mp3"
-                    ),
-                    topic=topic,
-                    channel=channel,
-                )
+        while not tts_success:
+            tts_success = tts_ms(
+                subtitle,
+                clip_dst_path=os.path.join(
+                    tts_mp3_path, channel, srt_basename, f"{sub_idx}.mp3"
+                ),
+                topic=topic,
+                channel=channel,
+            )
         ## 使用aliyun tts
         # elif topic == "code":
         #     aliyun_tts_single(
