@@ -264,7 +264,7 @@ def controller_after_whisper(topic, all_channels):
         # 删掉.DS_Store
         all_eng_srt = [srt for srt in all_eng_srt if srt != ".DS_Store"]
 
-        ### warp=True已经翻译的字幕，也就是已经发布的纯英文mp4对应的中文srt
+        ### warp=True已经翻译的字幕，英文mp4对应的中文srt
         if topic in ["code", "mama"]:
             zh_srts_warp = os.listdir(
                 os.path.join(
@@ -367,7 +367,7 @@ def controller_after_whisper(topic, all_channels):
                 if cur_os == "linux":
                     unset_clash_proxy()
 
-            ###### step2： tts合成语音 ######
+            ###### step2： tts合成语音clips ######
             tts_folder_name = srt.replace(".srt", "")
             tts_mp3_path_single = os.path.join(tts_mp3_path, channel, tts_folder_name)
             mp4_abs_single_path = os.path.join(
@@ -380,7 +380,6 @@ def controller_after_whisper(topic, all_channels):
             merge_mp3_single_path = os.path.join(
                 mp3_merge_path, channel, f"{tts_folder_name}.mp3"
             )
-            print(not lookup_dict[srt_basename]["merge_mp3"])
             if not lookup_dict[srt_basename]["merge_mp3"]:
                 unset_clash_proxy()
                 print(f"正在合成mp3，频道{channel}的{srt}...")

@@ -37,6 +37,7 @@ def get_mp4_clip_list(video_path, ts_list, mp3_list):
 
     mp4_clip_list = []
     mp3_clip_list = []
+    clip_idx = 0
     current_time = timedelta(seconds=0)
     for srt_idx, (ts, mp3_path) in enumerate(tqdm(zip(ts_list, mp3_list))):
         start_time_str, end_time_str = ts
@@ -55,16 +56,26 @@ def get_mp4_clip_list(video_path, ts_list, mp3_list):
         if current_time < start_time:
             mp4_clip = video.subclip(current_time.total_seconds(), start_seconds)
             mp4_clip_list.append([0, mp4_clip])
-            # 创建一个silence片段
+            # 创建一个silence mp3片段
             silence_duration = (start_time - current_time).total_seconds()
             silence = AudioSegment.silent(duration=int(silence_duration * 1000))
             mp3_clip_list.append([0, silence])
+
+            # for test, save mp3 and mp4 clips to ./test_mp3 and ./test_mp4 with clip_idx as name
+            # mp3_clip.export(f"./test_mp3/{clip_idx}.mp3", format="mp3")
+            # mp4_clip.write_videofile(f"./test_mp4/{clip_idx}.mp4", codec="libx264")
+            # clip_idx += 1
 
         # 处理字幕时间戳内的片段
         mp4_clip = video.subclip(start_seconds, end_seconds)
         mp4_clip_list.append([1, mp4_clip])
         mp3_clip_list.append([1, mp3_clip])
         current_time = end_time
+
+        # for test, save mp3 and mp4 clips to ./test_mp3 and ./test_mp4 with clip_idx as name
+        # mp3_clip.export(f"./test_mp3/{clip_idx}.mp3", format="mp3")
+        # mp4_clip.write_videofile(f"./test_mp4/{clip_idx}.mp4", codec="libx264")
+        # clip_idx += 1
 
     # 处理最后一个字幕时间戳之后的片段,前提是视频时长和当前时间差大于0.5s
     time_diff = video.duration - current_time.total_seconds()
@@ -76,6 +87,11 @@ def get_mp4_clip_list(video_path, ts_list, mp3_list):
         silence_duration = video.duration - current_time.total_seconds()
         silence = AudioSegment.silent(duration=int(silence_duration * 1000))
         mp3_clip_list.append([0, silence])
+
+        # for test, save mp3 and mp4 clips to ./test_mp3 and ./test_mp4 with clip_idx as name
+        # mp3_clip.export(f"./test_mp3/{clip_idx}.mp3", format="mp3")
+        # mp4_clip.write_videofile(f"./test_mp4/{clip_idx}.mp4", codec="libx264")
+        # clip_idx += 1
 
     return mp4_clip_list, mp3_clip_list
 
@@ -110,7 +126,7 @@ def merge_mp3tomp4(
     new_mp4_list = []
     new_mp3_list = []
 
-    for mp3, mp4 in tqdm(zip(mp3_list, mp4_list)):
+    for index, (mp3, mp4) in tqdm(enumerate(zip(mp3_list, mp4_list))):
         if mp3[0] == 1 and mp4[0] == 1:
 
             # 比较音频和视频的长度
@@ -131,9 +147,10 @@ def merge_mp3tomp4(
                 new_mp4_list.append(mp4[1].set_duration(mp3_duration))
 
         # 此部分存在视频但没有对应音频,此时mp3是silence
-        elif mp3[0] == 0 and mp4[0] == 1:
+        elif mp3[0] == 0 and mp4[0] == 0:
             mp3_duration = mp3[1].duration_seconds
             mp4_duration = mp4[1].duration
+
             # 两个片段长度比例不能小于0.98
             assert mp3_duration / mp4_duration > 0.98
             new_mp4_list.append(mp4[1])
