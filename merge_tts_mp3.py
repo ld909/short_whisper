@@ -61,21 +61,11 @@ def get_mp4_clip_list(video_path, ts_list, mp3_list):
             silence = AudioSegment.silent(duration=int(silence_duration * 1000))
             mp3_clip_list.append([0, silence])
 
-            # for test, save mp3 and mp4 clips to ./test_mp3 and ./test_mp4 with clip_idx as name
-            # mp3_clip.export(f"./test_mp3/{clip_idx}.mp3", format="mp3")
-            # mp4_clip.write_videofile(f"./test_mp4/{clip_idx}.mp4", codec="libx264")
-            # clip_idx += 1
-
         # 处理字幕时间戳内的片段
         mp4_clip = video.subclip(start_seconds, end_seconds)
         mp4_clip_list.append([1, mp4_clip])
         mp3_clip_list.append([1, mp3_clip])
         current_time = end_time
-
-        # for test, save mp3 and mp4 clips to ./test_mp3 and ./test_mp4 with clip_idx as name
-        # mp3_clip.export(f"./test_mp3/{clip_idx}.mp3", format="mp3")
-        # mp4_clip.write_videofile(f"./test_mp4/{clip_idx}.mp4", codec="libx264")
-        # clip_idx += 1
 
     # 处理最后一个字幕时间戳之后的片段,前提是视频时长和当前时间差大于0.5s
     time_diff = video.duration - current_time.total_seconds()
@@ -87,11 +77,6 @@ def get_mp4_clip_list(video_path, ts_list, mp3_list):
         silence_duration = video.duration - current_time.total_seconds()
         silence = AudioSegment.silent(duration=int(silence_duration * 1000))
         mp3_clip_list.append([0, silence])
-
-        # for test, save mp3 and mp4 clips to ./test_mp3 and ./test_mp4 with clip_idx as name
-        # mp3_clip.export(f"./test_mp3/{clip_idx}.mp3", format="mp3")
-        # mp4_clip.write_videofile(f"./test_mp4/{clip_idx}.mp4", codec="libx264")
-        # clip_idx += 1
 
     return mp4_clip_list, mp3_clip_list
 
