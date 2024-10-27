@@ -29,9 +29,10 @@ def float_to_srt_timestamp(seconds):
 
 
 def mp3totxt(mp3_path):
-    """this function using whisper larger v3 to generate pure transcriptions"""
-    model = whisper.load_model("large-v3")
-    print("strat transcribing...")
+    """this function using whisper larger v3 turbo model to generate pure transcriptions"""
+    model = whisper.load_model("turbo")
+
+    print(f"start transcribing {mp3_path}...")
     result = model.transcribe(
         mp3_path,
         word_timestamps=True,

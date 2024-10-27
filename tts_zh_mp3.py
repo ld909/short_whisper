@@ -12,7 +12,7 @@ from xml.dom import minidom
 # from aliyun_tts import aliyun_tts_single
 
 
-def create_ssml_string(text, rate="1.1", yinse_name="zh-CN-YunjieNeural"):
+def create_ssml_string(text, rate="1.15", yinse_name="zh-CN-YunjieNeural"):
     """创建SSML字符串"""
     # 创建根元素
     speak = ET.Element(
@@ -45,9 +45,9 @@ def tts_ms(txt_string, topic, clip_dst_path, channel):
     """调用微软的tts接口，生成mp3文件"""
 
     # 配置参数
-    # speech_key = "cba10589e21e48dfb986f493e276b833"
-    speech_key = "2de1f6961d394116a8a5b0ff5bd22845"
-    service_region = "japanwest"
+    speech_key = "cba10589e21e48dfb986f493e276b833"
+    # speech_key = "2de1f6961d394116a8a5b0ff5bd22845"
+    service_region = "eastasia"
 
     speech_config = speechsdk.SpeechConfig(
         subscription=speech_key, region=service_region
@@ -60,16 +60,10 @@ def tts_ms(txt_string, topic, clip_dst_path, channel):
     speech_synthesizer = speechsdk.SpeechSynthesizer(
         speech_config=speech_config, audio_config=None
     )
-    if topic == "mama":
-        yinse_name = "zh-CN-XiaochenNeural"
-    elif topic == "code" and channel == "fireship":
-        yinse_name = "zh-CN-XiaochenNeural"
-    elif topic == "code" and channel == "networkchuck":
-        yinse_name = "zh-CN-YunyangNeural"
-    elif topic == "code" and channel == "brocodez":
-        yinse_name = "zh-CN-XiaochenNeural"
-    elif topic == "history":
-        yinse_name = "zh-CN-YunyangNeural"
+
+    # 根据topic和channel设置不同的音色
+    if topic == "code":
+        yinse_name = "zh-CN-XiaoxiaoMultilingualNeural"
 
     # 构造SSML字符串
     ssml_string = create_ssml_string(txt_string, yinse_name=yinse_name)
@@ -215,7 +209,7 @@ def controller_tts_single(
             os.remove(mp3_dst_path)
             print(f"{mp3_dst_path} size 为0，已删除")
 
-    # 生成字幕，并保存为mp3
+    # TTS，并保存为单条的mp3
     print(f"一共有{len(subtitles)}个字幕待合成tts")
     for sub_idx, subtitle in tqdm(enumerate(subtitles)):
         tts_success = False
@@ -308,6 +302,6 @@ def ts_to_duration(ts_list):
 
 
 if __name__ == "__main__":
-
+    topic = argv[1]
     controller_tts(topic=topic)
     # controller_merge_single_mp3(topic)

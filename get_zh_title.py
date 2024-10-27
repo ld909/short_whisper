@@ -2,19 +2,20 @@ import json
 import os
 import anthropic
 from tqdm import tqdm
+import yt_dlp
 
 
 def translate_to_zh_title(eng_title, topic):
     client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
     if topic == "code":
-        prompt_txt = f"""我有一个英文视频的名称，视频是关于变成或者计算机科学的话题，请准确翻译相关专业词汇。请注意，英文名可能包含emoji等表情符号，返回的结果中请剔除这些emoji等符号，我要得到纯净的中文翻译结果。直接返回翻译后的中文标题，不需要其他多余信息。英文标题是：{eng_title}"""
+        prompt_txt = f"""我有一个英文视频的名称，视频是关于变成或者计算机科学的话题，请准确翻译相关专业词汇。请注意，英文名可能包含emoji等表情符号，返回的结果中请剔除这些emoji、标签等符号，我要得到纯净的中文翻译结果。直接返回翻译后的中文标题，不需要其他多余信息。英文标题是：{eng_title}"""
     elif topic == "mama":
-        prompt_txt = f"""我有一个英文视频的名称，视频是母婴类的标题，请准确翻译相关专业词汇。请注意，英文名可能包含emoji等表情符号，返回的结果中请剔除这些emoji等符号，我要得到纯净的中文翻译结果。直接返回翻译后的中文标题，不需要其他多余信息。英文标题是：{eng_title}"""
+        prompt_txt = f"""我有一个英文视频的名称，视频是母婴类的标题，请准确翻译相关专业词汇。请注意，英文名可能包含emoji等表情符号，返回的结果中请剔除这些emoji、标签等符号，我要得到纯净的中文翻译结果。直接返回翻译后的中文标题，不需要其他多余信息。英文标题是：{eng_title}"""
     elif topic == "history":
         prompt_txt = f"""我有一个英文视频的名称，视频是历史/时政类的标题，请准确翻译相关专业词汇。请注意，英文名可能包含emoji等表情符号，返回的结果中请剔除这些emoji等符号，我要得到纯净的中文翻译结果。直接返回翻译后的中文标题，不需要其他多余信息。英文标题是：{eng_title}"""
 
     message = client.messages.create(
-        model="claude-3-sonnet-20240229",
+        model="claude-3-5-sonnet-20241022",
         max_tokens=1000,
         temperature=0,
         system="你是一个优秀的翻译家，能够精确优雅准确精炼地把英文字幕翻译为中文字幕。不要返回多余信息，精准严格存寻prompt。",
@@ -41,7 +42,7 @@ def claude3_zh_tag(zh_title):
         api_key=os.environ.get("ANTHROPIC_API_KEY")
     )
     message = client.messages.create(
-        model="claude-3-sonnet-20240229",
+        model="claude-3-5-sonnet-20241022",
         max_tokens=1000,
         temperature=0,
         system="你是一个优秀的翻译家，能够精确优雅准确精炼地把英文字幕翻译为中文字幕。不要返回多余信息，精准严格存寻prompt。",
@@ -164,11 +165,14 @@ def zh_title_tags_controller_single(
         return
 
     # get the base name of the srt file
-    base_name = os.path.splitext(srt_file_name)[0]
-    dst_file_name = base_name + ".txt"
+    video_id = os.path.splitext(srt_file_name)[0]
+    dst_file_name = video_id + ".txt"
 
     # 得到英文标题，即srt文件的base name
-    eng_title = base_name
+    eng_title = get_original_title(video_id)
+    if eng_title is None:
+        print(f"无法获取视频 {video_id} 的原始标题,使用视频ID作为标题")
+        eng_title = video_id
 
     # using claude 3 to translate the eng title to zh title
     title_zh = translate_to_zh_title(eng_title, topic)
@@ -194,6 +198,25 @@ def zh_title_tags_controller_single(
     ) as f:
         for tag in tags_zh:
             f.write(tag + "\n")
+
+
+def get_original_title(video_id):
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "extract_flat": True,
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info = ydl.extract_info(
+                f"https://www.youtube.com/watch?v={video_id}", download=False
+            )
+            return info["title"]
+        except Exception as e:
+            print(f"获取标题时出错: {str(e)}")
+            return None
 
 
 if __name__ == "__main__":

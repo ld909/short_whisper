@@ -1,33 +1,46 @@
-import numpy as np
-from datetime import datetime, timedelta
+import yt_dlp
+import os
 
 
-def get_uniform_dates(num_days=60):
+def get_original_title(video_id):
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "extract_flat": True,
+    }
 
-    # 获取当前日期
-    today = datetime.today()
-
-    today = datetime(2024, 12, 2)
-    # 获取今年的元旦
-    new_year = datetime(today.year, 1, 1)
-
-    # 计算从元旦到今天的天数
-    delta_days = (today - new_year).days + 1  # 加1包括今天
-
-    if delta_days < num_days:
-        # 如果天数不足60,进行差值
-        dates = [new_year + timedelta(days=i % delta_days) for i in range(num_days)]
-    else:
-        # 均匀选择60天，确保今天被包含
-        indices = np.linspace(0, delta_days - 1, num_days, dtype=int)
-        dates = [new_year + timedelta(days=int(idx)) for idx in indices]
-        # 确保今天在列表中
-        if today not in dates:
-            dates[-1] = today
-
-    return sorted(dates)
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info = ydl.extract_info(
+                f"https://www.youtube.com/watch?v={video_id}", download=False
+            )
+            return info["title"]
+        except Exception as e:
+            print(f"获取标题时出错: {str(e)}")
+            return None
 
 
-# 打印结果
-for idx, date in enumerate(get_uniform_dates()):
-    print(date.strftime("%Y-%m-%d"), idx + 1)
+def set_clash_proxy():
+
+    # 设置环境变量
+    os.environ["http_proxy"] = "http://127.0.0.1:7897"
+    os.environ["https_proxy"] = "http://127.0.0.1:7897"
+    # os.environ["all_proxy"] = "socks5://127.0.0.1:7891"
+    print("成功设定clash环境proxy...")
+
+
+def unset_clash_proxy():
+    # 删除环境变量
+    os.environ.pop("http_proxy", None)
+    os.environ.pop("https_proxy", None)
+    # os.environ.pop("all_proxy", None)
+    print("成功取消clash环境proxy...")
+
+
+# 使用示例
+video_id = "dQw4w9WgXcQ"
+set_clash_proxy()
+original_title = get_original_title(video_id)
+print(f"原始标题: {original_title}")
+unset_clash_proxy()

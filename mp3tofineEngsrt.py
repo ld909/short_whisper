@@ -1,7 +1,7 @@
 # this file is the controller of the whole pipeline from mp3 to srt to video
 # srt files are generated from mp3 files and are formatted to make it more readable
 # srt are still in English
-# ！！！！此脚本需要Nividai GPU上运行，否则whisper模型会很慢！！！！
+# ！！！！此脚本需要Nvidia GPU上运行，否则whisper模型会很慢！！！！
 
 import os
 import sys
@@ -12,9 +12,22 @@ from after_whisper_controller import load_bad_json
 from translate_srt import get_duration
 
 
+def remove_trash_files(mp3_abs_path):
+    """remove .DS_Store files and all files start with '._' in the mp3_abs_path"""
+    for channel in os.listdir(mp3_abs_path):
+        for file in os.listdir(os.path.join(mp3_abs_path, channel)):
+            if file.startswith("._"):
+                os.remove(os.path.join(mp3_abs_path, channel, file))
+                print(f"{channel}, {file} removed")
+            if file == ".DS_Store":
+                os.remove(os.path.join(mp3_abs_path, channel, file))
+
+
 def controller_mp3_to_format_srt(topic):
     hard_dive_path = "/media/dhl/TOSHIBA"
     mp3_abs_path = f"{hard_dive_path}/ytb-videos/mp3/{topic}"  # fill in the absolute path of the mp3 folder
+
+    remove_trash_files(mp3_abs_path)
     dst_srt_abs_path = f"{hard_dive_path}/video_material/format_srt/{topic}"  # fill in the absolute path of the srt folder
 
     # check if the dst_srt_abs_path exists, if not create it
@@ -25,8 +38,8 @@ def controller_mp3_to_format_srt(topic):
     # remove .DS_store
     all_channels = [folder for folder in all_channels if folder != ".DS_Store"]
 
-    #
-    # all_channels = ["networkchuck"]
+    # 删除._开头的文件
+    all_channels = [folder for folder in all_channels if not folder.startswith("._")]
 
     print("all chanels are", all_channels)
 
@@ -42,6 +55,7 @@ def controller_mp3_to_format_srt(topic):
             if mp3_file.endswith(".mp3"):
                 # check if base_name +'.srt' exists in the dst_srt
                 base_name = os.path.splitext(mp3_file)[0]
+                # 如果topic在bad_data中，则检查channel和base_name是否在bad_data中,如果都在，则跳过
                 if topic in bad_data:
                     if channel in bad_data[topic]:
                         if base_name in bad_data[topic][channel]:
@@ -55,19 +69,18 @@ def controller_mp3_to_format_srt(topic):
 
                 # 检查之前是否完成过此任务，完成就跳过
                 if os.path.exists(dst_srt):
-                    print("srt file exists, skip")
+                    print(f"srt file exists, skip {base_name} in {channel}")
                     continue
-
+                mp3_path = os.path.join(mp3_abs_path, channel, mp3_file)
+                print("processing: ", mp3_path, " in channel: ", channel)
                 # if mp3 duration is larger than 30 minutes, skip
-                mp3_duration_seconds = get_duration(
-                    os.path.join(mp3_abs_path, channel, mp3_file)
-                )
+                mp3_duration_seconds = get_duration(mp3_path)
                 if mp3_duration_seconds > 1800:
                     print(f"mp3 {mp3_file} duration is larger than 30 minutes, skip")
                     continue
 
                 mp3_path = os.path.join(mp3_abs_path, channel, mp3_file)
-                print("processing: ", mp3_path, " in channel: ", channel)
+
                 print("transcribing mp3 to txt using OpenAI whisper model...")
                 ts_list, txt_list = mp3totxt(mp3_path)
 

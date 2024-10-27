@@ -118,7 +118,7 @@ def controller_translate_srt_single(eng_srt_path, dst_zh_srt_path, topic):
         print(f"{dst_zh_srt_path} 文件存在, 跳过继续...")
         return
 
-    # parse the srt file
+    # parse the english srt file
     srt_read = read_srt_file(eng_srt_path)
 
     # get the timestamps and subtitles from the srt file
