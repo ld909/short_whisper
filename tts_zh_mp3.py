@@ -12,7 +12,7 @@ from xml.dom import minidom
 # from aliyun_tts import aliyun_tts_single
 
 
-def create_ssml_string(text, rate="1.15", yinse_name="zh-CN-YunjieNeural"):
+def create_ssml_string(text, rate="1.2", yinse_name="zh-CN-YunjieNeural"):
     """创建SSML字符串"""
     # 创建根元素
     speak = ET.Element(

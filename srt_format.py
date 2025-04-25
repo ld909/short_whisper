@@ -26,7 +26,8 @@ def check_ends_condition(txt_list):
     # check if every line except the last one ends with a qutation that ends a sentence
     for txt in txt_list:
         txt = txt.strip()
-        if txt[-1] not in [".", "?", "!"]:
+        # 顿号不作为句子结束的标记
+        if txt[-1] not in ["。", "?", "！"]:
             return False
     return True
 
@@ -38,7 +39,7 @@ def format_srt(ts_list, txt_list):
     single_qutation_idx = []
     for txt_id, txt in enumerate(txt_list):
         # if txt is a single qutation, merge it with the previous line
-        if len(txt) == 1 and txt in [",", ".", "?", "!"]:
+        if len(txt) == 1 and txt in ["，", "。", "?", "！", "、"]:
             txt_list[txt_id - 1] += txt
             single_qutation_idx.append(txt_id)
 
@@ -49,8 +50,8 @@ def format_srt(ts_list, txt_list):
             txt_list.pop(idx)
 
     # check if the last line ends with a qutation that ends a sentence, if not, add a qutation
-    if txt_list[-1][-1] not in [".", "?", "!"]:
-        txt_list[-1] += "."
+    if txt_list[-1][-1] not in ["。", "?", "！"]:
+        txt_list[-1] += "。"
 
     # merge lines that within a sentence
     end_condition = False
@@ -65,13 +66,28 @@ def format_srt(ts_list, txt_list):
             cur_ts = ts_list[cur_idx]
 
             # if the current line ends with a qutation that ends a sentence
-            if cur_txt[-1] in [".", "?", "!"]:
+            if cur_txt[-1] in ["。", "?", "！"]:
                 # append the current line to the new list
                 new_ts_list.append(cur_ts)
                 new_txt_list.append(cur_txt)
                 # increase the index
                 cur_idx += 1
+            # 如果当前行以顿号结尾，表示句子未完成，需要与下一行合并
+            elif cur_txt[-1] == "、":
+                # merge the current line with the next line
+                next_txt = txt_list[cur_idx + 1]
+                next_ts = ts_list[cur_idx + 1]
 
+                # merge the current and next line
+                new_txt = cur_txt + " " + next_txt
+                new_ts = (cur_ts[0], next_ts[1])
+
+                # append the new line to the new list
+                new_ts_list.append(new_ts)
+                new_txt_list.append(new_txt)
+
+                # skip the next line
+                cur_idx += 2
             else:
                 # merge the current line with the next line
                 next_txt = txt_list[cur_idx + 1]
@@ -94,6 +110,10 @@ def format_srt(ts_list, txt_list):
 
         # check end condition
         end_condition = check_ends_condition(new_txt_list)
+
+    # 去掉合并后每一句中的空格
+    for i in range(len(txt_list)):
+        txt_list[i] = txt_list[i].replace(" ", "")
 
     print("formatting finished!")
     return ts_list, txt_list
@@ -140,7 +160,8 @@ def read_srt_file(file_path):
 
 def check_breack_condition(txt):
     """check if the txt is a single sentence, if it is, return True, otherwise return False"""
-    if ". " not in txt and "? " not in txt and "! " not in txt:
+    # 顿号不应该作为句子结束的标志，所以不需要检查它
+    if "。 " not in txt and "? " not in txt and "！ " not in txt:
         return True
     else:
         return False
@@ -165,7 +186,8 @@ def timedelta_to_srt(timedelta_obj):
 def break_srt_txt_into_sentences(old_ts_list, old_txt_list):
     """break the srt text into sentences"""
 
-    for qutation in [". ", "? ", "! "]:
+    # 顿号不应该作为句子分割的标志，从列表中移除
+    for qutation in ["。 ", "? ", "！ "]:
         ts_list = []
         txt_list = []
 

@@ -338,7 +338,7 @@ def translate_single_srt(eng_srt_single_str, topic):
                 "content": [
                     {
                         "type": "text",
-                        "text": f"""我有一个英文字幕，请帮我翻译为英文，直接返回翻译后的结果，不返回其他任何多余结果, 结果不要带任何引号。英文字幕是：{eng_srt_single_str}""",
+                        "text": f"""我有一个英文字幕，请帮我翻译为中文，直接返回翻译后的结果，不返回其他任何多余结果, 结果不要带任何引号。英文字幕是：{eng_srt_single_str}""",
                     }
                 ],
             }

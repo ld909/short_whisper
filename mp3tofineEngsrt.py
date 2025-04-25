@@ -1,7 +1,20 @@
-# this file is the controller of the whole pipeline from mp3 to srt to video
-# srt files are generated from mp3 files and are formatted to make it more readable
-# srt are still in English
-# ！！！！此脚本需要Nvidia GPU上运行，否则whisper模型会很慢！！！！
+"""
+MP3到英文SRT字幕转换控制器
+
+此脚本控制整个从MP3音频到SRT字幕的转换流程：
+1. 使用OpenAI的Whisper模型将MP3音频文件转录为文本
+2. 生成英文SRT字幕文件
+3. 对SRT格式进行优化，使其更易读
+4. 处理字幕断句，提高可读性
+
+注意：此脚本需要在Nvidia GPU上运行，否则Whisper模型处理速度会很慢！
+
+使用方法：
+    python mp3tofineEngsrt.py <主题名称>
+
+示例：
+    python mp3tofineEngsrt.py code
+"""
 
 import os
 import sys
@@ -13,7 +26,15 @@ from translate_srt import get_duration
 
 
 def remove_trash_files(mp3_abs_path):
-    """remove .DS_Store files and all files start with '._' in the mp3_abs_path"""
+    """
+    清理目录中的垃圾文件
+
+    此函数删除指定目录及其子目录中的.DS_Store文件和所有以'._'开头的文件，
+    这些通常是macOS系统生成的元数据文件。
+
+    参数:
+        mp3_abs_path (str): MP3文件所在的绝对路径
+    """
     for channel in os.listdir(mp3_abs_path):
         for file in os.listdir(os.path.join(mp3_abs_path, channel)):
             if file.startswith("._"):
@@ -24,11 +45,30 @@ def remove_trash_files(mp3_abs_path):
 
 
 def controller_mp3_to_format_srt(topic):
-    hard_dive_path = "/media/dhl/TOSHIBA"
-    mp3_abs_path = f"{hard_dive_path}/ytb-videos/mp3/{topic}"  # fill in the absolute path of the mp3 folder
+    """
+    MP3到格式化SRT的控制器主函数
+
+    此函数控制整个处理流程：
+    1. 清理垃圾文件
+    2. 遍历指定主题下的所有频道和MP3文件
+    3. 使用Whisper模型转录音频为文本
+    4. 格式化文本为SRT格式
+    5. 优化SRT字幕的断句
+    6. 保存格式化后的SRT文件
+
+    函数会自动跳过：
+    - 已处理过的文件
+    - 在bad.json中标记为有问题的文件
+    - 时长超过30分钟的音频文件
+
+    参数:
+        topic (str): 主题名称，用于确定处理的文件夹
+    """
+    hard_dive_path = "/media/dhl/"
+    mp3_abs_path = f"{hard_dive_path}/buda_videos_youtube/{topic}"  # fill in the absolute path of the mp3 folder
 
     remove_trash_files(mp3_abs_path)
-    dst_srt_abs_path = f"{hard_dive_path}/video_material/format_srt/{topic}"  # fill in the absolute path of the srt folder
+    dst_srt_abs_path = f"{hard_dive_path}/buda_videos_youtube/format_srt_zh/{topic}"  # fill in the absolute path of the srt folder
 
     # check if the dst_srt_abs_path exists, if not create it
     if not os.path.exists(dst_srt_abs_path):
@@ -41,7 +81,7 @@ def controller_mp3_to_format_srt(topic):
     # 删除._开头的文件
     all_channels = [folder for folder in all_channels if not folder.startswith("._")]
 
-    print("all chanels are", all_channels)
+    print("所有频道包括:", all_channels)
 
     # read bad.json from
     bad_data = load_bad_json()
@@ -59,7 +99,7 @@ def controller_mp3_to_format_srt(topic):
                 if topic in bad_data:
                     if channel in bad_data[topic]:
                         if base_name in bad_data[topic][channel]:
-                            print(f"Bad corrept, skip {base_name} in {channel}")
+                            print(f"文件损坏，跳过 {channel} 中的 {base_name}")
                             continue
                 dst_srt = os.path.join(dst_srt_abs_path, channel, base_name + ".srt")
 
@@ -69,19 +109,19 @@ def controller_mp3_to_format_srt(topic):
 
                 # 检查之前是否完成过此任务，完成就跳过
                 if os.path.exists(dst_srt):
-                    print(f"srt file exists, skip {base_name} in {channel}")
+                    print(f"SRT文件已存在，跳过 {channel} 中的 {base_name}")
                     continue
                 mp3_path = os.path.join(mp3_abs_path, channel, mp3_file)
-                print("processing: ", mp3_path, " in channel: ", channel)
+                print("正在处理: ", mp3_path, " 频道: ", channel)
                 # if mp3 duration is larger than 30 minutes, skip
                 mp3_duration_seconds = get_duration(mp3_path)
                 if mp3_duration_seconds > 1800:
-                    print(f"mp3 {mp3_file} duration is larger than 30 minutes, skip")
+                    print(f"MP3 {mp3_file} 时长超过30分钟，跳过")
                     continue
 
                 mp3_path = os.path.join(mp3_abs_path, channel, mp3_file)
 
-                print("transcribing mp3 to txt using OpenAI whisper model...")
+                print("开始使用OpenAI whisper模型将MP3转录为文本...")
                 ts_list, txt_list = mp3totxt(mp3_path)
 
                 # format srt
@@ -95,7 +135,7 @@ def controller_mp3_to_format_srt(topic):
 
                 # get base name without extension
                 save_srt(ts_list, txt_list, dst_srt)
-                print(f"srt formatted save on {dst_srt}")
+                print(f"格式化后的字幕已保存到 {dst_srt}")
 
 
 if __name__ == "__main__":
