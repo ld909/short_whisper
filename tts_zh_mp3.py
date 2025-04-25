@@ -87,8 +87,6 @@ def tts_ms(txt_string, topic, clip_dst_path, channel):
                 print("Did you set the speech resource key and region values?")
         return False
 
-
-def tts_minimax(content_str, mp3_dst_path, topic):
     """调用minimax的tts接口，生成mp3文件"""
 
     if topic == "mama":

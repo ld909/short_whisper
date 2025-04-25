@@ -3,8 +3,6 @@ import threading
 import nls
 
 URL = "wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1"
-TOKEN = "d14ca8b458664d089714dbce3ddf1347"  # 参考https://help.aliyun.com/document_detail/450255.html 获取token
-APPKEY = "jtud4cprXE2nGCuk"  # 获取Appkey请前往控制台：https://nls-portal.console.aliyun.com/applist
 
 
 # 以下代码会根据上述TEXT文本反复进行语音合成
