@@ -2,7 +2,8 @@
 ##### 主要的逻辑都在这里
 import os
 from sys import argv
-from translate_srt_zh_multi import controller_translate_srt_single, get_duration
+from translate_srt_en_zh import controller_translate_srt_single
+from merge_srt_video import get_duration
 from tts_zh_mp3 import controller_tts_single
 from merge_tts_mp3 import merge_mp4_controller_single
 from get_zh_title import zh_title_tags_controller_single

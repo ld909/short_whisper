@@ -22,7 +22,7 @@ from tqdm import tqdm
 from mp3toscripts import mp3totxt, save_srt
 from srt_format import format_srt, break_srt_txt_into_sentences
 from after_whisper_controller import load_bad_json
-from translate_srt import get_duration
+from merge_srt_video import get_duration
 
 
 def remove_trash_files(mp3_abs_path):

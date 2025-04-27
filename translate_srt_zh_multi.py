@@ -28,6 +28,10 @@ def setup_openai_client():
 # 初始化OpenAI客户端
 client = None  # 将在main函数中初始化
 
+# 定义支持的语言列表
+LANGUAGES = ["English", "Japanese", "Vietnamese", "Korean"]
+LANGUAGE_CODES = {"English": "en", "Japanese": "ja", "Vietnamese": "vi", "Korean": "ko"}
+
 
 def parse_srt(file_path):
     """解析SRT文件，返回字幕条目列表"""
@@ -70,7 +74,7 @@ def translate_text(text, target_language="English"):
             messages=[
                 {
                     "role": "system",
-                    "content": "你是一个翻译大师，佛学大师，佛教专家。精通佛教各种术语在不同文化中对应的词汇，我需要你将中文佛教内容翻译为英文，直接返回翻译后的结果，不要夹带其他内容。不要以翻译后这样的内容开头作为返回。",
+                    "content": f"你是一个翻译大师，佛学大师，佛教专家。精通佛教各种术语在不同文化中对应的词汇，我需要你将中文佛教内容翻译为{target_language}，直接返回翻译后的结果，不要夹带其他内容。不要以翻译后这样的内容开头作为返回。",
                 },
                 {"role": "user", "content": text},
             ],
@@ -159,64 +163,129 @@ def translate_srt_file(input_file, output_file, target_language="English"):
                     time.sleep(0.5)
 
         print(f"翻译完成! 所有内容已保存到 {output_file}")
+        return True  # 返回成功完成的标志
 
     except KeyboardInterrupt:
         print("\n翻译被用户中断")
         print(f"已翻译并保存到第 {i+1} 条字幕")
         print(f"下次运行时将从第 {i+2} 条开始继续翻译")
+        return False
 
     except Exception as e:
         print(f"翻译过程中出错: {e}")
         print(f"已翻译并保存部分内容，下次可继续从断点处翻译")
+        return False
 
 
-def process_directory(input_path, output_path, target_language="English", force=False):
-    """处理目录中的所有SRT文件"""
-    # 确保输出目录存在
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
-        print(f"创建输出目录: {output_path}")
+def process_srt_with_new_structure(input_path, topic, languages=None, force=False):
+    """处理格式化SRT目录中的所有频道和SRT文件，并按新的目录结构输出"""
+    if languages is None:
+        languages = LANGUAGES
 
-    # 获取所有SRT文件
-    srt_files = glob.glob(os.path.join(input_path, "*.srt"))
+    base_input_path = os.path.join(input_path, topic)
+    base_output_path = (
+        f"/media/dhl/buda_videos_youtube/multi_lang_srt_before_format/{topic}"
+    )
 
-    if not srt_files:
-        print(f"在目录 '{input_path}' 中未找到任何SRT文件")
+    print(f"输入路径: {base_input_path}")
+    print(f"输出路径: {base_output_path}")
+    print(f"将依次翻译为以下语言: {', '.join(languages)}")
+
+    # 检查输入路径是否存在
+    if not os.path.exists(base_input_path):
+        print(f"错误: 输入路径 '{base_input_path}' 不存在")
         return
 
-    print(f"在目录 '{input_path}' 中找到 {len(srt_files)} 个SRT文件")
+    # 获取所有频道目录
+    channels = [
+        d
+        for d in os.listdir(base_input_path)
+        if os.path.isdir(os.path.join(base_input_path, d))
+    ]
 
-    for input_file in srt_files:
-        # 生成输出文件路径
-        file_name = os.path.basename(input_file)
-        base_name = os.path.splitext(file_name)[0]
-        output_file = os.path.join(
-            output_path, f"{base_name}_{target_language.lower()}.srt"
-        )
+    if not channels:
+        print(f"在 '{base_input_path}' 中未找到任何频道目录")
+        return
 
-        print(f"\n处理文件: {file_name}")
-        print(f"输出到: {output_file}")
+    print(f"找到 {len(channels)} 个频道目录")
 
-        # 如果强制重新翻译且输出文件存在，则删除输出文件
-        if force and os.path.exists(output_file):
-            os.remove(output_file)
-            print(f"已删除现有输出文件 '{output_file}'，将重新翻译")
+    for channel in channels:
+        channel_input_path = os.path.join(base_input_path, channel)
 
-        # 翻译文件
-        translate_srt_file(input_file, output_file, target_language)
+        # 获取当前频道中的所有SRT文件
+        srt_files = [f for f in os.listdir(channel_input_path) if f.endswith(".srt")]
+
+        if not srt_files:
+            print(f"在频道 '{channel}' 中未找到任何SRT文件，跳过")
+            continue
+
+        print(f"\n处理频道: {channel}，找到 {len(srt_files)} 个SRT文件")
+
+        for language in languages:
+            # 为每种语言创建输出目录
+            language_output_path = os.path.join(
+                base_output_path, channel, LANGUAGE_CODES[language]
+            )
+
+            if not os.path.exists(language_output_path):
+                os.makedirs(language_output_path)
+                print(f"创建输出目录: {language_output_path}")
+
+            print(f"\n开始为频道 {channel} 翻译为 {language}...")
+
+            for srt_file in srt_files:
+                input_file_path = os.path.join(channel_input_path, srt_file)
+                output_file_path = os.path.join(language_output_path, srt_file)
+
+                # 如果强制重新翻译且输出文件存在，则删除输出文件
+                if force and os.path.exists(output_file_path):
+                    os.remove(output_file_path)
+                    print(f"已删除现有输出文件 '{output_file_path}'，将重新翻译")
+
+                print(f"\n处理文件: {srt_file}")
+                print(f"从 {input_file_path}")
+                print(f"到 {output_file_path}")
+
+                # 翻译文件
+                success = translate_srt_file(
+                    input_file_path, output_file_path, language
+                )
+
+                if success:
+                    print(f"成功完成 {srt_file} 到 {language} 的翻译!")
+                else:
+                    print(
+                        f"{srt_file} 到 {language} 的翻译未完全完成，将继续下一个文件"
+                    )
 
 
 def main():
     global client
 
     # 创建命令行参数解析器
-    parser = argparse.ArgumentParser(description="使用OpenAI GPT模型翻译SRT字幕文件")
+    parser = argparse.ArgumentParser(
+        description="使用OpenAI GPT模型将中文SRT字幕文件翻译为多种语言"
+    )
 
     # 添加命令行参数
-    parser.add_argument("-i", "--input", default="o.srt", help="输入SRT文件或目录路径")
-    parser.add_argument("-o", "--output", help="输出SRT文件或目录路径")
     parser.add_argument(
-        "-l", "--language", default="English", help="目标语言 (默认: English)"
+        "-t",
+        "--topic",
+        required=True,
+        help="要处理的主题名称，对应format_srt_zh下的目录名",
+    )
+    parser.add_argument(
+        "-i",
+        "--input",
+        default="/media/dhl/buda_videos_youtube/format_srt_zh",
+        help="输入SRT基础目录路径，默认为/media/dhl/buda_videos_youtube/format_srt_zh",
+    )
+    parser.add_argument(
+        "-l",
+        "--languages",
+        nargs="+",
+        default=LANGUAGES,
+        help=f"目标语言列表 (默认: {' '.join(LANGUAGES)})",
     )
     parser.add_argument(
         "-f", "--force", action="store_true", help="强制重新翻译，忽略已有翻译进度"
@@ -228,35 +297,8 @@ def main():
     # 设置OpenAI客户端
     client = setup_openai_client()
 
-    # 检查输入路径是文件还是目录
-    if os.path.isdir(args.input):
-        # 如果是目录，需要指定输出目录
-        if not args.output:
-            args.output = os.path.join(
-                os.path.dirname(args.input), f"translated_{args.language.lower()}"
-            )
-
-        # 处理目录
-        process_directory(args.input, args.output, args.language, args.force)
-    else:
-        # 如果是单个文件
-        # 如果未指定输出文件，则根据输入文件名生成
-        if not args.output:
-            input_name = os.path.splitext(args.input)[0]
-            args.output = f"{input_name}_{args.language.lower()}.srt"
-
-        # 确保输入文件存在
-        if not os.path.exists(args.input):
-            print(f"错误: 找不到输入文件 '{args.input}'")
-            sys.exit(1)
-
-        # 如果指定了强制重新翻译，且输出文件存在，则删除输出文件
-        if args.force and os.path.exists(args.output):
-            os.remove(args.output)
-            print(f"已删除现有输出文件 '{args.output}'，将重新翻译")
-
-        # 执行翻译
-        translate_srt_file(args.input, args.output, args.language)
+    # 处理SRT文件
+    process_srt_with_new_structure(args.input, args.topic, args.languages, args.force)
 
 
 if __name__ == "__main__":

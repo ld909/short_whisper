@@ -30,13 +30,13 @@ def float_to_srt_timestamp(seconds):
 
 def mp3totxt(mp3_path):
     """this function using whisper larger v3 turbo model to generate pure transcriptions"""
-    model = whisper.load_model("large-v3")
+    model = whisper.load_model("large-v2")
 
     print(f"开始转录 {mp3_path}...")
     result = model.transcribe(
         mp3_path,
         word_timestamps=True,
-        initial_prompt="你好，欢迎来到我的视频。",
+        initial_prompt="你好，欢迎来到我的佛法课程。佛法无边。",
         verbose=True,  # 添加verbose=True参数来显示转换进度
     )
     print("转录完成")
