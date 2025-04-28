@@ -3,8 +3,27 @@ import re
 import time
 import argparse
 import sys
+import platform
 from openai import OpenAI
 import glob
+import concurrent.futures
+from threading import Lock
+from tqdm import tqdm
+
+
+def get_base_media_path():
+    """根据操作系统返回适当的媒体路径"""
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        return "/Volumes/dhl/buda_videos_youtube"
+    else:  # 默认为Linux/Ubuntu
+        return "/media/dhl/buda_videos_youtube"
+
+
+# 获取媒体基础路径
+BASE_MEDIA_PATH = get_base_media_path()
+# 输入SRT目录
+INPUT_SRT_PATH = os.path.join(BASE_MEDIA_PATH, "zh_srt_tyro_fix")
 
 
 def setup_openai_client():
@@ -62,28 +81,41 @@ def parse_srt(file_path):
         sys.exit(1)
 
 
-def translate_text(text, target_language="English"):
-    """使用OpenAI的GPT模型翻译文本"""
+def translate_text(text, target_language="English", max_retries=3):
+    """使用OpenAI的GPT模型翻译文本，失败时自动重试"""
     if not text.strip():
         return ""  # 如果文本为空，则直接返回空字符串
 
-    try:
-        completion = client.chat.completions.create(
-            model="gpt-4.1-mini",
-            max_tokens=1000,
-            messages=[
-                {
-                    "role": "system",
-                    "content": f"你是一个翻译大师，佛学大师，佛教专家。精通佛教各种术语在不同文化中对应的词汇，我需要你将中文佛教内容翻译为{target_language}，直接返回翻译后的结果，不要夹带其他内容。不要以翻译后这样的内容开头作为返回。",
-                },
-                {"role": "user", "content": text},
-            ],
-        )
-        return completion.choices[0].message.content
-    except Exception as e:
-        print(f"翻译出错: {e}")
-        print(f"原文: {text}")
-        return text  # 如果翻译失败，返回原文
+    # 检测是否为中文文本（如果是中文且目标语言不是中文，则需要翻译）
+    is_chinese = any("\u4e00" <= char <= "\u9fff" for char in text)
+    need_translation = is_chinese and target_language != "Chinese"
+
+    if not need_translation:
+        return text  # 如果不需要翻译，直接返回原文
+
+    for attempt in range(max_retries):
+        try:
+            completion = client.chat.completions.create(
+                model="gpt-4.1-mini",
+                max_tokens=1000,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"你是一个翻译大师，佛学大师，佛教专家。精通佛教各种术语在不同文化中对应的词汇，我需要你将中文佛教内容翻译为{target_language}，直接返回翻译后的结果，不要夹带其他内容。不要以翻译后这样的内容开头作为返回。",
+                    },
+                    {"role": "user", "content": text},
+                ],
+            )
+            result = completion.choices[0].message.content
+            return result
+        except Exception as e:
+            print(f"翻译出错 (尝试 {attempt+1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                print("等待2秒后重试...")
+                time.sleep(2)  # 添加延迟，避免过快请求
+            else:
+                print(f"达到最大重试次数 ({max_retries})，返回原文")
+                return text  # 如果所有尝试都失败，返回原文
 
 
 def check_progress(output_file):
@@ -104,13 +136,15 @@ def check_progress(output_file):
         return 0
 
 
-def translate_srt_file(input_file, output_file, target_language="English"):
-    """翻译整个SRT文件，逐条翻译并即时写入输出文件"""
+def translate_srt_file_concurrent(
+    input_file, output_file, target_language="English", batch_size=20
+):
+    """并发翻译整个SRT文件，保持字幕顺序并即时写入输出文件"""
     entries = parse_srt(input_file)
 
     if not entries:
         print("错误: 未解析到任何字幕条目")
-        return
+        return False
 
     # 确保输出目录存在
     output_dir = os.path.dirname(output_file)
@@ -122,53 +156,94 @@ def translate_srt_file(input_file, output_file, target_language="English"):
     already_translated = check_progress(output_file)
     print(f"检测到已翻译 {already_translated}/{len(entries)} 条字幕")
 
+    # 如果所有条目都已翻译完成，直接返回
+    if already_translated >= len(entries):
+        print("所有字幕都已翻译完成，无需重新翻译")
+        return True
+
     # 确定从哪个索引开始翻译
     start_index = already_translated
     total_entries = len(entries)
-
-    # 如果全部翻译完成，直接返回
-    if start_index >= total_entries:
-        print("所有字幕都已翻译完成，无需重新翻译")
-        return
 
     print(f"从第 {start_index+1} 条开始翻译，共 {total_entries} 条字幕...")
 
     # 确定写入模式：如果已有翻译内容，追加模式；否则，写入模式
     write_mode = "a" if already_translated > 0 else "w"
 
+    # 创建锁用于保护文件写入
+    lock = Lock()
+    # 创建结果字典用于保存已翻译的结果，确保输出顺序
+    results = {}
+
+    def translate_entry(i, entry):
+        """翻译单个字幕条目的函数"""
+        try:
+            original_text = entry["text"]
+            print(f"正在翻译第 {i+1}/{total_entries} 条字幕...")
+            print(f"翻译前: {original_text}")
+
+            translated_text = translate_text(
+                original_text, target_language, max_retries=3
+            )
+            print(f"翻译后: {translated_text}")
+
+            return i, translated_text
+        except Exception as e:
+            print(f"翻译第 {i+1} 条字幕时出错: {e}")
+            return i, original_text  # 出错时返回原文
+
     try:
         with open(output_file, write_mode, encoding="utf-8") as file:
-            for i in range(start_index, total_entries):
-                entry = entries[i]
-                print(f"正在翻译第 {i+1}/{total_entries} 条字幕...")
-                original_text = entry["text"]
-                print(f"翻译前: {original_text}")
+            # 使用ThreadPoolExecutor进行并发处理
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=batch_size
+            ) as executor:
+                # 提交所有需要翻译的条目到线程池
+                future_to_index = {
+                    executor.submit(translate_entry, i, entry): i
+                    for i, entry in enumerate(entries[start_index:], start=start_index)
+                }
 
-                translated_text = translate_text(original_text, target_language)
-                print(f"翻译后: {translated_text}")
+                # 使用tqdm显示总体进度
+                with tqdm(total=len(future_to_index), desc="翻译进度") as pbar:
+                    # 按顺序处理结果
+                    for i in range(start_index, total_entries):
+                        # 等待当前索引的结果完成
+                        while i not in results:
+                            # 检查是否有任何已完成的任务
+                            completed_futures, _ = concurrent.futures.wait(
+                                [f for f, idx in future_to_index.items() if idx == i],
+                                return_when=concurrent.futures.FIRST_COMPLETED,
+                            )
 
-                # 即时写入翻译结果到文件
-                file.write(f"{entry['index']}\n")
-                file.write(f"{entry['timestamp']}\n")
-                file.write(f"{translated_text}\n\n")
-                # 确保立即写入磁盘
-                file.flush()
-                os.fsync(file.fileno())
+                            # 处理完成的任务
+                            for future in completed_futures:
+                                idx, translated_text = future.result()
+                                with lock:
+                                    results[idx] = translated_text
 
-                print(f"已写入第 {i+1} 条字幕")
-                print("-" * 50)  # 分隔线，使输出更清晰
+                        # 获取当前索引的翻译结果
+                        translated_text = results[i]
+                        entry = entries[i]
 
-                # 添加延迟，避免API请求过于频繁
-                if i < total_entries - 1:  # 最后一项不需要延迟
-                    time.sleep(0.5)
+                        # 写入翻译结果到文件
+                        with lock:
+                            file.write(f"{entry['index']}\n")
+                            file.write(f"{entry['timestamp']}\n")
+                            file.write(f"{translated_text}\n\n")
+                            # 确保立即写入磁盘
+                            file.flush()
+                            os.fsync(file.fileno())
+
+                        print(f"已写入第 {i+1} 条字幕")
+                        pbar.update(1)
 
         print(f"翻译完成! 所有内容已保存到 {output_file}")
         return True  # 返回成功完成的标志
 
     except KeyboardInterrupt:
         print("\n翻译被用户中断")
-        print(f"已翻译并保存到第 {i+1} 条字幕")
-        print(f"下次运行时将从第 {i+2} 条开始继续翻译")
+        print(f"已翻译并保存部分内容，下次可继续从断点处翻译")
         return False
 
     except Exception as e:
@@ -177,40 +252,31 @@ def translate_srt_file(input_file, output_file, target_language="English"):
         return False
 
 
-def process_srt_with_new_structure(input_path, topic, languages=None, force=False):
-    """处理格式化SRT目录中的所有频道和SRT文件，并按新的目录结构输出"""
+def process_all_channels(languages=None, force=False, batch_size=20, check_only=False):
+    """处理zh_srt_tyro_fix目录下的所有频道和SRT文件"""
     if languages is None:
         languages = LANGUAGES
 
-    base_input_path = os.path.join(input_path, topic)
-    base_output_path = (
-        f"/media/dhl/buda_videos_youtube/multi_lang_srt_before_format/{topic}"
-    )
-
-    print(f"输入路径: {base_input_path}")
-    print(f"输出路径: {base_output_path}")
-    print(f"将依次翻译为以下语言: {', '.join(languages)}")
-
     # 检查输入路径是否存在
-    if not os.path.exists(base_input_path):
-        print(f"错误: 输入路径 '{base_input_path}' 不存在")
+    if not os.path.exists(INPUT_SRT_PATH):
+        print(f"错误: 输入路径 '{INPUT_SRT_PATH}' 不存在")
         return
 
     # 获取所有频道目录
     channels = [
         d
-        for d in os.listdir(base_input_path)
-        if os.path.isdir(os.path.join(base_input_path, d))
+        for d in os.listdir(INPUT_SRT_PATH)
+        if os.path.isdir(os.path.join(INPUT_SRT_PATH, d))
     ]
 
     if not channels:
-        print(f"在 '{base_input_path}' 中未找到任何频道目录")
+        print(f"在 '{INPUT_SRT_PATH}' 中未找到任何频道目录")
         return
 
     print(f"找到 {len(channels)} 个频道目录")
 
     for channel in channels:
-        channel_input_path = os.path.join(base_input_path, channel)
+        channel_input_path = os.path.join(INPUT_SRT_PATH, channel)
 
         # 获取当前频道中的所有SRT文件
         srt_files = [f for f in os.listdir(channel_input_path) if f.endswith(".srt")]
@@ -224,7 +290,10 @@ def process_srt_with_new_structure(input_path, topic, languages=None, force=Fals
         for language in languages:
             # 为每种语言创建输出目录
             language_output_path = os.path.join(
-                base_output_path, channel, LANGUAGE_CODES[language]
+                BASE_MEDIA_PATH,
+                "multi_lang_srt_before_format",
+                channel,
+                LANGUAGE_CODES[language],
             )
 
             if not os.path.exists(language_output_path):
@@ -237,18 +306,18 @@ def process_srt_with_new_structure(input_path, topic, languages=None, force=Fals
                 input_file_path = os.path.join(channel_input_path, srt_file)
                 output_file_path = os.path.join(language_output_path, srt_file)
 
+                print(f"\n处理文件: {srt_file}")
+                print(f"从 {input_file_path}")
+                print(f"到 {output_file_path}")
+
                 # 如果强制重新翻译且输出文件存在，则删除输出文件
                 if force and os.path.exists(output_file_path):
                     os.remove(output_file_path)
                     print(f"已删除现有输出文件 '{output_file_path}'，将重新翻译")
 
-                print(f"\n处理文件: {srt_file}")
-                print(f"从 {input_file_path}")
-                print(f"到 {output_file_path}")
-
-                # 翻译文件
-                success = translate_srt_file(
-                    input_file_path, output_file_path, language
+                # 使用并发翻译文件
+                success = translate_srt_file_concurrent(
+                    input_file_path, output_file_path, language, batch_size
                 )
 
                 if success:
@@ -269,18 +338,6 @@ def main():
 
     # 添加命令行参数
     parser.add_argument(
-        "-t",
-        "--topic",
-        required=True,
-        help="要处理的主题名称，对应format_srt_zh下的目录名",
-    )
-    parser.add_argument(
-        "-i",
-        "--input",
-        default="/media/dhl/buda_videos_youtube/format_srt_zh",
-        help="输入SRT基础目录路径，默认为/media/dhl/buda_videos_youtube/format_srt_zh",
-    )
-    parser.add_argument(
         "-l",
         "--languages",
         nargs="+",
@@ -290,6 +347,16 @@ def main():
     parser.add_argument(
         "-f", "--force", action="store_true", help="强制重新翻译，忽略已有翻译进度"
     )
+    parser.add_argument(
+        "-b",
+        "--batch_size",
+        type=int,
+        default=2,
+        help="并发处理的批量大小，默认为20",
+    )
+    parser.add_argument(
+        "-s", "--single_file", type=str, help="指定单独处理一个SRT文件路径"
+    )
 
     # 解析命令行参数
     args = parser.parse_args()
@@ -297,8 +364,52 @@ def main():
     # 设置OpenAI客户端
     client = setup_openai_client()
 
-    # 处理SRT文件
-    process_srt_with_new_structure(args.input, args.topic, args.languages, args.force)
+    # 处理单个文件模式
+    if args.single_file:
+        if not os.path.exists(args.single_file):
+            print(f"错误: 指定的文件 '{args.single_file}' 不存在")
+            return
+
+        # 提取文件名和目录
+        file_dir = os.path.dirname(args.single_file)
+        file_name = os.path.basename(args.single_file)
+
+        # 确定输出目录
+        channel = os.path.basename(os.path.dirname(args.single_file))
+
+        for language in args.languages:
+            output_dir = os.path.join(
+                BASE_MEDIA_PATH,
+                "multi_lang_srt_before_format",
+                channel,
+                LANGUAGE_CODES[language],
+            )
+
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+
+            output_file = os.path.join(output_dir, file_name)
+
+            print(f"\n处理单个文件: {file_name}")
+            print(f"从 {args.single_file}")
+            print(f"到 {output_file}")
+
+            # 如果强制重新翻译
+            if args.force and os.path.exists(output_file):
+                os.remove(output_file)
+                print(f"已删除现有输出文件 '{output_file}'，将重新翻译")
+
+            success = translate_srt_file_concurrent(
+                args.single_file, output_file, language, args.batch_size
+            )
+
+            if success:
+                print(f"成功完成 {file_name} 到 {language} 的翻译!")
+            else:
+                print(f"{file_name} 到 {language} 的翻译未完全完成")
+    else:
+        # 处理所有频道和SRT文件
+        process_all_channels(args.languages, args.force, args.batch_size)
 
 
 if __name__ == "__main__":
