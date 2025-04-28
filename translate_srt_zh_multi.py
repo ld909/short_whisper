@@ -139,7 +139,7 @@ def check_progress(output_file):
 def translate_srt_file_concurrent(
     input_file, output_file, target_language="English", batch_size=20
 ):
-    """并发翻译整个SRT文件，保持字幕顺序并即时写入输出文件"""
+    """并发翻译整个SRT文件，保持字幕顺序并即时写入输出文件（真正并发批量处理）"""
     entries = parse_srt(input_file)
 
     if not entries:
@@ -170,82 +170,47 @@ def translate_srt_file_concurrent(
     # 确定写入模式：如果已有翻译内容，追加模式；否则，写入模式
     write_mode = "a" if already_translated > 0 else "w"
 
-    # 创建锁用于保护文件写入
-    lock = Lock()
-    # 创建结果字典用于保存已翻译的结果，确保输出顺序
-    results = {}
-
-    def translate_entry(i, entry):
-        """翻译单个字幕条目的函数"""
+    def translate_entry(entry):
+        """翻译单个字幕条目的函数（不带索引）"""
         try:
             original_text = entry["text"]
-            print(f"正在翻译第 {i+1}/{total_entries} 条字幕...")
             print(f"翻译前: {original_text}")
-
             translated_text = translate_text(
                 original_text, target_language, max_retries=3
             )
             print(f"翻译后: {translated_text}")
-
-            return i, translated_text
+            return translated_text
         except Exception as e:
-            print(f"翻译第 {i+1} 条字幕时出错: {e}")
-            return i, original_text  # 出错时返回原文
+            print(f"翻译字幕时出错: {e}")
+            return entry["text"]  # 出错时返回原文
 
     try:
         with open(output_file, write_mode, encoding="utf-8") as file:
-            # 使用ThreadPoolExecutor进行并发处理
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=batch_size
-            ) as executor:
-                # 提交所有需要翻译的条目到线程池
-                future_to_index = {
-                    executor.submit(translate_entry, i, entry): i
-                    for i, entry in enumerate(entries[start_index:], start=start_index)
-                }
-
-                # 使用tqdm显示总体进度
-                with tqdm(total=len(future_to_index), desc="翻译进度") as pbar:
-                    # 按顺序处理结果
-                    for i in range(start_index, total_entries):
-                        # 等待当前索引的结果完成
-                        while i not in results:
-                            # 检查是否有任何已完成的任务
-                            completed_futures, _ = concurrent.futures.wait(
-                                [f for f, idx in future_to_index.items() if idx == i],
-                                return_when=concurrent.futures.FIRST_COMPLETED,
-                            )
-
-                            # 处理完成的任务
-                            for future in completed_futures:
-                                idx, translated_text = future.result()
-                                with lock:
-                                    results[idx] = translated_text
-
-                        # 获取当前索引的翻译结果
-                        translated_text = results[i]
-                        entry = entries[i]
-
-                        # 写入翻译结果到文件
-                        with lock:
-                            file.write(f"{entry['index']}\n")
-                            file.write(f"{entry['timestamp']}\n")
-                            file.write(f"{translated_text}\n\n")
-                            # 确保立即写入磁盘
-                            file.flush()
-                            os.fsync(file.fileno())
-
-                        print(f"已写入第 {i+1} 条字幕")
+            with tqdm(total=total_entries - start_index, desc="翻译进度") as pbar:
+                for batch_start in range(start_index, total_entries, batch_size):
+                    batch_end = min(batch_start + batch_size, total_entries)
+                    batch_entries = entries[batch_start:batch_end]
+                    # 并发翻译本批次
+                    with concurrent.futures.ThreadPoolExecutor(
+                        max_workers=batch_size
+                    ) as executor:
+                        results = list(executor.map(translate_entry, batch_entries))
+                    # 按顺序写入本批次
+                    for idx, translated_text in enumerate(results):
+                        entry = batch_entries[idx]
+                        file.write(f"{entry['index']}\n")
+                        file.write(f"{entry['timestamp']}\n")
+                        file.write(f"{translated_text}\n\n")
+                        file.flush()
+                        os.fsync(file.fileno())
+                        print(f"已写入第 {batch_start + idx + 1} 条字幕")
                         pbar.update(1)
-
         print(f"翻译完成! 所有内容已保存到 {output_file}")
-        return True  # 返回成功完成的标志
-
+        return True
     except KeyboardInterrupt:
         print("\n翻译被用户中断")
         print(f"已翻译并保存部分内容，下次可继续从断点处翻译")
         return False
-
     except Exception as e:
         print(f"翻译过程中出错: {e}")
         print(f"已翻译并保存部分内容，下次可继续从断点处翻译")
@@ -328,6 +293,116 @@ def process_all_channels(languages=None, force=False, batch_size=20, check_only=
                     )
 
 
+def check_txt_progress(output_file):
+    """检查txt输出文件中已翻译的行数"""
+    if not os.path.exists(output_file):
+        return 0
+    try:
+        with open(output_file, "r", encoding="utf-8") as f:
+            return sum(1 for _ in f)
+    except Exception as e:
+        print(f"检查txt翻译进度时出错: {e}")
+        return 0
+
+
+def translate_txt_files_multi_lang(languages=None, force=False, batch_size=20):
+    """
+    批量翻译pure_sentence下所有频道的所有txt文件为多语言，输出到multi_lang_txt，支持断点续传
+    """
+    if languages is None:
+        languages = LANGUAGES
+    input_base = os.path.join(BASE_MEDIA_PATH, "pure_sentence")
+    output_base = os.path.join(BASE_MEDIA_PATH, "multi_lang_txt")
+    if not os.path.exists(input_base):
+        print(f"错误: 输入目录不存在: {input_base}")
+        return
+    channels = [
+        d for d in os.listdir(input_base) if os.path.isdir(os.path.join(input_base, d))
+    ]
+    print(f"找到 {len(channels)} 个频道目录")
+    for channel in channels:
+        input_channel_dir = os.path.join(input_base, channel)
+        txt_files = [f for f in os.listdir(input_channel_dir) if f.endswith(".txt")]
+        print(f"频道 {channel} 下找到 {len(txt_files)} 个txt文件")
+        for language in languages:
+            lang_code = LANGUAGE_CODES[language]
+            output_channel_dir = os.path.join(output_base, channel, lang_code)
+            if not os.path.exists(output_channel_dir):
+                os.makedirs(output_channel_dir)
+                print(f"创建输出目录: {output_channel_dir}")
+            print(f"\n开始为频道 {channel} 翻译为 {language}...")
+            for txt_file in txt_files:
+                input_file = os.path.join(input_channel_dir, txt_file)
+                output_file = os.path.join(output_channel_dir, txt_file)
+                print(f"\n处理文件: {txt_file}")
+                print(f"从 {input_file}")
+                print(f"到 {output_file}")
+                if force and os.path.exists(output_file):
+                    os.remove(output_file)
+                    print(f"已删除现有输出文件 '{output_file}'，将重新翻译")
+                # 断点续传：统计已翻译行数
+                already_translated = check_txt_progress(output_file)
+                print(f"检测到已翻译 {already_translated} 行")
+                # 读取所有行
+                with open(input_file, "r", encoding="utf-8") as fin:
+                    lines = fin.readlines()
+                total_lines = len(lines)
+                if already_translated >= total_lines:
+                    print("所有行都已翻译完成，无需重新翻译")
+                    continue
+
+                write_mode = "a" if already_translated > 0 else "w"
+
+                # 为翻译单行文本定义一个函数
+                def translate_line(line_info):
+                    idx, line = line_info
+                    src_line = line.rstrip("\n")
+                    print(f"正在翻译第 {idx+1}/{total_lines} 行: {src_line}")
+                    translated = translate_text(src_line, language)
+                    print(f"翻译后: {translated}")
+                    return idx, translated
+
+                try:
+                    with open(output_file, write_mode, encoding="utf-8") as fout:
+                        with tqdm(
+                            total=total_lines - already_translated, desc="翻译进度"
+                        ) as pbar:
+                            # 从上次翻译结束的位置开始，批量处理
+                            for batch_start in range(
+                                already_translated, total_lines, batch_size
+                            ):
+                                batch_end = min(batch_start + batch_size, total_lines)
+                                batch_lines = [
+                                    (i, lines[i]) for i in range(batch_start, batch_end)
+                                ]
+
+                                # 并发翻译本批次
+                                with concurrent.futures.ThreadPoolExecutor(
+                                    max_workers=batch_size
+                                ) as executor:
+                                    results = list(
+                                        executor.map(translate_line, batch_lines)
+                                    )
+
+                                # 按顺序写入本批次
+                                for idx, translated_text in sorted(
+                                    results
+                                ):  # 确保按原始顺序写入
+                                    fout.write(translated_text + "\n")
+                                    fout.flush()
+                                    os.fsync(fout.fileno())
+                                    print(f"已写入第 {idx+1} 行")
+                                    pbar.update(1)
+
+                    print(f"翻译完成! 所有内容已保存到 {output_file}")
+                except KeyboardInterrupt:
+                    print("\n翻译被用户中断")
+                    print(f"已翻译并保存部分内容，下次可继续从断点处翻译")
+                except Exception as e:
+                    print(f"翻译过程中出错: {e}")
+                    print(f"已翻译并保存部分内容，下次可继续从断点处翻译")
+
+
 def main():
     global client
 
@@ -351,11 +426,16 @@ def main():
         "-b",
         "--batch_size",
         type=int,
-        default=2,
+        default=20,
         help="并发处理的批量大小，默认为20",
     )
     parser.add_argument(
         "-s", "--single_file", type=str, help="指定单独处理一个SRT文件路径"
+    )
+    parser.add_argument(
+        "--txt_mode",
+        action="store_true",
+        help="处理pure_sentence下所有txt批量翻译为多语言txt",
     )
 
     # 解析命令行参数
@@ -363,6 +443,10 @@ def main():
 
     # 设置OpenAI客户端
     client = setup_openai_client()
+
+    if args.txt_mode:
+        translate_txt_files_multi_lang(args.languages, args.force, args.batch_size)
+        return
 
     # 处理单个文件模式
     if args.single_file:

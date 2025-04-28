@@ -3,6 +3,7 @@ import re
 import argparse
 import sys
 import string
+import platform
 
 
 def is_only_punctuation(text):
@@ -72,70 +73,83 @@ def split_sentences(text):
         return [text]
 
 
+def get_base_path():
+    """根据操作系统类型返回对应的基础路径"""
+    if platform.system() == "Darwin":  # Mac OS
+        return "/Volumes/dhl/buda_videos_youtube"
+    else:  # 默认为Linux/Ubuntu
+        return "/media/dhl/buda_videos_youtube"
+
+
 def process_srt_to_txt(input_file, output_file):
     """处理SRT文件，将其转换为按句子分割的TXT文件"""
-    # 解析SRT文件
     entries = parse_srt(input_file)
-
     if not entries:
-        print("错误: 未解析到任何字幕条目")
+        print(f"错误: 未解析到任何字幕条目: {input_file}")
         return
-
-    # 准备输出目录
     output_dir = os.path.dirname(output_file)
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
         print(f"创建输出目录: {output_dir}")
-
-    # 处理每条字幕并写入TXT文件
-    sentence_count = 0
-
     try:
         with open(output_file, "w", encoding="utf-8") as file:
             for entry in entries:
                 text = entry["text"]
                 sentences = split_sentences(text)
-
-                # 写入每个句子
                 for sentence in sentences:
-                    # 跳过仅包含标点符号的句子
                     if is_only_punctuation(sentence):
                         continue
-
-                    sentence_count += 1
-                    file.write(f"{sentence_count}|{sentence}\n")
-
-        print(f"处理完成! 共提取 {sentence_count} 个句子，已保存到 {output_file}")
-
+                    file.write(f"{sentence}\n")
+        print(f"处理完成! 已保存到 {output_file}")
     except Exception as e:
         print(f"处理过程中出错: {e}")
 
 
 def main():
-    # 创建命令行参数解析器
+    base_path = get_base_path()
     parser = argparse.ArgumentParser(
-        description="将SRT字幕文件转换为按句子分割的TXT文件"
+        description="批量将SRT字幕文件转换为按句子分割的TXT文件"
     )
-
-    # 添加命令行参数
-    parser.add_argument("-i", "--input", required=True, help="输入SRT文件路径")
-    parser.add_argument("-o", "--output", help="输出TXT文件路径")
-
-    # 解析命令行参数
+    parser.add_argument(
+        "-i",
+        "--input",
+        default=f"{base_path}/zh_srt_tyro_fix",
+        help="输入SRT基础目录路径（通常为fix_tyro.py输出目录）",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        default=f"{base_path}/pure_sentence",
+        help="输出TXT基础目录路径",
+    )
     args = parser.parse_args()
-
-    # 如果未指定输出文件，则根据输入文件名生成
-    if not args.output:
-        input_name = os.path.splitext(args.input)[0]
-        args.output = f"{input_name}.txt"
-
-    # 确保输入文件存在
-    if not os.path.exists(args.input):
-        print(f"错误: 找不到输入文件 '{args.input}'")
-        sys.exit(1)
-
-    # 执行转换
-    process_srt_to_txt(args.input, args.output)
+    input_base_dir = args.input
+    output_base_dir = args.output
+    if not os.path.exists(input_base_dir):
+        print(f"错误: 输入目录不存在: {input_base_dir}")
+        return
+    if not os.path.exists(output_base_dir):
+        os.makedirs(output_base_dir)
+        print(f"已创建输出基础目录: {output_base_dir}")
+    channels = [
+        d
+        for d in os.listdir(input_base_dir)
+        if os.path.isdir(os.path.join(input_base_dir, d))
+    ]
+    print(f"找到 {len(channels)} 个频道目录")
+    for channel in channels:
+        input_channel_dir = os.path.join(input_base_dir, channel)
+        output_channel_dir = os.path.join(output_base_dir, channel)
+        if not os.path.exists(output_channel_dir):
+            os.makedirs(output_channel_dir)
+            print(f"已创建频道输出目录: {output_channel_dir}")
+        srt_files = [f for f in os.listdir(input_channel_dir) if f.endswith(".srt")]
+        print(f"频道 {channel} 下找到 {len(srt_files)} 个SRT文件")
+        for srt_file in srt_files:
+            input_file_path = os.path.join(input_channel_dir, srt_file)
+            txt_file_name = os.path.splitext(srt_file)[0] + ".txt"
+            output_file_path = os.path.join(output_channel_dir, txt_file_name)
+            process_srt_to_txt(input_file_path, output_file_path)
 
 
 if __name__ == "__main__":
