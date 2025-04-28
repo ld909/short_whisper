@@ -1,8 +1,8 @@
 import os
 import re
 import sys
-import json
 import argparse
+import platform
 from tqdm import tqdm
 from openai import OpenAI
 
@@ -78,13 +78,20 @@ def setup_uni_client():
     return client
 
 
-def fix_typos(subtitle, api_type="ali"):
+def fix_typos(subtitle, context="", api_type="ali"):
     """使用指定的大模型检查并修复字幕中的错别字"""
-    tyro_dict = {"元气": "缘起"}
+    tyro_dict = {
+        "元气": "缘起",
+        "吟念": "淫念",
+        "须云菩提": "须菩提",
+        "师尊": "释尊",
+        "世尊": "释尊",
+    }
+
     system_prompt = f'你是一个字幕错别字检查专家，只对错别字进行修正,内容是佛教/佛学的主题，\
         文字来自于一个语音转文字的模型，有些字是发音对了，但字没有对，需特别注意。\
-            有些词发音对了，但不是佛教名词，修改为专业的佛教名、人名、地名、专有名词，比如参考{tyro_dict}\
-                注意专业词汇。如果句子没有错别字，仅回复数字"111"；\
+            有些词发音对了，但不是佛教名词，修改为专业的佛教名、人名、地名、经文名和专有名词，佛教中多用男他而非女她。常见错误参考{tyro_dict}\
+                一定要注意专业词汇，要专业。如果句子没有错别字，仅回复数字"111"；\
                     如果有错别字，请返回修复后的完整句子，直接返回新句子,不要返回修改前的句子，不要返回类似于：【原句】，修改后：【新句】这样的错误结构。不要对任何其他作修改，不要修改标点、引号等内容，不要增加任何内容。'
 
     try:
@@ -93,13 +100,18 @@ def fix_typos(subtitle, api_type="ali"):
             model = "qwen-max-0125"
         else:  # api_type == "uni"
             client = setup_uni_client()
+            # model = "gemini-2.5-pro-exp-03-25"
             model = "gpt-4.1-mini"
 
         completion = client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f'检查这个字幕是否有错别字："{subtitle}"'},
+                {
+                    "role": "user",
+                    "content": f'检查这个句子是否有错别字："{subtitle}"。',
+                    # 前面三句话帮你理解上下文，前面三句话是：{context}',
+                },
             ],
         )
 
@@ -122,43 +134,6 @@ def fix_typos(subtitle, api_type="ali"):
     except Exception as e:
         print(f"API调用错误：{e}")
         return subtitle  # 发生错误时返回原句
-
-
-def get_progress_file_path():
-    """获取进度文件路径"""
-    return os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "tyro_fix_progress.json"
-    )
-
-
-def load_progress():
-    """加载处理进度"""
-    progress_file = get_progress_file_path()
-    if os.path.exists(progress_file):
-        try:
-            with open(progress_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"读取进度文件时出错: {e}")
-            return {}
-    return {}
-
-
-def save_progress(channel, srt_file, last_index):
-    """保存处理进度"""
-    progress_file = get_progress_file_path()
-    progress = load_progress()
-
-    if channel not in progress:
-        progress[channel] = {}
-
-    progress[channel][srt_file] = last_index
-
-    try:
-        with open(progress_file, "w", encoding="utf-8") as f:
-            json.dump(progress, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"保存进度文件时出错: {e}")
 
 
 def check_output_file_progress(output_file_path, total_subtitles):
@@ -209,35 +184,53 @@ def process_srt_file(input_path, output_path, channel, srt_file, api_type):
         # 如果输出文件已完全处理，则跳过
         if is_file_completed:
             print(f"文件 {srt_file} 已完全处理（根据输出文件检查），跳过")
-            # 同步JSON进度文件
-            save_progress(channel, srt_file, len(subtitles))
             return
 
         # 如果输出文件存在但不完整，则从断点继续
         start_index = file_progress
         if file_progress > 0:
             print(f"检测到输出文件，从字幕 #{start_index+1} 继续处理")
-            # 同步JSON进度文件
-            save_progress(channel, srt_file, start_index)
         else:
             # 如果是新文件，先清空输出文件
             with open(output_path, "w", encoding="utf-8") as f:
                 pass
+
+        # 用于保存已修复的字幕，作为上下文
+        fixed_subtitles = []
+
+        # 如果从中间继续处理，需要读取已经处理过的字幕作为上下文
+        if start_index > 0:
+            with open(output_path, "r", encoding="utf-8") as f:
+                output_content = f.read()
+
+            # 解析已处理的字幕文本
+            processed_subtitles = parse_srt_with_re(output_content)
+            # 添加到已修复字幕列表
+            fixed_subtitles.extend(
+                [subtitle["text"] for subtitle in processed_subtitles]
+            )
 
         # 修复错别字 - 只处理未处理的部分
         for i, subtitle in enumerate(tqdm(subtitles[start_index:], desc="修复错别字")):
             real_index = i + start_index
             print(f"\n字幕 #{real_index+1}/{len(subtitles)}:")
 
+            # 获取前三句上下文
+            context = ""
+            if fixed_subtitles:
+                context_items = fixed_subtitles[-3:]
+                context = "，".join(context_items)
+                print(f"上下文: {context}")
+
             # 修复错别字
-            fixed_text = fix_typos(subtitle["text"], api_type)
+            fixed_text = fix_typos(subtitle["text"], context, api_type)
             subtitle["text"] = fixed_text
+
+            # 添加到已修复字幕列表，用于下一句的上下文
+            fixed_subtitles.append(fixed_text)
 
             # 立即写入单个字幕项
             save_subtitle_item(subtitle, output_path, "a")
-
-            # 保存当前进度
-            save_progress(channel, srt_file, real_index + 1)
 
             print("-" * 50)
 
@@ -248,27 +241,38 @@ def process_srt_file(input_path, output_path, channel, srt_file, api_type):
         print(f"错误信息: {str(e)}")
 
 
+def get_base_path():
+    """根据操作系统类型返回对应的基础路径"""
+    if platform.system() == "Darwin":  # Mac OS
+        return "/Volumes/dhl/buda_videos_youtube"
+    else:  # 默认为Linux/Ubuntu
+        return "/media/dhl/buda_videos_youtube"
+
+
 def main():
     """处理指定目录结构中的中文SRT文件"""
+    # 获取基础路径
+    base_path = get_base_path()
+
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description="修复SRT字幕文件中的错别字")
     parser.add_argument(
         "-a",
         "--api",
-        default="ali",
+        default="uni",
         choices=["ali", "uni"],
         help="选择使用的API服务（ali=阿里云千问模型，uni=uniapi）",
     )
     parser.add_argument(
         "-i",
         "--input",
-        default="/media/dhl/buda_videos_youtube/format_srt_zh/mp3",
+        default=f"{base_path}/format_srt_zh/mp3",
         help="输入SRT基础目录路径",
     )
     parser.add_argument(
         "-o",
         "--output",
-        default="/media/dhl/buda_videos_youtube/zh_srt_tyro_fix",
+        default=f"{base_path}/zh_srt_tyro_fix",
         help="输出SRT基础目录路径",
     )
 
@@ -279,6 +283,8 @@ def main():
     api_type = args.api
 
     print(f"使用 {api_type} API 进行错别字修复")
+    print(f"检测到系统: {platform.system()}")
+    print(f"使用基础路径: {base_path}")
 
     # 检查输入目录是否存在
     if not os.path.exists(input_base_dir):
