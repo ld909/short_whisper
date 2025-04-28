@@ -5,6 +5,8 @@ import argparse
 import platform
 from tqdm import tqdm
 from openai import OpenAI
+import concurrent.futures
+from threading import Lock
 
 
 def read_srt_file(file_path):
@@ -110,7 +112,6 @@ def fix_typos(subtitle, context="", api_type="ali"):
                 {
                     "role": "user",
                     "content": f'检查这个句子是否有错别字："{subtitle}"。',
-                    # 前面三句话帮你理解上下文，前面三句话是：{context}',
                 },
             ],
         )
@@ -161,8 +162,59 @@ def check_output_file_progress(output_file_path, total_subtitles):
         return 0, False
 
 
-def process_srt_file(input_path, output_path, channel, srt_file, api_type):
-    """处理单个SRT文件，逐句修复错别字并保存"""
+def process_subtitles_concurrently(
+    subtitles, fixed_subtitles, api_type, output_path, batch_size=5
+):
+    """并发处理字幕，同时保持顺序并实时写入文件"""
+    results = {}  # 存储处理结果，键为索引，值为修复后的文本
+    lock = Lock()  # 用于保护对结果字典的访问和文件写入
+
+    def process_subtitle(index, subtitle):
+        """处理单个字幕的函数"""
+        print(f"\n字幕 #{index+1}/{len(subtitles)}:")
+
+        # 修复错别字
+        fixed_text = fix_typos(subtitle["text"], "", api_type)
+
+        with lock:
+            results[index] = fixed_text
+
+        return index, fixed_text
+
+    # 使用 ThreadPoolExecutor 进行并发处理
+    with concurrent.futures.ThreadPoolExecutor(max_workers=batch_size) as executor:
+        # 提交所有任务
+        future_to_index = {
+            executor.submit(process_subtitle, i, subtitle): i
+            for i, subtitle in enumerate(subtitles)
+        }
+
+        # 按顺序获取结果并实时写入文件
+        for i in range(len(subtitles)):
+            while i not in results:
+                # 等待当前索引的结果
+                completed, _ = concurrent.futures.wait(
+                    [f for f, idx in future_to_index.items() if idx == i],
+                    return_when=concurrent.futures.FIRST_COMPLETED,
+                )
+
+            # 已获取当前索引的结果，更新字幕
+            subtitles[i]["text"] = results[i]
+            fixed_subtitles.append(results[i])
+
+            # 立即将该字幕写入文件
+            with lock:
+                save_subtitle_item(subtitles[i], output_path, "a")
+
+            print(f"完成处理字幕 #{i+1}/{len(subtitles)}: {results[i]}")
+
+    return subtitles
+
+
+def process_srt_file(
+    input_path, output_path, channel, srt_file, api_type, batch_size=5
+):
+    """处理单个SRT文件，并发修复错别字并保存"""
     print(f"正在处理：{input_path}")
 
     try:
@@ -210,29 +262,21 @@ def process_srt_file(input_path, output_path, channel, srt_file, api_type):
                 [subtitle["text"] for subtitle in processed_subtitles]
             )
 
-        # 修复错别字 - 只处理未处理的部分
-        for i, subtitle in enumerate(tqdm(subtitles[start_index:], desc="修复错别字")):
-            real_index = i + start_index
-            print(f"\n字幕 #{real_index+1}/{len(subtitles)}:")
+        # 并发修复错别字 - 只处理未处理的部分
+        remaining_subtitles = subtitles[start_index:]
+        print(
+            f"使用并发方式处理剩余的 {len(remaining_subtitles)} 个字幕，批量大小: {batch_size}"
+        )
 
-            # 获取前三句上下文
-            context = ""
-            if fixed_subtitles:
-                context_items = fixed_subtitles[-3:]
-                context = "，".join(context_items)
-                print(f"上下文: {context}")
+        # 处理剩余字幕
+        with tqdm(total=len(remaining_subtitles), desc="修复错别字") as pbar:
+            processed_subtitles = process_subtitles_concurrently(
+                remaining_subtitles, fixed_subtitles, api_type, output_path, batch_size
+            )
 
-            # 修复错别字
-            fixed_text = fix_typos(subtitle["text"], context, api_type)
-            subtitle["text"] = fixed_text
-
-            # 添加到已修复字幕列表，用于下一句的上下文
-            fixed_subtitles.append(fixed_text)
-
-            # 立即写入单个字幕项
-            save_subtitle_item(subtitle, output_path, "a")
-
-            print("-" * 50)
+            # 更新进度条
+            for _ in range(len(remaining_subtitles)):
+                pbar.update(1)
 
         print(f"已完成文件处理：{output_path}")
 
@@ -275,16 +319,25 @@ def main():
         default=f"{base_path}/zh_srt_tyro_fix",
         help="输出SRT基础目录路径",
     )
+    parser.add_argument(
+        "-b",
+        "--batch_size",
+        type=int,
+        default=20,
+        help="并发处理的批量大小",
+    )
 
     # 解析命令行参数
     args = parser.parse_args()
     input_base_dir = args.input
     output_base_dir = args.output
     api_type = args.api
+    batch_size = args.batch_size
 
     print(f"使用 {api_type} API 进行错别字修复")
     print(f"检测到系统: {platform.system()}")
     print(f"使用基础路径: {base_path}")
+    print(f"并发批量大小: {batch_size}")
 
     # 检查输入目录是否存在
     if not os.path.exists(input_base_dir):
@@ -353,7 +406,12 @@ def main():
 
             # 使用新的处理函数处理文件
             process_srt_file(
-                input_file_path, output_file_path, channel, srt_file, api_type
+                input_file_path,
+                output_file_path,
+                channel,
+                srt_file,
+                api_type,
+                batch_size,
             )
 
 
