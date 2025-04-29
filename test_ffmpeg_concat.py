@@ -35,6 +35,8 @@ def merge_with_ffmpeg_concat(clip_files, output_path):
         start_time = time.time()
         cmd = [
             "ffmpeg",
+            "-v",
+            "error",  # 只显示错误信息，不显示警告和进度
             "-f",
             "concat",
             "-safe",

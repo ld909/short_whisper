@@ -220,6 +220,8 @@ def merge_mp3_files(input_dir, output_file, force=False):
         # 使用concat demuxer合并MP3文件
         cmd = [
             "ffmpeg",
+            "-v",
+            "error",  # 只显示错误，不显示警告
             "-y" if force else "-n",
             "-f",
             "concat",

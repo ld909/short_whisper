@@ -51,6 +51,8 @@ def trim_video(input_path, output_path, duration=THRESHOLD_SECONDS):
 
         cmd = [
             "ffmpeg",
+            "-v",
+            "error",  # 只显示错误信息，不显示警告和进度
             "-i",
             input_path,
             "-t",

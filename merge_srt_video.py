@@ -4,9 +4,11 @@ from mutagen import File
 
 
 def run_ffmpeg_command(input_video, subtitles, font_file, output_video):
-    '''merge subtitle srt file into original mp4'''
+    """merge subtitle srt file into original mp4"""
     ffmpeg_command = [
         "ffmpeg",
+        "-v",
+        "error",  # 只显示错误信息，不显示警告和进度
         "-i",
         input_video,
         "-vf",
