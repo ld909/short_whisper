@@ -13,7 +13,8 @@
 7. 使用MoviePy 2.x版本
 """
 
-from moviepy import *
+# 修改导入部分，兼容MoviePy 2.x
+from moviepy import VideoClip, ImageClip, ColorClip
 import numpy as np
 import cv2
 from PIL import Image
@@ -33,6 +34,7 @@ def smooth_pan(
     ] = "left_to_right",
     fps: int = 30,
     pan_speed: float = 1.0,
+    start_padding: float = 0.15,  # 新增参数：起始视野边距比例
 ) -> None:
     """
     创建平滑的平移运镜效果
@@ -44,6 +46,7 @@ def smooth_pan(
         direction: 平移方向
         fps: 视频帧率
         pan_speed: 平移速度，值越大移动越快
+        start_padding: 起始视野边距比例，数值越大，起始视野范围越大
     """
     # 加载图像
     orig_img = Image.open(image_path)
@@ -72,34 +75,51 @@ def smooth_pan(
         # 使用 min(1.0, ...) 确保进度不会超过1
         progress = min(1.0, (t / duration) * pan_speed)
 
+        # 计算可用的边距空间
+        available_width_margin = new_width - target_width
+        available_height_margin = new_height - target_height
+
+        # 使用start_padding参数调整起始视野
         if direction == "left_to_right":
-            # 从左向右移动，从0开始到最大位移
-            offset_x = int(progress * (new_width - target_width))
+            # 从左向右移动，保留部分左边界
+            start_offset = int(available_width_margin * start_padding)
+            max_offset = available_width_margin - start_offset
+            offset_x = int(start_offset + progress * max_offset)
             offset_y = (new_height - target_height) // 2
             frame = img_array[
                 offset_y : offset_y + target_height, offset_x : offset_x + target_width
             ]
 
         elif direction == "right_to_left":
-            # 从右向左移动
-            offset_x = int((1 - progress) * (new_width - target_width))
+            # 从右向左移动，保留部分右边界
+            start_offset = int(available_width_margin * start_padding)
+            max_offset = available_width_margin - start_offset
+            offset_x = int(
+                available_width_margin - start_offset - progress * max_offset
+            )
             offset_y = (new_height - target_height) // 2
             frame = img_array[
                 offset_y : offset_y + target_height, offset_x : offset_x + target_width
             ]
 
         elif direction == "top_to_bottom":
-            # 从上到下移动
+            # 从上到下移动，保留部分上边界
+            start_offset = int(available_height_margin * start_padding)
+            max_offset = available_height_margin - start_offset
             offset_x = (new_width - target_width) // 2
-            offset_y = int(progress * (new_height - target_height))
+            offset_y = int(start_offset + progress * max_offset)
             frame = img_array[
                 offset_y : offset_y + target_height, offset_x : offset_x + target_width
             ]
 
         elif direction == "bottom_to_top":
-            # 从下到上移动
+            # 从下到上移动，保留部分下边界
+            start_offset = int(available_height_margin * start_padding)
+            max_offset = available_height_margin - start_offset
             offset_x = (new_width - target_width) // 2
-            offset_y = int((1 - progress) * (new_height - target_height))
+            offset_y = int(
+                available_height_margin - start_offset - progress * max_offset
+            )
             frame = img_array[
                 offset_y : offset_y + target_height, offset_x : offset_x + target_width
             ]
@@ -277,6 +297,12 @@ def main():
         default="center",
         help="缩放中心位置",
     )
+    parser.add_argument(
+        "--start-padding",
+        type=float,
+        default=0.15,
+        help="平移起始视野边距比例，值越大视野越大，默认0.15",
+    )
 
     args = parser.parse_args()
 
@@ -288,6 +314,7 @@ def main():
             direction=args.direction,
             fps=args.fps,
             pan_speed=args.pan_speed,
+            start_padding=args.start_padding,
         )
     else:  # zoom
         smooth_zoom(
