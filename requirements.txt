@@ -1,0 +1,6 @@
+numpy>=1.20.0
+opencv-python>=4.5.1
+opencv-contrib-python>=4.5.1  # 包含CUDA支持
+tqdm>=4.60.0
+# 可选依赖
+# cupy-cuda11x  # 根据您的CUDA版本选择合适的包，例如 cupy-cuda110、cupy-cuda111 等 
