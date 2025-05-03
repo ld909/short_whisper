@@ -2,10 +2,44 @@
 # -*- coding: utf-8 -*-
 
 """
+使用说明
+--------
 这个脚本用于根据多语言音频文件的时长，自动从视频片段库中随机选取并合并MP4片段，
 然后裁剪生成与音频时长相匹配的无声视频文件。主要用于批量处理不同频道和语言的
-音频文件，生成可用于后续视频制作的素材。使用方法：通过命令行参数指定频道、语言
-或特定音频文件进行处理。
+音频文件，生成可用于后续视频制作的素材。
+
+输入目录:
+- 音频文件目录: /Volumes/dhl/buda_videos_youtube/merge_multi_lange_mp3/频道名/语言/
+- 视频片段目录: /Volumes/dhl/buda_videos_youtube/mp4_clips/
+
+输出目录:
+- 合并视频目录: /Volumes/dhl/buda_videos_youtube/mp4_merge_silient/频道名/语言/
+
+注: 在Linux系统上，基础路径为/media/dhl/buda_videos_youtube
+
+命令行参数:
+  -c, --channel     指定要处理的频道名
+  -l, --language    指定要处理的语言
+  -f, --file        指定要处理的音频文件名
+  --list-channels   列出所有可用频道
+  --list-languages  列出指定频道的所有可用语言
+  --base-path       指定自定义的基础路径，覆盖默认路径
+
+示例:
+  # 列出所有频道
+  python merge_mp4_clips_by_audio_duration.py --list-channels
+
+  # 列出频道'buddha'的所有语言
+  python merge_mp4_clips_by_audio_duration.py --list-languages buddha
+
+  # 处理频道'buddha'下语言'chinese'的所有音频文件
+  python merge_mp4_clips_by_audio_duration.py -c buddha -l chinese
+
+  # 处理频道'buddha'下语言'chinese'中的特定音频文件
+  python merge_mp4_clips_by_audio_duration.py -c buddha -l chinese -f audio_file.mp3
+
+  # 使用自定义基础路径
+  python merge_mp4_clips_by_audio_duration.py --base-path /path/to/custom/base
 """
 
 import os
@@ -39,7 +73,7 @@ BASE_PATH = get_base_path()
 # 目录配置
 MP3_BASE_DIR = f"{BASE_PATH}/merge_multi_lange_mp3"
 MP4_CLIPS_DIR = f"{BASE_PATH}/mp4_clips"
-OUTPUT_BASE_DIR = f"{BASE_PATH}/mp4_merged"
+OUTPUT_BASE_DIR = f"{BASE_PATH}/mp4_merge_silient"
 
 # 每个视频片段的时长(秒)
 CLIP_DURATION = 8
@@ -477,7 +511,7 @@ def main():
         custom_base_path = args.base_path
         MP3_BASE_DIR = f"{custom_base_path}/merge_multi_lange_mp3"
         MP4_CLIPS_DIR = f"{custom_base_path}/mp4_clips"
-        OUTPUT_BASE_DIR = f"{custom_base_path}/mp4_merged"
+        OUTPUT_BASE_DIR = f"{custom_base_path}/mp4_merge_silient"
         print(f"使用自定义基础路径: {custom_base_path}")
     else:
         # 打印系统信息和基础路径

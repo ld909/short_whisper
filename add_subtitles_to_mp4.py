@@ -9,7 +9,7 @@
 支持多种语言，包括英语(en)、日语(ja)、越南语(vi)和韩语(ko)等。
 
 目录结构:
-- 输入MP4目录: /Volumes/dhl/buda_videos_youtube/mp4_merged/
+- 输入MP4目录: /Volumes/dhl/buda_videos_youtube/mp4_merge_silient/
 - 输入SRT目录: /Volumes/dhl/buda_videos_youtube/multi_lang_srt/
 - 字体目录: /Users/donghaoliu/doc/short_whisper/fonts/
 - 输出MP4目录: /Volumes/dhl/buda_videos_youtube/mp4_multi_with_subtitles/
@@ -52,7 +52,7 @@ def get_base_path():
 # 定义全局路径变量
 BASE_PATH = get_base_path()
 # 输入MP4目录（来自merge_mp4_clips_by_audio_duration.py的输出）
-INPUT_MP4_PATH = os.path.join(BASE_PATH, "mp4_merged")
+INPUT_MP4_PATH = os.path.join(BASE_PATH, "mp4_merge_silient")
 # 输入SRT目录（来自generate_subtitles.py的输出）
 INPUT_SRT_PATH = os.path.join(BASE_PATH, "multi_lang_srt")
 # 字体目录
