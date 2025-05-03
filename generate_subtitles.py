@@ -1,6 +1,37 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+多语言字幕生成工具
+
+功能说明:
+此脚本用于从文本文件自动生成SRT格式的字幕文件，可以使用对应的MP3音频文件来提高时间戳的准确性。
+支持多语言处理，包括英语(en)、日语(ja)、越南语(vi)和韩语(ko)。
+
+目录结构:
+- 输入文本目录: /Volumes/dhl/buda_videos_youtube/multi_lang_txt_split/ (macOS) 或
+              /media/dhl/buda_videos_youtube/multi_lang_txt_split/ (Linux)
+ - 输入MP3目录: /Volumes/dhl/buda_videos_youtube/multi_lang_mp3/
+- 合并MP3目录: /Volumes/dhl/buda_videos_youtube/merge_multi_lange_mp3/
+- 输出SRT目录: /Volumes/dhl/buda_videos_youtube/multi_lang_srt/
+
+处理流程:
+1. 读取文本文件内容
+2. 尝试找到对应的MP3文件获取准确时长
+3. 根据文本内容和语言特性计算每行字幕的显示时间
+4. 生成标准SRT格式字幕文件
+5. 支持并发处理多个视频和多种语言
+
+使用方法:
+python generate_subtitles.py [-l LANGUAGES] [-f] [-w WORKERS] [-s CHANNEL/VIDEO]
+
+参数说明:
+- -l, --languages: 指定需要处理的语言，默认处理所有支持的语言
+- -f, --force: 强制重新生成已存在的字幕文件
+- -w, --workers: 设置并发处理线程数，默认为3
+- -s, --single: 指定只处理单个视频，格式为"频道名/视频名"
+"""
+
 import os
 import argparse
 import platform
@@ -28,7 +59,7 @@ INPUT_MP3_PATH = os.path.join(BASE_PATH, "multi_lang_mp3")
 # 合并后的MP3目录
 MERGED_MP3_PATH = os.path.join(BASE_PATH, "merge_multi_lange_mp3")
 # 输入TXT目录
-INPUT_TXT_PATH = os.path.join(BASE_PATH, "multi_lang_txt")
+INPUT_TXT_PATH = os.path.join(BASE_PATH, "multi_lang_txt_split")
 # 输出SRT目录
 OUTPUT_SRT_PATH = os.path.join(BASE_PATH, "multi_lang_srt")
 # 支持的语言

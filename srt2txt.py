@@ -1,3 +1,29 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+SRT转TXT工具
+
+此脚本用于将SRT字幕文件批量转换为纯文本TXT文件。主要功能包括：
+1. 解析SRT字幕文件中的文本内容
+2. 按句子分割字幕文本（以英文句号为分隔符）
+3. 过滤掉只包含标点符号的文本行
+4. 保持目录结构，将处理后的文本保存到指定输出目录
+
+用法：
+    python srt2txt.py -i <输入目录> -o <输出目录>
+
+默认情况下，脚本会根据操作系统自动选择基础路径：
+- Mac OS: /Volumes/dhl/buda_videos_youtube
+- 其他系统: /media/dhl/buda_videos_youtube
+
+默认目录：
+- 输入目录: <基础路径>/zh_srt_tyro_fix
+- 输出目录: <基础路径>/pure_sentence
+
+输入目录结构应为：<基础路径>/频道名/字幕文件.srt
+输出将保持相同结构：<输出基础路径>/频道名/字幕文件.txt
+"""
+
 import os
 import re
 import argparse

@@ -1,0 +1,1 @@
+/Users/donghaoliu/doc/short_whisper/test_srt_out/o_en.srt

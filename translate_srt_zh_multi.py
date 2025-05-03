@@ -1,3 +1,31 @@
+"""
+多语言字幕/文本翻译工具
+
+功能说明:
+此脚本用于将中文SRT字幕文件或纯文本文件批量翻译成多种语言（英语、日语、越南语、韩语）。
+脚本使用OpenAI API进行翻译，特别针对佛教内容优化，支持并发处理和断点续传。
+
+输入目录:
+- SRT模式: [媒体路径]/zh_srt_tyro_fix/[频道名称]/
+- TXT模式: [媒体路径]/pure_sentence/[频道名称]/
+
+输出目录:
+- SRT模式: [媒体路径]/multi_lang_srt_before_format/[频道名称]/[语言代码]/
+- TXT模式: [媒体路径]/multi_lang_txt/[频道名称]/[语言代码]/
+
+使用方法:
+1. 基本使用: python translate_srt_zh_multi.py
+2. 指定目标语言: python translate_srt_zh_multi.py -l English Japanese
+3. 强制重新翻译: python translate_srt_zh_multi.py -f
+4. 设置批处理大小: python translate_srt_zh_multi.py -b 30
+5. 单文件处理: python translate_srt_zh_multi.py -s /path/to/file.srt
+6. TXT模式: python translate_srt_zh_multi.py --txt_mode
+
+注意:
+- 需要设置环境变量UNI_API_KEY以提供OpenAI API密钥
+- 脚本支持断点续传，中断后可从上次停止的位置继续翻译
+"""
+
 import os
 import re
 import time
