@@ -38,11 +38,12 @@ import argparse
 import platform
 import httplib2
 import glob
+import tempfile
 from tqdm import tqdm
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
-from oauth2client.client import flow_from_clientsecrets
+from oauth2client.client import flow_from_clientsecrets, OAuth2WebServerFlow
 from oauth2client.file import Storage
 from oauth2client.tools import run_flow
 import http.client as httplib  # Python 3 compatible
@@ -111,37 +112,81 @@ BASE_PATH = get_base_path()
 VIDEO_BASE_DIR = f"{BASE_PATH}/mp4_with_audio"
 TITLE_BASE_DIR = f"{BASE_PATH}/multi_lang_titles"
 SECRET_DIR = "./secret_json"
+ENV_CLIENT_ID_PREFIX = "YOUTUBE_CLIENT_ID_"
+ENV_CLIENT_SECRET_PREFIX = "YOUTUBE_CLIENT_SECRET_"
+ENV_REDIRECT_URI = "YOUTUBE_REDIRECT_URI"
 
 
-# 获取认证服务
-def get_authenticated_service(language, args):
-    """根据语言获取已认证的YouTube服务"""
+# 从环境变量创建OAuth2流程
+def create_flow_from_env(language):
+    """从环境变量创建OAuth2认证流程"""
+    # 获取语言对应的环境变量名
+    lang_code = LANG_CODES.get(language.lower(), "ja").upper()
+    client_id_var = f"{ENV_CLIENT_ID_PREFIX}{lang_code}"
+    client_secret_var = f"{ENV_CLIENT_SECRET_PREFIX}{lang_code}"
+    
+    # 从环境变量获取客户端ID和密钥
+    client_id = os.environ.get(client_id_var)
+    client_secret = os.environ.get(client_secret_var)
+    redirect_uri = os.environ.get(ENV_REDIRECT_URI, "urn:ietf:wg:oauth:2.0:oob")
+    
+    if not client_id or not client_secret:
+        return None
+    
+    # 创建OAuth2流程
+    return OAuth2WebServerFlow(
+        client_id=client_id,
+        client_secret=client_secret,
+        scope=YOUTUBE_UPLOAD_SCOPE,
+        redirect_uri=redirect_uri
+    )
+
+# 从JSON文件创建流程（后备方案）
+def create_flow_from_file(language):
+    """从JSON文件创建认证流程作为后备方案"""
     # 根据语言选择对应的密钥文件
     client_secrets_file = os.path.join(
         SECRET_DIR, LANG_TO_SECRET.get(language.lower(), "jp.json")
     )
-
+    
     if not os.path.exists(client_secrets_file):
-        print(f"错误: {language} 语言的密钥文件不存在: {client_secrets_file}")
+        return None
+        
+    # 创建认证流程
+    try:
+        return flow_from_clientsecrets(
+            client_secrets_file,
+            scope=YOUTUBE_UPLOAD_SCOPE,
+            message=MISSING_CLIENT_SECRETS_MESSAGE % client_secrets_file,
+        )
+    except Exception as e:
+        print(f"从密钥文件创建流程时出错: {e}")
         return None
 
-    # 创建认证流程
-    flow = flow_from_clientsecrets(
-        client_secrets_file,
-        scope=YOUTUBE_UPLOAD_SCOPE,
-        message=MISSING_CLIENT_SECRETS_MESSAGE % client_secrets_file,
-    )
-
+# 获取认证服务
+def get_authenticated_service(language, args):
+    """根据语言获取已认证的YouTube服务"""
+    # 首先尝试从环境变量创建流程
+    flow = create_flow_from_env(language)
+    
+    # 如果环境变量不可用，尝试从文件创建
+    if flow is None:
+        flow = create_flow_from_file(language)
+        if flow is None:
+            print(f"错误: 无法为 {language} 创建认证流程，请设置环境变量或提供密钥文件")
+            print(f"所需环境变量: {ENV_CLIENT_ID_PREFIX}{LANG_CODES.get(language.lower(), 'ja').upper()} 和 {ENV_CLIENT_SECRET_PREFIX}{LANG_CODES.get(language.lower(), 'ja').upper()}")
+            return None
+    
     # 存储认证信息
     storage_file = f"{language.lower()}-oauth2.json"
     storage = Storage(storage_file)
     credentials = storage.get()
-
+    
     # 如果没有有效的认证信息，则运行认证流程
     if credentials is None or credentials.invalid:
         print(f"需要为 {language} 频道进行 YouTube 认证...")
         credentials = run_flow(flow, storage, args)
-
+    
     # 构建 YouTube API 服务
     return build(
         YOUTUBE_API_SERVICE_NAME,
@@ -504,6 +549,12 @@ def parse_args():
     parser.add_argument(
         "--show-multilingual", action="store_true", help="显示多语言内容"
     )
+    parser.add_argument(
+        "--generate-env-example", action="store_true", help="生成环境变量设置示例文件"
+    )
+    parser.add_argument(
+        "--check-env", action="store_true", help="检查环境变量设置情况"
+    )
 
     # 添加OAuth2客户端所需的参数
     parser.add_argument(
@@ -558,11 +609,68 @@ def show_multilingual_content():
     print("-" * 80)
 
 
+# 生成环境变量设置示例
+def generate_env_example():
+    """生成设置环境变量的示例脚本"""
+    example_file = "youtube_credentials_example.sh"
+    
+    with open(example_file, "w") as f:
+        f.write("#!/bin/bash\n\n")
+        f.write("# YouTube API 认证环境变量示例\n")
+        f.write("# 请将此文件复制为 youtube_credentials.sh 并填入实际的值\n")
+        f.write("# 然后运行 source youtube_credentials.sh 来设置环境变量\n\n")
+        
+        for lang, code in LANG_CODES.items():
+            lang_upper = code.upper()
+            f.write(f"# {lang.capitalize()} 频道的认证信息\n")
+            f.write(f"export {ENV_CLIENT_ID_PREFIX}{lang_upper}='YOUR_{lang_upper}_CLIENT_ID_HERE'\n")
+            f.write(f"export {ENV_CLIENT_SECRET_PREFIX}{lang_upper}='YOUR_{lang_upper}_CLIENT_SECRET_HERE'\n\n")
+        
+        f.write(f"# 重定向URI（通常无需修改）\n")
+        f.write(f"export {ENV_REDIRECT_URI}='urn:ietf:wg:oauth:2.0:oob'\n")
+    
+    print(f"已生成环境变量示例文件: {example_file}")
+    print("请按照文件中的说明设置您的认证信息")
+
+# 检查环境变量设置
+def check_env_settings():
+    """检查必要的环境变量是否已设置"""
+    any_set = False
+    missing = []
+    
+    for lang, code in LANG_CODES.items():
+        lang_upper = code.upper()
+        client_id_var = f"{ENV_CLIENT_ID_PREFIX}{lang_upper}"
+        client_secret_var = f"{ENV_CLIENT_SECRET_PREFIX}{lang_upper}"
+        
+        if os.environ.get(client_id_var) and os.environ.get(client_secret_var):
+            any_set = True
+            print(f"✓ {lang.capitalize()} 频道的环境变量已设置")
+        else:
+            missing.append(lang)
+    
+    if not any_set:
+        print("警告: 未找到任何语言的认证环境变量")
+        print("您可以使用以下命令生成环境变量设置示例:")
+        print("  python youtube_uploader.py --generate-env-example")
+    elif missing:
+        print(f"注意: 以下语言的环境变量未设置: {', '.join(missing)}")
+
 # 主函数
 def main():
     """主函数"""
     args = parse_args()
-
+    
+    # 处理生成环境变量示例的请求
+    if hasattr(args, 'generate_env_example') and args.generate_env_example:
+        generate_env_example()
+        return
+    
+    # 检查环境变量设置
+    if hasattr(args, 'check_env') and args.check_env:
+        check_env_settings()
+        return
+    
     # 如果用户请求显示多语言内容
     if args.show_multilingual:
         show_multilingual_content()
