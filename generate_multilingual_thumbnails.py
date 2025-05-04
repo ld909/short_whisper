@@ -171,16 +171,16 @@ def create_thumbnail(
         # 加载背景图片
         img = Image.open(bg_image_path)
 
-        # 调整大小为1080p (1920x1080)，但保持宽高比
+        # 调整大小为720p (1280x720)，但保持宽高比
         # 计算原始宽高比
         width, height = img.size
         original_ratio = width / height
-        target_ratio = 1920 / 1080
+        target_ratio = 1280 / 720
 
         # 根据宽高比决定裁剪或填充方式
         if original_ratio > target_ratio:
             # 图片比目标更宽，基于高度等比例调整，然后裁剪宽度
-            new_height = 1080
+            new_height = 720
             new_width = int(new_height * original_ratio)
             try:
                 # 新版PIL使用Image.Resampling.LANCZOS
@@ -190,12 +190,12 @@ def create_thumbnail(
                 img = img.resize((new_width, new_height), Image.LANCZOS)
 
             # 从中心裁剪到目标宽度
-            left = (new_width - 1920) // 2
-            right = left + 1920
+            left = (new_width - 1280) // 2
+            right = left + 1280
             img = img.crop((left, 0, right, new_height))
         else:
             # 图片比目标更高，基于宽度等比例调整，然后裁剪高度
-            new_width = 1920
+            new_width = 1280
             new_height = int(new_width / original_ratio)
             try:
                 img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
@@ -203,8 +203,8 @@ def create_thumbnail(
                 img = img.resize((new_width, new_height), Image.LANCZOS)
 
             # 从中心裁剪到目标高度
-            top = (new_height - 1080) // 2
-            bottom = top + 1080
+            top = (new_height - 720) // 2
+            bottom = top + 720
             img = img.crop((0, top, new_width, bottom))
 
         # 创建绘图对象
@@ -492,7 +492,7 @@ def main():
     parser.add_argument("-c", "--channel", help="指定要处理的频道")
     parser.add_argument("-v", "--video", help="指定要处理的视频名称（不含扩展名）")
     parser.add_argument("-l", "--languages", nargs="+", help="指定要生成的语言列表")
-    parser.add_argument("--font_size", type=int, default=95, help="字体大小")
+    parser.add_argument("--font_size", type=int, default=100, help="字体大小")
     parser.add_argument("--font_color", default="gray", help="字体颜色")
     parser.add_argument(
         "--bg_color", default="240,240,53,180", help="背景颜色 (r,g,b,a)"
