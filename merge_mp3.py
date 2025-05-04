@@ -5,8 +5,11 @@
 2. 验证MP3文件完整性，必要时尝试重新生成
 3. 支持并行处理以提高效率
 4. 提供强制重新合并和单个视频处理选项
+5. 支持直接修复单个损坏的MP3文件
 
-使用方法: python merge_mp3.py [-l 语言列表] [-f] [-w 工作线程数] [-s 频道名/视频名]
+使用方法:
+1. 合并MP3: python merge_mp3.py [-l 语言列表] [-f] [-w 工作线程数] [-s 频道名/视频名]
+2. 修复单个MP3: python merge_mp3.py -r MP3文件的完整路径
 """
 
 import os
@@ -35,8 +38,10 @@ INPUT_MP3_PATH = os.path.join(BASE_PATH, "multi_lang_mp3")
 OUTPUT_MERGE_PATH = os.path.join(BASE_PATH, "merge_multi_lange_mp3")
 # 支持的语言
 SUPPORTED_LANGUAGES = ["en", "ja", "vi", "ko"]
-# 输入TXT目录
-INPUT_TXT_PATH = os.path.join(BASE_PATH, "multi_lang_txt")
+# 输入TXT目录 (优先使用generate_mp3_clips.py中使用的目录)
+INPUT_TXT_PATH = os.path.join(BASE_PATH, "multi_lang_txt_split")
+# 备用TXT目录
+INPUT_TXT_PATH_BACKUP = os.path.join(BASE_PATH, "multi_lang_txt")
 
 
 def import_generate_mp3_module():
@@ -44,21 +49,59 @@ def import_generate_mp3_module():
     try:
         # 获取当前脚本所在目录
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        # 构建generate_mp3.py的完整路径
-        generate_mp3_path = os.path.join(current_dir, "generate_mp3.py")
 
-        if not os.path.exists(generate_mp3_path):
-            print(f"警告: 找不到 {generate_mp3_path}")
-            return None
+        # 搜索可能存在的generate_mp3相关文件的位置
+        search_paths = [
+            os.path.join(current_dir, "generate_mp3_clips.py"),  # 优先查找clips版本
+            os.path.join(current_dir, "generate_mp3.py"),  # 同目录
+            os.path.join(
+                os.path.dirname(current_dir), "generate_mp3_clips.py"
+            ),  # 父目录clips版本
+            os.path.join(os.path.dirname(current_dir), "generate_mp3.py"),  # 父目录
+            os.path.join(
+                current_dir, "..", "generate_mp3_clips.py"
+            ),  # 相对父目录clips版本
+            os.path.join(current_dir, "..", "generate_mp3.py"),  # 相对父目录
+        ]
+
+        # 尝试在所有可能的位置查找文件
+        found_path = None
+        for path in search_paths:
+            if os.path.exists(path):
+                found_path = path
+                break
+
+        if not found_path:
+            # 尝试查找含有generate_mp3的文件
+            import glob
+
+            all_py_files = glob.glob(os.path.join(current_dir, "*.py"))
+            all_py_files.extend(
+                glob.glob(os.path.join(os.path.dirname(current_dir), "*.py"))
+            )
+
+            for py_file in all_py_files:
+                if "generate_mp3" in os.path.basename(py_file).lower():
+                    found_path = py_file
+                    break
+
+            if not found_path:
+                return None
 
         # 导入模块
-        spec = importlib.util.spec_from_file_location("generate_mp3", generate_mp3_path)
+        spec = importlib.util.spec_from_file_location("generate_mp3", found_path)
+        if spec is None:
+            return None
+
         generate_mp3 = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(generate_mp3)
 
+        # 验证模块中是否包含必要的函数
+        if not hasattr(generate_mp3, "text_to_mp3"):
+            return None
+
         return generate_mp3
     except Exception as e:
-        print(f"导入generate_mp3模块失败: {e}")
         return None
 
 
@@ -72,11 +115,8 @@ def verify_mp3_file(file_path):
         if not result.stderr.strip():
             return True
 
-        print(f"检测到损坏的MP3文件: {file_path}")
-        print(f"错误信息: {result.stderr}")
         return False
     except Exception as e:
-        print(f"验证MP3文件时出错: {e}")
         return False
 
 
@@ -86,64 +126,124 @@ def regenerate_mp3_file(mp3_path, generate_mp3):
         # 从MP3文件路径推断出TXT文件路径
         # 假设目录结构: multi_lang_mp3/channel/video_name/language/number.mp3
         parts = mp3_path.split(os.sep)
+
         if len(parts) < 5:
-            print(f"无法从路径解析频道/视频/语言信息: {mp3_path}")
             return False
 
         # 解析信息
-        relative_idx = (
-            parts.index("multi_lang_mp3") if "multi_lang_mp3" in parts else -1
-        )
-        if relative_idx == -1:
-            print(f"无法找到multi_lang_mp3在路径中: {mp3_path}")
+        # 兼容子目录可能不包含完整路径的情况
+        if "multi_lang_mp3" in parts:
+            relative_idx = parts.index("multi_lang_mp3")
+        else:
+            # 尝试匹配路径的最后几个部分
+            # 假设格式是 */channel/video_name/language/number.mp3
+            if len(parts) < 4:  # 至少需要4个部分
+                return False
+            # 假设倒数第4个是channel，倒数第3个是video_name，倒数第2个是language
+            relative_idx = len(parts) - 4
+
+        if relative_idx < 0 or relative_idx + 3 >= len(parts):
             return False
 
-        channel = parts[relative_idx + 1]
-        video_name = parts[relative_idx + 2]
-        language = parts[relative_idx + 3]
+        channel = parts[relative_idx]
+        video_name = parts[relative_idx + 1]
+        language = parts[relative_idx + 2]
         file_number = os.path.splitext(parts[-1])[0]  # 不带扩展名的文件编号
 
-        # 构建对应的TXT文件路径
+        # 构建对应的TXT文件路径（优先使用INPUT_TXT_PATH目录）
         txt_file_path = os.path.join(
             INPUT_TXT_PATH, channel, language, f"{video_name}.txt"
         )
 
+        # 如果在主TXT目录中找不到文件，尝试备用目录
         if not os.path.exists(txt_file_path):
-            print(f"找不到对应的TXT文件: {txt_file_path}")
-            return False
+            backup_txt_path = os.path.join(
+                INPUT_TXT_PATH_BACKUP, channel, language, f"{video_name}.txt"
+            )
 
-        print(f"找到对应的TXT文件: {txt_file_path}")
+            if os.path.exists(backup_txt_path):
+                txt_file_path = backup_txt_path
+            else:
+                # 尝试在频道的子目录中寻找
+                # 先在主目录中查找
+                if os.path.exists(os.path.join(INPUT_TXT_PATH, channel)):
+                    for subdir in os.listdir(os.path.join(INPUT_TXT_PATH, channel)):
+                        sub_txt_path = os.path.join(
+                            INPUT_TXT_PATH,
+                            channel,
+                            subdir,
+                            language,
+                            f"{video_name}.txt",
+                        )
+                        if os.path.exists(sub_txt_path):
+                            txt_file_path = sub_txt_path
+                            break
+
+                # 如果在主目录没找到，再在备用目录中查找
+                if not os.path.exists(txt_file_path) and os.path.exists(
+                    os.path.join(INPUT_TXT_PATH_BACKUP, channel)
+                ):
+                    for subdir in os.listdir(
+                        os.path.join(INPUT_TXT_PATH_BACKUP, channel)
+                    ):
+                        sub_txt_path = os.path.join(
+                            INPUT_TXT_PATH_BACKUP,
+                            channel,
+                            subdir,
+                            language,
+                            f"{video_name}.txt",
+                        )
+                        if os.path.exists(sub_txt_path):
+                            txt_file_path = sub_txt_path
+                            break
+
+                if not os.path.exists(txt_file_path):
+                    return False
 
         # 读取TXT文件中对应行的文本
-        with open(txt_file_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+        try:
+            with open(txt_file_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        except Exception as e:
+            return False
 
-        if not lines or int(file_number) > len(lines):
-            print(f"文件编号{file_number}超出了TXT文件的行数{len(lines)}")
+        try:
+            file_idx = int(file_number) - 1
+            if not lines or file_idx < 0 or file_idx >= len(lines):
+                return False
+        except ValueError:
             return False
 
         # 获取对应行的文本
-        text = lines[int(file_number) - 1].strip()
+        text = lines[file_idx].strip()
 
         if not text:
-            print(f"行{file_number}的文本为空")
             return False
+
+        # 确保目标目录存在
+        target_dir = os.path.dirname(mp3_path)
+        os.makedirs(target_dir, exist_ok=True)
 
         # 调用generate_mp3模块中的text_to_mp3函数重新生成MP3
         if generate_mp3:
-            print(f"重新生成MP3文件: {mp3_path}")
-            success = generate_mp3.text_to_mp3(text, mp3_path, language)
-            if success:
-                print(f"成功重新生成MP3文件: {mp3_path}")
-                return True
-            else:
-                print(f"重新生成MP3文件失败: {mp3_path}")
+            if not hasattr(generate_mp3, "text_to_mp3"):
+                return False
+
+            try:
+                success = generate_mp3.text_to_mp3(text, mp3_path, language)
+                if success:
+                    # 验证文件是否实际创建成功
+                    if os.path.exists(mp3_path) and os.path.getsize(mp3_path) > 0:
+                        return True
+                    else:
+                        return False
+                else:
+                    return False
+            except Exception as e:
                 return False
         else:
-            print("generate_mp3模块不可用，无法重新生成MP3文件")
             return False
     except Exception as e:
-        print(f"重新生成MP3文件时出错: {e}")
         return False
 
 
@@ -174,44 +274,61 @@ def merge_mp3_files(input_dir, output_file, force=False):
 
     # 验证所有MP3文件是否有效，并修复损坏的文件
     valid_files = []
+    invalid_files = []
+    fixed_files = []
+
+    print(f"\n===== 开始验证 {len(mp3_files)} 个MP3文件 =====")
     for mp3_file in mp3_files:
         file_path = os.path.join(input_dir, mp3_file)
 
         # 检查文件是否存在且大小大于0
-        if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
-            print(f"文件不存在或大小为0: {file_path}")
-            if generate_mp3 and regenerate_mp3_file(file_path, generate_mp3):
-                if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-                    valid_files.append(mp3_file)
-                    print(f"成功重新生成并验证: {file_path}")
-                else:
-                    print(f"重新生成后文件仍然无效: {file_path}")
-            else:
-                print(f"跳过无效文件: {file_path}")
-            continue
-
-        # 验证文件格式
-        if not verify_mp3_file(file_path):
-            # 如果文件损坏，尝试重新生成
-            print(f"文件格式无效: {file_path}")
-            if generate_mp3 and regenerate_mp3_file(file_path, generate_mp3):
-                if verify_mp3_file(file_path):
-                    valid_files.append(mp3_file)
-                    print(f"成功重新生成并验证: {file_path}")
-                else:
-                    print(f"重新生成后文件仍然无效: {file_path}")
-            else:
-                print(f"跳过损坏的文件: {file_path}")
+        if not os.path.exists(file_path):
+            invalid_files.append((mp3_file, "不存在"))
+        elif os.path.getsize(file_path) == 0:
+            invalid_files.append((mp3_file, "大小为0"))
         else:
-            valid_files.append(mp3_file)
-            print(f"文件有效: {file_path}")
+            # 验证文件格式
+            if not verify_mp3_file(file_path):
+                invalid_files.append((mp3_file, "格式无效"))
+            else:
+                valid_files.append(mp3_file)
 
-    if not valid_files:
-        print(f"警告: 目录 {input_dir} 中没有有效的MP3文件")
-        return False
+    print(f"\n有效文件: {len(valid_files)}/{len(mp3_files)}")
+    print(f"无效文件: {len(invalid_files)}/{len(mp3_files)}")
+
+    # 尝试修复无效文件
+    if invalid_files and generate_mp3:
+        print(f"\n===== 尝试修复 {len(invalid_files)} 个无效文件 =====")
+        for mp3_file, reason in invalid_files:
+            file_path = os.path.join(input_dir, mp3_file)
+
+            # 确保目录存在
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+            # 尝试重新生成文件
+            if regenerate_mp3_file(file_path, generate_mp3):
+                # 验证重新生成的文件
+                if (
+                    os.path.exists(file_path)
+                    and os.path.getsize(file_path) > 0
+                    and verify_mp3_file(file_path)
+                ):
+                    valid_files.append(mp3_file)
+                    fixed_files.append(mp3_file)
+                else:
+                    pass  # 修复尝试失败
+            else:
+                pass  # 无法修复文件
+
+        print(f"\n成功修复的文件: {len(fixed_files)}/{len(invalid_files)}")
 
     # 更新mp3_files为有效的文件列表
-    mp3_files = valid_files
+    mp3_files = sorted(valid_files, key=lambda f: int(os.path.splitext(f)[0]))
+    print(f"\n最终有效文件数: {len(mp3_files)}")
+
+    if not mp3_files:
+        print(f"警告: 目录 {input_dir} 中没有有效的MP3文件")
+        return False
 
     # 尝试使用简单的连接方法
     print(f"尝试使用简单连接方法合并 {len(mp3_files)} 个MP3文件...")
@@ -272,12 +389,13 @@ def merge_mp3_files(input_dir, output_file, force=False):
             # 准备输出中间WAV文件
             intermediate_files = []
 
+            # 将MP3转换为WAV (无日志输出)
             for i, mp3_file in enumerate(mp3_files):
                 src_file = os.path.join(input_dir, mp3_file)
                 temp_wav = os.path.join(output_dir, f"temp_{i}.wav")
                 intermediate_files.append(temp_wav)
 
-                # 将MP3转换为WAV
+                # 将MP3转换为WAV，不打印详细日志
                 convert_cmd = [
                     "ffmpeg",
                     "-y",
@@ -288,10 +406,10 @@ def merge_mp3_files(input_dir, output_file, force=False):
                     temp_wav,
                 ]
 
-                print(f"转换为WAV: {' '.join(convert_cmd)}")
+                # 静默执行转换命令
                 subprocess.run(convert_cmd, check=True, capture_output=True, text=True)
 
-            # 如果只有一个文件，直接转换为MP3
+            # 如果只有一个文件，直接转换为MP3 (无日志输出)
             if len(intermediate_files) == 1:
                 encode_cmd = [
                     "ffmpeg",
@@ -305,7 +423,7 @@ def merge_mp3_files(input_dir, output_file, force=False):
                     output_file,
                 ]
             else:
-                # 合并多个WAV文件
+                # 合并多个WAV文件 (无日志输出)
                 concat_filter = (
                     "concat=n=" + str(len(intermediate_files)) + ":v=0:a=1[aout]"
                 )
@@ -336,10 +454,10 @@ def merge_mp3_files(input_dir, output_file, force=False):
                     ]
                 )
 
-            print(f"合并并编码: {' '.join(encode_cmd)}")
+            # 执行合并和编码命令 (无日志输出)
             subprocess.run(encode_cmd, check=True, capture_output=True, text=True)
 
-            # 清理临时文件
+            # 清理临时文件 (无日志输出)
             for temp_file in intermediate_files:
                 if os.path.exists(temp_file):
                     os.remove(temp_file)
@@ -512,13 +630,49 @@ def process_all_channels(languages=None, force=False, max_workers=3):
             ):
                 channel, video_name, language = futures[future]
                 try:
-                    success = future.result()
-                    if success:
-                        print(f"成功合并 {channel}/{video_name}/{language}")
-                    else:
-                        print(f"合并失败 {channel}/{video_name}/{language}")
-                except Exception as e:
-                    print(f"处理 {channel}/{video_name}/{language} 时出错: {e}")
+                    future.result()
+                except Exception:
+                    pass
+
+
+def fix_single_mp3(mp3_path):
+    """修复单个MP3文件"""
+    print(f"\n尝试修复单个MP3文件: {mp3_path}")
+
+    # 检查文件是否存在
+    if not os.path.exists(mp3_path):
+        print(f"错误: 文件不存在 {mp3_path}")
+        return False
+
+    # 检查文件格式
+    is_valid = os.path.getsize(mp3_path) > 0 and verify_mp3_file(mp3_path)
+    if is_valid:
+        print(f"文件已经是有效的MP3: {mp3_path}")
+        return True
+
+    # 尝试修复文件
+    generate_mp3 = import_generate_mp3_module()
+    if not generate_mp3:
+        print("错误: 无法导入generate_mp3模块，无法修复文件")
+        return False
+
+    # 重新生成文件
+    success = regenerate_mp3_file(mp3_path, generate_mp3)
+    if success:
+        # 验证结果
+        if (
+            os.path.exists(mp3_path)
+            and os.path.getsize(mp3_path) > 0
+            and verify_mp3_file(mp3_path)
+        ):
+            print(f"成功修复文件: {mp3_path}")
+            return True
+        else:
+            print(f"修复尝试失败")
+            return False
+    else:
+        print(f"无法修复文件")
+        return False
 
 
 def main():
@@ -543,9 +697,21 @@ def main():
     parser.add_argument(
         "-s", "--single", type=str, help="只处理指定的单个视频，格式: 频道名/视频名"
     )
+    parser.add_argument(
+        "-r", "--repair", type=str, help="修复单个损坏的MP3文件，提供完整路径"
+    )
 
     # 解析命令行参数
     args = parser.parse_args()
+
+    # 处理修复单个MP3文件的模式 (优先级最高)
+    if args.repair:
+        success = fix_single_mp3(args.repair)
+        if success:
+            print("文件修复成功")
+        else:
+            print("文件修复失败")
+        return
 
     # 处理单个视频模式
     if args.single:

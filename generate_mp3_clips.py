@@ -61,8 +61,10 @@ INPUT_TXT_PATH = os.path.join(BASE_MEDIA_PATH, "multi_lang_txt_split")
 OUTPUT_MP3_PATH = os.path.join(BASE_MEDIA_PATH, "multi_lang_mp3")
 
 # Azure语音合成配置
-SPEECH_KEY = "cba10589e21e48dfb986f493e276b833"
-SERVICE_REGION = "eastasia"
+# SPEECH_KEY = "cba10589e21e48dfb986f493e276b833"
+# SERVICE_REGION = "eastasia"
+SPEECH_KEY = "7ce9bde9dc744a4c9cb603bb74761c4d"
+SERVICE_REGION = "eastus"
 
 # 定义语言和对应的语音名称
 VOICE_NAMES = {
