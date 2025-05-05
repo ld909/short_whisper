@@ -288,7 +288,7 @@ def main():
         "-f", "--force", action="store_true", help="强制重新翻译，忽略已有翻译"
     )
     parser.add_argument(
-        "-b", "--batch_size", type=int, default=20, help="并发处理的批量大小，默认为20"
+        "-b", "--batch_size", type=int, default=5, help="并发处理的批量大小，默认为20"
     )
 
     # 解析命令行参数

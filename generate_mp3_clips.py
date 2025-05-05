@@ -6,14 +6,14 @@
 
 此脚本用于将多语言的文本文件转换为MP3音频文件，使用Azure语音合成服务。
 
-输入目录: /Volumes/dhl/buda_videos_youtube/multi_lang_txt_split (macOS)
-         /media/dhl/buda_videos_youtube/multi_lang_txt_split (Linux)
+输入目录: /Volumes/dhl/buda_videos_youtube/multi_lang_txt (macOS)
+         /media/dhl/buda_videos_youtube/multi_lang_txt (Linux)
 
 输出目录: /Volumes/dhl/buda_videos_youtube/multi_lang_mp3 (macOS)
          /media/dhl/buda_videos_youtube/multi_lang_mp3 (Linux)
 
 目录结构:
-- 输入: <基础媒体路径>/multi_lang_txt_split/<频道>/<语言>/<视频名>.txt
+- 输入: <基础媒体路径>/multi_lang_txt/<频道>/<语言>/<视频名>.txt
 - 输出: <基础媒体路径>/multi_lang_mp3/<频道>/<视频名>/<语言>/<行号>.mp3
 
 支持的语言:
@@ -56,7 +56,7 @@ def get_base_media_path():
 # 获取媒体基础路径
 BASE_MEDIA_PATH = get_base_media_path()
 # 输入TXT目录
-INPUT_TXT_PATH = os.path.join(BASE_MEDIA_PATH, "multi_lang_txt_split")
+INPUT_TXT_PATH = os.path.join(BASE_MEDIA_PATH, "multi_lang_txt")
 # 输出MP3目录
 OUTPUT_MP3_PATH = os.path.join(BASE_MEDIA_PATH, "multi_lang_mp3")
 

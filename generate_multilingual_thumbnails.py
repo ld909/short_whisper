@@ -22,6 +22,7 @@
 7. 设置背景颜色: python generate_multilingual_thumbnails.py --bg_color "88,235,52,180"
 8. 设置底部边距: python generate_multilingual_thumbnails.py --bottom_margin 100
 9. 设置背景圆角: python generate_multilingual_thumbnails.py --corner_radius 20
+10. 设置文字描边: python generate_multilingual_thumbnails.py --stroke_width 2 --stroke_color black
 """
 
 import os
@@ -53,7 +54,12 @@ def get_base_media_path():
 
 def get_font_path(language):
     """根据语言获取合适的字体路径"""
-    base_font_dir = "/Users/donghaoliu/doc/short_whisper/fonts"
+    # 根据操作系统设置不同的字体路径
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        base_font_dir = "/Users/donghaoliu/doc/short_whisper/fonts"
+    else:  # 默认为Linux/Ubuntu
+        base_font_dir = "/home/dhl/Documents/short_whisper/fonts"
 
     # 为不同语言指定默认字体
     language_font_dirs = {
@@ -165,6 +171,8 @@ def create_thumbnail(
     bg_color="88,235,52,180",
     bottom_margin=50,
     corner_radius=0,
+    stroke_width=0,
+    stroke_color="black",
 ):
     """创建单个缩略图"""
     try:
@@ -350,8 +358,26 @@ def create_thumbnail(
                 # 普通矩形（无圆角）
                 draw.rectangle(rect_coords, fill=bg_color_rgba)
 
-            # 绘制文本，保持在原来的y_position
-            draw.text((x_position, y_position), line, font=font, fill=font_color)
+            # 绘制带描边的文本
+            if stroke_width > 0:
+                # 先绘制描边
+                for offset_x in range(-stroke_width, stroke_width + 1):
+                    for offset_y in range(-stroke_width, stroke_width + 1):
+                        if offset_x == 0 and offset_y == 0:
+                            continue  # 跳过原始位置，后面单独绘制
+                        draw.text(
+                            (x_position + offset_x, y_position + offset_y),
+                            line,
+                            font=font,
+                            fill=stroke_color,
+                        )
+
+                # 然后绘制原始文本
+                draw.text((x_position, y_position), line, font=font, fill=font_color)
+            else:
+                # 无描边的文本
+                draw.text((x_position, y_position), line, font=font, fill=font_color)
+
             y_position += int(line_height)
 
         # 确保输出目录存在
@@ -376,6 +402,8 @@ def generate_thumbnails(
     bg_color="88,235,52,180",
     bottom_margin=200,
     corner_radius=0,
+    stroke_width=0,
+    stroke_color="black",
 ):
     """生成多语言视频封面"""
     media_path = get_base_media_path()
@@ -484,6 +512,8 @@ def generate_thumbnails(
                     bg_color=bg_color,
                     bottom_margin=bottom_margin,
                     corner_radius=corner_radius,
+                    stroke_width=stroke_width,
+                    stroke_color=stroke_color,
                 )
 
 
@@ -498,11 +528,15 @@ def main():
         "--bg_color", default="240,240,53,180", help="背景颜色 (r,g,b,a)"
     )
     parser.add_argument(
-        "--bottom_margin", type=int, default=200, help="文字距离底部的距离（像素）"
+        "--bottom_margin", type=int, default=118, help="文字距离底部的距离（像素）"
     )
     parser.add_argument(
-        "--corner_radius", type=int, default=100, help="背景矩形的圆角半径（像素）"
+        "--corner_radius", type=int, default=98, help="背景矩形的圆角半径（像素）"
     )
+    parser.add_argument(
+        "--stroke_width", type=int, default=1, help="文字描边宽度（像素）"
+    )
+    parser.add_argument("--stroke_color", default="black", help="文字描边颜色")
     parser.add_argument("--debug", action="store_true", help="打印调试信息")
 
     args = parser.parse_args()
@@ -517,7 +551,12 @@ def main():
 
     if args.debug:
         # 打印字体目录信息
-        base_font_dir = "/Users/donghaoliu/doc/short_whisper/fonts"
+        system = platform.system()
+        if system == "Darwin":  # macOS
+            base_font_dir = "/Users/donghaoliu/doc/short_whisper/fonts"
+        else:  # 默认为Linux/Ubuntu
+            base_font_dir = "/home/dhl/Documents/short_whisper/fonts"
+
         print("\n字体目录信息:")
         for lang, font_dir in {
             "English": "Noto_Sans_EN",
@@ -544,6 +583,8 @@ def main():
         bg_color=args.bg_color,
         bottom_margin=args.bottom_margin,
         corner_radius=args.corner_radius,
+        stroke_width=args.stroke_width,
+        stroke_color=args.stroke_color,
     )
 
 

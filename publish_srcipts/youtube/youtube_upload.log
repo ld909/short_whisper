@@ -1,0 +1,49 @@
+2025-05-05 16:27:27,323 - youtube_uploader - INFO - 开始登录YouTube...
+2025-05-05 16:28:29,396 - youtube_uploader - ERROR - 登录超时: Page.wait_for_selector: Timeout 60000ms exceeded.
+Call log:
+waiting for locator("input[type=\"password\"]") to be visible
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+
+2025-05-05 16:28:29,405 - youtube_uploader - ERROR - 登录失败，终止上传流程
+2025-05-05 16:28:29,562 - youtube_uploader - INFO - 浏览器已关闭
+2025-05-05 16:31:30,327 - youtube_uploader - ERROR - 上传流程中出现未处理的错误: BrowserType.launch() got an unexpected keyword argument 'user_data_dir'
+2025-05-05 16:33:14,951 - youtube_uploader - INFO - 开始登录YouTube...
+2025-05-05 16:33:25,078 - youtube_uploader - ERROR - 登录过程中出错: Page.wait_for_selector: Target page, context or browser has been closed
+Call log:
+waiting for locator("input[type=\"password\"]") to be visible
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+  -   locator resolved to hidden <input class="Hvu6D" tabindex="-1" type="password" jsname="RHeR4d" aria-hidden="true" spellcheck="false" name="hiddenPassword"/>
+
+2025-05-05 16:33:25,078 - youtube_uploader - ERROR - 登录失败，终止上传流程
+2025-05-05 16:33:25,242 - youtube_uploader - INFO - 浏览器已关闭
+2025-05-05 16:33:33,658 - youtube_uploader - INFO - 开始登录YouTube...
+2025-05-05 16:34:04,125 - youtube_uploader - ERROR - 登录过程中出错: Target page, context or browser has been closed
+=========================== logs ===========================
+waiting for navigation to "https://studio.youtube.com/**" until 'load'
+  navigated to "https://www.youtube.com/signin_prompt?app=desktop&next=https%3A%2F%2Fwww.youtube.com%2F"
+============================================================
+2025-05-05 16:34:04,126 - youtube_uploader - ERROR - 登录失败，终止上传流程
+2025-05-05 16:34:04,260 - youtube_uploader - INFO - 浏览器已关闭
+2025-05-05 16:46:14,383 - youtube_uploader - ERROR - 无法加载配置文件 ./youtube_config_example.json: [Errno 2] No such file or directory: './youtube_config_example.json'
+2025-05-05 16:46:19,491 - youtube_uploader - INFO - 开始登录YouTube...
+2025-05-05 16:46:23,752 - youtube_uploader - INFO - 检测到已经登录YouTube
+2025-05-05 16:46:27,389 - youtube_uploader - INFO - 开始上传视频...
+2025-05-05 16:46:27,389 - youtube_uploader - ERROR - 上传流程中出现未处理的错误: 'video_path'
+2025-05-05 16:46:27,644 - youtube_uploader - INFO - 浏览器已关闭
