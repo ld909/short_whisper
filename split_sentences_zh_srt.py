@@ -50,7 +50,7 @@ DEBUG_MODE = False
 # 中文句子结束标点
 SENTENCE_ENDINGS = r"[。！？]"
 # 最大句子长度限制
-MAX_SENTENCE_LENGTH = 260
+MAX_SENTENCE_LENGTH = 200
 
 
 def read_srt_file(file_path):
@@ -74,6 +74,8 @@ def parse_srt_with_re(srt_content):
     for match in matches:
         index, start_time, end_time, subtitle = match
         subtitle = subtitle.replace("\n", " ").strip()
+        # 移除「」符号
+        subtitle = subtitle.replace("「", "").replace("」", "")
         subtitles.append(
             {
                 "index": int(index),
@@ -84,6 +86,11 @@ def parse_srt_with_re(srt_content):
         )
 
     return subtitles
+
+
+def clean_text(text):
+    """清理文本，移除「」符号"""
+    return text.replace("「", "").replace("」", "")
 
 
 def split_sentences(text):
@@ -97,6 +104,9 @@ def split_sentences(text):
         list: 拆分后的句子列表
     """
     global DEBUG_MODE
+
+    # 移除「」符号
+    text = clean_text(text)
 
     # 替换文本中的所有换行符为空格
     text = re.sub(r"\s+", " ", text)
@@ -151,6 +161,11 @@ def fix_long_sentence_punctuation(sentence):
     Returns:
         str: 修复标点后的句子
     """
+    global MAX_SENTENCE_LENGTH
+
+    # 移除「」符号
+    sentence = clean_text(sentence)
+
     # 清理输入句子中的空白字符
     sentence = re.sub(r"\s+", " ", sentence.strip())
 
@@ -198,9 +213,13 @@ def ensure_sentence_length(sentences):
     Returns:
         list: 处理后的句子列表
     """
+    global MAX_SENTENCE_LENGTH
     result = []
 
     for sentence in sentences:
+        # 移除「」符号
+        sentence = clean_text(sentence)
+
         # 清理句子中的空白字符
         clean_sentence = re.sub(r"\s+", " ", sentence.strip())
 
@@ -418,6 +437,8 @@ def process_single_file(file_path, force=False):
 
 
 def main():
+    global MAX_SENTENCE_LENGTH
+
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(
         description="将中文SRT文件中的字幕拆分为句子，并处理长句"
@@ -434,14 +455,14 @@ def main():
         "-d", "--debug", action="store_true", help="启用调试模式，显示详细处理信息"
     )
     parser.add_argument(
-        "-m", "--max_length", type=int, default=260, help="最大句子长度限制 (默认: 260)"
+        "-m", "--max_length", type=int, default=200, help="最大句子长度限制 (默认: 200)"
     )
 
     # 解析命令行参数
     args = parser.parse_args()
 
     # 设置调试模式
-    global DEBUG_MODE, MAX_SENTENCE_LENGTH
+    global DEBUG_MODE
     DEBUG_MODE = args.debug
     MAX_SENTENCE_LENGTH = args.max_length
 
