@@ -466,7 +466,7 @@ def main():
         "-b",
         "--batch_size",
         type=int,
-        default=20,
+        default=10,
         help="并发处理的批量大小，默认为20",
     )
     parser.add_argument(
