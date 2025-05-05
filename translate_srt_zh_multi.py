@@ -6,11 +6,11 @@
 脚本使用OpenAI API进行翻译，特别针对佛教内容优化，支持并发处理和断点续传。
 
 输入目录:
-- SRT模式: [媒体路径]/zh_srt_tyro_fix/[频道名称]/
+- SRT模式: [媒体路径]/zh_subtitle_split_txt/[频道名称]/
 - TXT模式: [媒体路径]/pure_sentence/[频道名称]/
 
 输出目录:
-- SRT模式: [媒体路径]/multi_lang_srt_before_format/[频道名称]/[语言代码]/
+- SRT模式: [媒体路径]/multi_lang_txt/[频道名称]/[语言代码]/ (纯文本格式，每行一句话)
 - TXT模式: [媒体路径]/multi_lang_txt/[频道名称]/[语言代码]/
 
 使用方法:
@@ -18,7 +18,7 @@
 2. 指定目标语言: python translate_srt_zh_multi.py -l English Japanese
 3. 强制重新翻译: python translate_srt_zh_multi.py -f
 4. 设置批处理大小: python translate_srt_zh_multi.py -b 30
-5. 单文件处理: python translate_srt_zh_multi.py -s /path/to/file.srt
+5. 单文件处理: python translate_srt_zh_multi.py -s /path/to/file.txt
 6. TXT模式: python translate_srt_zh_multi.py --txt_mode
 
 注意:
@@ -50,8 +50,8 @@ def get_base_media_path():
 
 # 获取媒体基础路径
 BASE_MEDIA_PATH = get_base_media_path()
-# 输入SRT目录
-INPUT_SRT_PATH = os.path.join(BASE_MEDIA_PATH, "zh_srt_tyro_fix")
+# 输入TXT目录
+INPUT_SRT_PATH = os.path.join(BASE_MEDIA_PATH, "zh_subtitle_split_txt")
 
 
 def setup_openai_client():
@@ -60,8 +60,8 @@ def setup_openai_client():
 
     if not api_key:
         print("错误: 未找到OpenAI API密钥")
-        print("请设置环境变量OPENAI_API_KEY或在脚本中提供API密钥")
-        print("例如: export OPENAI_API_KEY='your-api-key'")
+        print("请设置环境变量UNI_API_KEY或在脚本中提供API密钥")
+        print("例如: export UNI_API_KEY='your-api-key'")
         sys.exit(1)
 
     try:
@@ -81,31 +81,29 @@ LANGUAGE_CODES = {"English": "en", "Japanese": "ja", "Vietnamese": "vi", "Korean
 
 
 def parse_srt(file_path):
-    """解析SRT文件，返回字幕条目列表"""
+    """解析TXT文件，返回文本条目列表"""
     try:
         with open(file_path, "r", encoding="utf-8") as file:
-            content = file.read()
-
-        # 使用正则表达式匹配SRT条目
-        pattern = r"(\d+)\n(\d{2}:\d{2}:\d{2},\d{3}\s-->\s\d{2}:\d{2}:\d{2},\d{3})\n([\s\S]*?)(?=\n\d+\n|$)"
-        matches = re.findall(pattern, content)
-
-        if not matches:
-            print("警告: 未找到匹配的SRT条目格式，请检查SRT文件格式是否正确")
+            lines = file.readlines()
 
         entries = []
-        for match in matches:
-            index = match[0]
-            timestamp = match[1]
-            text = match[2].strip()
-            entries.append({"index": index, "timestamp": timestamp, "text": text})
+        for i, line in enumerate(lines):
+            text = line.strip()
+            if text:  # 只有非空行才处理
+                entries.append(
+                    {
+                        "index": str(i + 1),  # 为每行分配索引号
+                        "timestamp": "00:00:00,000 --> 00:00:00,000",  # 虚拟时间戳
+                        "text": text,
+                    }
+                )
 
         return entries
     except UnicodeDecodeError:
         print("错误: 文件编码错误，请确保文件是UTF-8编码")
         sys.exit(1)
     except Exception as e:
-        print(f"解析SRT文件时出错: {e}")
+        print(f"解析TXT文件时出错: {e}")
         sys.exit(1)
 
 
@@ -129,12 +127,14 @@ def translate_text(text, target_language="English", max_retries=3):
                 messages=[
                     {
                         "role": "system",
-                        "content": f"你是一个翻译大师，佛学大师，佛教专家。精通佛教各种术语在不同文化中对应的词汇，我需要你将中文佛教内容翻译为{target_language}，直接返回翻译后的结果，不要夹带其他内容。不要以翻译后这样的内容开头作为返回。",
+                        "content": f"你是一个翻译大师，佛学大师，佛教专家。精通佛教各种术语在不同文化中对应的词汇，我需要你将中文佛教内容翻译为{target_language}，直接返回翻译后的结果，不要夹带其他内容,返回结果不要出现中文，只能出现{target_language}。不要以翻译后这样的内容开头作为返回。",
                     },
                     {"role": "user", "content": text},
                 ],
             )
             result = completion.choices[0].message.content
+            # 清理翻译结果中的空行
+            result = "\n".join([line for line in result.split("\n") if line.strip()])
             return result
         except Exception as e:
             print(f"翻译出错 (尝试 {attempt+1}/{max_retries}): {e}")
@@ -156,6 +156,7 @@ def check_progress(output_file):
             content = file.read()
 
         # 计算已翻译的条目数
+        # 每三行为一个条目：索引行、时间戳行、翻译内容行
         pattern = r"(\d+)\n(\d{2}:\d{2}:\d{2},\d{3}\s-->\s\d{2}:\d{2}:\d{2},\d{3})\n"
         matches = re.findall(pattern, content)
         return len(matches)
@@ -164,14 +165,14 @@ def check_progress(output_file):
         return 0
 
 
-def translate_srt_file_concurrent(
+def translate_txt_file_concurrent(
     input_file, output_file, target_language="English", batch_size=20
 ):
-    """并发翻译整个SRT文件，保持字幕顺序并即时写入输出文件（真正并发批量处理）"""
+    """并发翻译整个TXT文件，保持文本顺序并即时写入输出文件（真正并发批量处理）"""
     entries = parse_srt(input_file)
 
     if not entries:
-        print("错误: 未解析到任何字幕条目")
+        print("错误: 未解析到任何文本条目")
         return False
 
     # 确保输出目录存在
@@ -181,25 +182,25 @@ def translate_srt_file_concurrent(
         print(f"创建输出目录: {output_dir}")
 
     # 检查是否有已翻译的进度
-    already_translated = check_progress(output_file)
-    print(f"检测到已翻译 {already_translated}/{len(entries)} 条字幕")
+    already_translated = check_txt_progress(output_file)
+    print(f"检测到已翻译 {already_translated}/{len(entries)} 条文本")
 
     # 如果所有条目都已翻译完成，直接返回
     if already_translated >= len(entries):
-        print("所有字幕都已翻译完成，无需重新翻译")
+        print("所有文本都已翻译完成，无需重新翻译")
         return True
 
     # 确定从哪个索引开始翻译
     start_index = already_translated
     total_entries = len(entries)
 
-    print(f"从第 {start_index+1} 条开始翻译，共 {total_entries} 条字幕...")
+    print(f"从第 {start_index+1} 条开始翻译，共 {total_entries} 条文本...")
 
     # 确定写入模式：如果已有翻译内容，追加模式；否则，写入模式
     write_mode = "a" if already_translated > 0 else "w"
 
     def translate_entry(entry):
-        """翻译单个字幕条目的函数（不带索引）"""
+        """翻译单个文本条目的函数（不带索引）"""
         try:
             original_text = entry["text"]
             print(f"翻译前: {original_text}")
@@ -209,7 +210,7 @@ def translate_srt_file_concurrent(
             print(f"翻译后: {translated_text}")
             return translated_text
         except Exception as e:
-            print(f"翻译字幕时出错: {e}")
+            print(f"翻译文本时出错: {e}")
             return entry["text"]  # 出错时返回原文
 
     try:
@@ -225,13 +226,11 @@ def translate_srt_file_concurrent(
                         results = list(executor.map(translate_entry, batch_entries))
                     # 按顺序写入本批次
                     for idx, translated_text in enumerate(results):
-                        entry = batch_entries[idx]
-                        file.write(f"{entry['index']}\n")
-                        file.write(f"{entry['timestamp']}\n")
-                        file.write(f"{translated_text}\n\n")
+                        # 直接写入翻译后的文本，每行一句话
+                        file.write(f"{translated_text}\n")
                         file.flush()
                         os.fsync(file.fileno())
-                        print(f"已写入第 {batch_start + idx + 1} 条字幕")
+                        print(f"已写入第 {batch_start + idx + 1} 条文本")
                         pbar.update(1)
         print(f"翻译完成! 所有内容已保存到 {output_file}")
         return True
@@ -246,7 +245,7 @@ def translate_srt_file_concurrent(
 
 
 def process_all_channels(languages=None, force=False, batch_size=20, check_only=False):
-    """处理zh_srt_tyro_fix目录下的所有频道和SRT文件"""
+    """处理zh_subtitle_split_txt目录下的所有频道和TXT文件"""
     if languages is None:
         languages = LANGUAGES
 
@@ -271,20 +270,20 @@ def process_all_channels(languages=None, force=False, batch_size=20, check_only=
     for channel in channels:
         channel_input_path = os.path.join(INPUT_SRT_PATH, channel)
 
-        # 获取当前频道中的所有SRT文件
-        srt_files = [f for f in os.listdir(channel_input_path) if f.endswith(".srt")]
+        # 获取当前频道中的所有TXT文件
+        txt_files = [f for f in os.listdir(channel_input_path) if f.endswith(".txt")]
 
-        if not srt_files:
-            print(f"在频道 '{channel}' 中未找到任何SRT文件，跳过")
+        if not txt_files:
+            print(f"在频道 '{channel}' 中未找到任何TXT文件，跳过")
             continue
 
-        print(f"\n处理频道: {channel}，找到 {len(srt_files)} 个SRT文件")
+        print(f"\n处理频道: {channel}，找到 {len(txt_files)} 个TXT文件")
 
         for language in languages:
             # 为每种语言创建输出目录
             language_output_path = os.path.join(
                 BASE_MEDIA_PATH,
-                "multi_lang_srt_before_format",
+                "multi_lang_txt",
                 channel,
                 LANGUAGE_CODES[language],
             )
@@ -295,11 +294,11 @@ def process_all_channels(languages=None, force=False, batch_size=20, check_only=
 
             print(f"\n开始为频道 {channel} 翻译为 {language}...")
 
-            for srt_file in srt_files:
-                input_file_path = os.path.join(channel_input_path, srt_file)
-                output_file_path = os.path.join(language_output_path, srt_file)
+            for txt_file in txt_files:
+                input_file_path = os.path.join(channel_input_path, txt_file)
+                output_file_path = os.path.join(language_output_path, txt_file)
 
-                print(f"\n处理文件: {srt_file}")
+                print(f"\n处理文件: {txt_file}")
                 print(f"从 {input_file_path}")
                 print(f"到 {output_file_path}")
 
@@ -309,15 +308,15 @@ def process_all_channels(languages=None, force=False, batch_size=20, check_only=
                     print(f"已删除现有输出文件 '{output_file_path}'，将重新翻译")
 
                 # 使用并发翻译文件
-                success = translate_srt_file_concurrent(
+                success = translate_txt_file_concurrent(
                     input_file_path, output_file_path, language, batch_size
                 )
 
                 if success:
-                    print(f"成功完成 {srt_file} 到 {language} 的翻译!")
+                    print(f"成功完成 {txt_file} 到 {language} 的翻译!")
                 else:
                     print(
-                        f"{srt_file} 到 {language} 的翻译未完全完成，将继续下一个文件"
+                        f"{txt_file} 到 {language} 的翻译未完全完成，将继续下一个文件"
                     )
 
 
@@ -373,8 +372,9 @@ def translate_txt_files_multi_lang(languages=None, force=False, batch_size=20):
                 print(f"检测到已翻译 {already_translated} 行")
                 # 读取所有行
                 with open(input_file, "r", encoding="utf-8") as fin:
-                    lines = fin.readlines()
+                    lines = [line for line in fin.readlines() if line.strip()]
                 total_lines = len(lines)
+                print(f"文件包含 {total_lines} 行有效内容")
                 if already_translated >= total_lines:
                     print("所有行都已翻译完成，无需重新翻译")
                     continue
@@ -385,8 +385,15 @@ def translate_txt_files_multi_lang(languages=None, force=False, batch_size=20):
                 def translate_line(line_info):
                     idx, line = line_info
                     src_line = line.rstrip("\n")
+                    # 跳过空行
+                    if not src_line.strip():
+                        print(f"跳过第 {idx+1}/{total_lines} 行: [空行]")
+                        return idx, ""  # 返回空字符串，将在写入逻辑中处理
                     print(f"正在翻译第 {idx+1}/{total_lines} 行: {src_line}")
                     translated = translate_text(src_line, language)
+                    # 确保翻译结果不是空字符串
+                    if not translated.strip():
+                        translated = src_line  # 如果翻译结果为空，使用原文
                     print(f"翻译后: {translated}")
                     return idx, translated
 
@@ -416,6 +423,11 @@ def translate_txt_files_multi_lang(languages=None, force=False, batch_size=20):
                                 for idx, translated_text in sorted(
                                     results
                                 ):  # 确保按原始顺序写入
+                                    # 跳过空行，不写入文件
+                                    if not translated_text.strip():
+                                        print(f"跳过写入第 {idx+1} 行 (空行)")
+                                        pbar.update(1)
+                                        continue
                                     fout.write(translated_text + "\n")
                                     fout.flush()
                                     os.fsync(fout.fileno())
@@ -492,7 +504,7 @@ def main():
         for language in args.languages:
             output_dir = os.path.join(
                 BASE_MEDIA_PATH,
-                "multi_lang_srt_before_format",
+                "multi_lang_txt",
                 channel,
                 LANGUAGE_CODES[language],
             )
@@ -511,7 +523,7 @@ def main():
                 os.remove(output_file)
                 print(f"已删除现有输出文件 '{output_file}'，将重新翻译")
 
-            success = translate_srt_file_concurrent(
+            success = translate_txt_file_concurrent(
                 args.single_file, output_file, language, args.batch_size
             )
 

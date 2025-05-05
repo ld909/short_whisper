@@ -181,6 +181,19 @@ def process_subtitles_concurrently(
 
         return index, fixed_text
 
+    def safe_save_subtitle(subtitle_item, path):
+        """安全保存字幕到文件，处理可能的权限错误"""
+        try:
+            save_subtitle_item(subtitle_item, path, "a")
+            return True
+        except PermissionError as e:
+            print(f"权限错误: 无法写入文件 {path}")
+            print(f"错误信息: {str(e)}")
+            return False
+        except Exception as e:
+            print(f"保存字幕时出错: {str(e)}")
+            return False
+
     # 使用 ThreadPoolExecutor 进行并发处理
     with concurrent.futures.ThreadPoolExecutor(max_workers=batch_size) as executor:
         # 提交所有任务
@@ -204,7 +217,8 @@ def process_subtitles_concurrently(
 
             # 立即将该字幕写入文件
             with lock:
-                save_subtitle_item(subtitles[i], output_path, "a")
+                if not safe_save_subtitle(subtitles[i], output_path):
+                    print(f"警告: 字幕 #{i+1} 无法保存到文件，但处理会继续")
 
             print(f"完成处理字幕 #{i+1}/{len(subtitles)}: {results[i]}")
 
@@ -218,6 +232,16 @@ def process_srt_file(
     print(f"正在处理：{input_path}")
 
     try:
+        # 检查输出目录是否可写
+        output_dir = os.path.dirname(output_path)
+        if not os.access(output_dir, os.W_OK):
+            print(f"警告: 没有权限写入目录 {output_dir}")
+            print("解决方案: 请尝试以下命令为目录添加写入权限:")
+            print(f"sudo chmod -R 775 {output_dir}")
+            print("或者更改输出目录到本地可写目录:")
+            print("python fix_tyro.py -o /home/$USER/srt_fixed")
+            return
+
         # 读取SRT文件内容
         srt_content = read_srt_file(input_path)
 
@@ -244,8 +268,16 @@ def process_srt_file(
             print(f"检测到输出文件，从字幕 #{start_index+1} 继续处理")
         else:
             # 如果是新文件，先清空输出文件
-            with open(output_path, "w", encoding="utf-8") as f:
-                pass
+            try:
+                with open(output_path, "w", encoding="utf-8") as f:
+                    pass
+            except PermissionError:
+                print(f"错误: 没有权限创建或写入文件 {output_path}")
+                print("解决方案: 请尝试以下命令为目录添加写入权限:")
+                print(f"sudo chmod -R 775 {os.path.dirname(output_path)}")
+                print("或者更改输出目录到本地可写目录:")
+                print("python fix_tyro.py -o /home/$USER/srt_fixed")
+                return
 
         # 用于保存已修复的字幕，作为上下文
         fixed_subtitles = []
@@ -280,6 +312,16 @@ def process_srt_file(
 
         print(f"已完成文件处理：{output_path}")
 
+    except PermissionError as e:
+        print(f"权限错误: {input_path}")
+        print(f"错误信息: {str(e)}")
+        print("\n解决方案:")
+        print(
+            f"1. 确保挂载的设备有写入权限: sudo mount -o remount,rw {os.path.dirname(output_path)}"
+        )
+        print(
+            f"2. 更改输出目录到本地可写目录: python fix_tyro.py -o /home/$USER/srt_fixed"
+        )
     except Exception as e:
         print(f"处理文件时出错: {input_path}")
         print(f"错误信息: {str(e)}")
@@ -297,6 +339,7 @@ def main():
     """处理指定目录结构中的中文SRT文件"""
     # 获取基础路径
     base_path = get_base_path()
+    home_path = os.path.expanduser("~")
 
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(description="修复SRT字幕文件中的错别字")
@@ -320,10 +363,16 @@ def main():
         help="输出SRT基础目录路径",
     )
     parser.add_argument(
+        "-l",
+        "--local",
+        action="store_true",
+        help="使用本地目录作为输出（避免权限问题）",
+    )
+    parser.add_argument(
         "-b",
         "--batch_size",
         type=int,
-        default=20,
+        default=5,
         help="并发处理的批量大小",
     )
 
@@ -334,9 +383,17 @@ def main():
     api_type = args.api
     batch_size = args.batch_size
 
+    # 如果选择使用本地目录
+    if args.local:
+        local_output_dir = os.path.join(home_path, "srt_fixed")
+        output_base_dir = local_output_dir
+        print(f"使用本地输出目录: {output_base_dir}")
+
     print(f"使用 {api_type} API 进行错别字修复")
     print(f"检测到系统: {platform.system()}")
     print(f"使用基础路径: {base_path}")
+    print(f"输入目录: {input_base_dir}")
+    print(f"输出目录: {output_base_dir}")
     print(f"并发批量大小: {batch_size}")
 
     # 检查输入目录是否存在
@@ -344,10 +401,17 @@ def main():
         print(f"错误: 输入目录不存在: {input_base_dir}")
         return
 
-    # 确保输出基础目录存在
-    if not os.path.exists(output_base_dir):
-        os.makedirs(output_base_dir)
-        print(f"已创建输出基础目录: {output_base_dir}")
+    # 检查输出目录权限
+    try:
+        # 确保输出基础目录存在
+        if not os.path.exists(output_base_dir):
+            os.makedirs(output_base_dir)
+            print(f"已创建输出基础目录: {output_base_dir}")
+    except PermissionError:
+        print(f"错误: 没有权限创建输出目录: {output_base_dir}")
+        print("建议使用 -l/--local 选项使用本地目录作为输出，或手动指定可写目录:")
+        print("python fix_tyro.py -o /home/$USER/srt_fixed")
+        return
 
     # 检查API密钥是否设置
     if api_type == "ali" and not os.getenv("DASHSCOPE_API_KEY"):
@@ -384,9 +448,13 @@ def main():
         print(f"输出目录: {output_channel_dir}")
 
         # 确保输出频道目录存在
-        if not os.path.exists(output_channel_dir):
-            os.makedirs(output_channel_dir)
-            print(f"已创建频道输出目录: {output_channel_dir}")
+        try:
+            if not os.path.exists(output_channel_dir):
+                os.makedirs(output_channel_dir)
+                print(f"已创建频道输出目录: {output_channel_dir}")
+        except PermissionError:
+            print(f"错误: 没有权限创建频道输出目录: {output_channel_dir}")
+            continue
 
         # 获取当前频道下的所有SRT文件
         try:

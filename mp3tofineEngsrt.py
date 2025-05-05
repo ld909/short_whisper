@@ -21,8 +21,14 @@ import sys
 from tqdm import tqdm
 from mp3toscripts import mp3totxt, save_srt
 from srt_format import format_srt, break_srt_txt_into_sentences
-from after_whisper_controller import load_bad_json
-from merge_srt_video import get_duration
+from mutagen import File
+
+
+def get_duration(file_path):
+    """get the duration of the media file in seconds"""
+    media = File(file_path)
+    duration = media.info.length
+    return duration
 
 
 def remove_trash_files(mp3_abs_path):
@@ -35,13 +41,34 @@ def remove_trash_files(mp3_abs_path):
     参数:
         mp3_abs_path (str): MP3文件所在的绝对路径
     """
-    for channel in os.listdir(mp3_abs_path):
-        for file in os.listdir(os.path.join(mp3_abs_path, channel)):
-            if file.startswith("._"):
-                os.remove(os.path.join(mp3_abs_path, channel, file))
-                print(f"{channel}, {file} removed")
-            if file == ".DS_Store":
-                os.remove(os.path.join(mp3_abs_path, channel, file))
+    # 先删除主目录下的.DS_Store文件
+    ds_store_path = os.path.join(mp3_abs_path, ".DS_Store")
+    if os.path.exists(ds_store_path):
+        try:
+            os.remove(ds_store_path)
+            print(f"已删除主目录中的 .DS_Store 文件")
+        except OSError as e:
+            print(f"无法删除 {ds_store_path}: {e}")
+            print("继续执行，跳过此文件")
+
+    # 获取目录列表，过滤掉所有非目录项
+    channels = []
+    for item in os.listdir(mp3_abs_path):
+        item_path = os.path.join(mp3_abs_path, item)
+        if os.path.isdir(item_path):
+            channels.append(item)
+
+    # 处理子目录中的垃圾文件
+    for channel in channels:
+        channel_path = os.path.join(mp3_abs_path, channel)
+        for file in os.listdir(channel_path):
+            if file.startswith("._") or file == ".DS_Store":
+                try:
+                    os.remove(os.path.join(channel_path, file))
+                    print(f"{channel}, {file} 已删除")
+                except OSError as e:
+                    print(f"无法删除 {channel}/{file}: {e}")
+                    print("继续执行，跳过此文件")
 
 
 def controller_mp3_to_format_srt(topic):
@@ -58,13 +85,12 @@ def controller_mp3_to_format_srt(topic):
 
     函数会自动跳过：
     - 已处理过的文件
-    - 在bad.json中标记为有问题的文件
     - 时长超过30分钟的音频文件
 
     参数:
         topic (str): 主题名称，用于确定处理的文件夹
     """
-    hard_dive_path = "/media/dhl/"
+    hard_dive_path = "/media/dhl"
     mp3_abs_path = f"{hard_dive_path}/buda_videos_youtube/{topic}"  # fill in the absolute path of the mp3 folder
 
     remove_trash_files(mp3_abs_path)
@@ -83,9 +109,6 @@ def controller_mp3_to_format_srt(topic):
 
     print("所有频道包括:", all_channels)
 
-    # read bad.json from
-    bad_data = load_bad_json()
-
     # read all mp3 files in the folder
     for channel in tqdm(all_channels):
 
@@ -95,12 +118,6 @@ def controller_mp3_to_format_srt(topic):
             if mp3_file.endswith(".mp3"):
                 # check if base_name +'.srt' exists in the dst_srt
                 base_name = os.path.splitext(mp3_file)[0]
-                # 如果topic在bad_data中，则检查channel和base_name是否在bad_data中,如果都在，则跳过
-                if topic in bad_data:
-                    if channel in bad_data[topic]:
-                        if base_name in bad_data[topic][channel]:
-                            print(f"文件损坏，跳过 {channel} 中的 {base_name}")
-                            continue
                 dst_srt = os.path.join(dst_srt_abs_path, channel, base_name + ".srt")
 
                 # check if os.path.join(dst_srt_abs_path, channel) exists
