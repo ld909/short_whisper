@@ -40,7 +40,7 @@ BASE_MEDIA_PATH = get_base_media_path()
 # 输入TXT目录
 INPUT_TXT_PATH = os.path.join(BASE_MEDIA_PATH, "multi_lang_txt")
 # 输出TXT目录
-OUTPUT_TXT_PATH = os.path.join(BASE_MEDIA_PATH, "multi_lang_txt_split")
+OUTPUT_TXT_PATH = os.path.join(BASE_MEDIA_PATH, "multi_lang_txt")
 
 # 定义支持的语言列表
 LANGUAGES = ["English", "Japanese", "Vietnamese", "Korean"]
