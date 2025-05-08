@@ -7,6 +7,16 @@
 4. 提供强制重新合并和单个视频处理选项
 5. 支持直接修复单个损坏的MP3文件
 
+输入路径：
+- MP3源文件路径：/Volumes/dhl/buda_videos_youtube/multi_lang_mp3 (macOS)
+                /media/dhl/buda_videos_youtube/multi_lang_mp3 (Linux)
+- 文本源文件路径：/Volumes/dhl/buda_videos_youtube/multi_lang_txt (macOS)
+                /media/dhl/buda_videos_youtube/multi_lang_txt (Linux)
+
+输出路径：
+- 合并后MP3文件：/Volumes/dhl/buda_videos_youtube/merge_multi_lange_mp3 (macOS)
+                /media/dhl/buda_videos_youtube/merge_multi_lange_mp3 (Linux)
+
 使用方法:
 1. 合并MP3: python merge_mp3.py [-l 语言列表] [-f] [-w 工作线程数] [-s 频道名/视频名]
 2. 修复单个MP3: python merge_mp3.py -r MP3文件的完整路径
@@ -39,7 +49,7 @@ OUTPUT_MERGE_PATH = os.path.join(BASE_PATH, "merge_multi_lange_mp3")
 # 支持的语言
 SUPPORTED_LANGUAGES = ["en", "ja", "vi", "ko"]
 # 输入TXT目录 (优先使用generate_mp3_clips.py中使用的目录)
-INPUT_TXT_PATH = os.path.join(BASE_PATH, "multi_lang_txt_split")
+INPUT_TXT_PATH = os.path.join(BASE_PATH, "multi_lang_txt")
 # 备用TXT目录
 INPUT_TXT_PATH_BACKUP = os.path.join(BASE_PATH, "multi_lang_txt")
 

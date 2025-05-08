@@ -109,7 +109,8 @@ def create_concat_file(clip_files, concat_file_path):
     with open(concat_file_path, "w") as f:
         for clip_file in clip_files:
             # 使用file协议和转义路径
-            f.write(f"file '{clip_file.replace('\'', '\\\'')}'\n")
+            escaped_path = clip_file.replace("'", "'\\''")
+            f.write(f"file '{escaped_path}'\n")
     return concat_file_path
 
 

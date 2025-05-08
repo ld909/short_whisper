@@ -2,5 +2,7 @@
     "channel_ko": "https://studio.youtube.com/channel/UCQ2rirB86LDa_LcyjJjeXUw",
     "channel_jp": "https://studio.youtube.com/channel/UCuZbEEnL_msP9lPi-yMRg2w",
     "username": "crypto.zen.dong@gmail.com",
-    "password": "ldh808!!"
+    "password": "",
+    "force_login": true,
+    "ignore_cookies": true
 }

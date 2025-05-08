@@ -4,7 +4,7 @@
 生成MP3脚本
 ===========
 
-此脚本用于将多语言的文本文件转换为MP3音频文件，使用Azure语音合成服务。
+此脚本用于将多语言的文本文件转换为MP3音频文件，使用Edge TTS服务。
 
 输入目录: /Volumes/dhl/buda_videos_youtube/multi_lang_txt (macOS)
          /media/dhl/buda_videos_youtube/multi_lang_txt (Linux)
@@ -18,7 +18,7 @@
 
 支持的语言:
 - en: 英语 (en-US-AndrewMultilingualNeural)
-- ja: 日语 (ja-JP-MasaruMultilingualNeural)
+- ja: 日语 (ja-JP-KeitaNeural)
 - vi: 越南语 (vi-VN-NamMinhNeural)
 - ko: 韩语 (ko-KR-InJoonNeural)
 
@@ -41,58 +41,18 @@ import sys
 import platform
 import concurrent.futures
 from tqdm import tqdm
-import azure.cognitiveservices.speech as speechsdk
 import threading
-import queue
-
-# 添加键盘监听相关的库
-import keyboard
-
-# 退出标志和计数器
-exit_flag = False
-q_press_count = 0
-q_press_lock = threading.Lock()
-q_press_time = 0
-Q_TIMEOUT = 1.0  # 连续按键的超时时间(秒)
+import signal
+import subprocess
 
 
-# 创建键盘监听线程
-def keyboard_listener():
-    global exit_flag, q_press_count, q_press_time
-
-    print("按三次'q'键可以安全退出程序（当前任务完成后）")
-
-    while not exit_flag:
-        try:
-            if keyboard.is_pressed("q"):
-                current_time = time.time()
-                with q_press_lock:
-                    # 检查是否超时
-                    if current_time - q_press_time > Q_TIMEOUT:
-                        q_press_count = 1
-                    else:
-                        q_press_count += 1
-
-                    q_press_time = current_time
-
-                    if q_press_count >= 3:
-                        print("\n检测到连续三次按下'q'键，将在当前任务完成后退出...")
-                        exit_flag = True
-
-                # 防止一次按键被多次检测
-                time.sleep(0.3)
-            time.sleep(0.1)
-        except:
-            # 如果键盘监听失败，继续尝试
-            pass
+# 注册信号处理器，用于捕获Ctrl+C
+def signal_handler(sig, frame):
+    print("\n检测到中断信号，将在当前任务完成后退出...")
 
 
-# 初始化键盘监听线程
-def start_keyboard_listener():
-    listener_thread = threading.Thread(target=keyboard_listener)
-    listener_thread.daemon = True
-    listener_thread.start()
-    return listener_thread
+# 注册信号处理器
+signal.signal(signal.SIGINT, signal_handler)
 
 
 def get_base_media_path():
@@ -111,71 +71,45 @@ INPUT_TXT_PATH = os.path.join(BASE_MEDIA_PATH, "multi_lang_txt")
 # 输出MP3目录
 OUTPUT_MP3_PATH = os.path.join(BASE_MEDIA_PATH, "multi_lang_mp3")
 
-# Azure语音合成配置
-# SPEECH_KEY = "cba10589e21e48dfb986f493e276b833"
-# SERVICE_REGION = "eastasia"
-SPEECH_KEY = "7ce9bde9dc744a4c9cb603bb74761c4d"
-SERVICE_REGION = "eastus"
-
 # 定义语言和对应的语音名称
 VOICE_NAMES = {
     "en": "en-US-AndrewMultilingualNeural",
-    "ja": "ja-JP-MasaruMultilingualNeural",
+    "ja": "ja-JP-KeitaNeural",
     "vi": "vi-VN-NamMinhNeural",
     "ko": "ko-KR-InJoonNeural",
 }
 
 
-def setup_speech_synthesizer(language_code):
-    """设置语音合成器"""
-    if language_code not in VOICE_NAMES:
-        print(f"错误: 不支持的语言代码 {language_code}")
-        return None
-
-    try:
-        speech_config = speechsdk.SpeechConfig(
-            subscription=SPEECH_KEY, region=SERVICE_REGION
-        )
-        speech_config.speech_synthesis_voice_name = VOICE_NAMES[language_code]
-        speech_synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config)
-        return speech_synthesizer
-    except Exception as e:
-        print(f"初始化语音合成器时出错: {e}")
-        return None
-
-
 def text_to_mp3(text, output_file, language_code, max_retries=5):
-    """将文本转换为MP3文件"""
+    """使用Edge TTS将文本转换为MP3文件"""
     if not text.strip():
         print("警告: 空文本，跳过")
         return False
 
-    # 设置音频配置
-    audio_config = speechsdk.audio.AudioOutputConfig(filename=output_file)
-
-    # 获取语音合成器
-    speech_config = speechsdk.SpeechConfig(
-        subscription=SPEECH_KEY, region=SERVICE_REGION
-    )
-    speech_config.speech_synthesis_voice_name = VOICE_NAMES[language_code]
-    speech_synthesizer = speechsdk.SpeechSynthesizer(
-        speech_config=speech_config, audio_config=audio_config
-    )
+    voice = VOICE_NAMES.get(language_code)
+    if not voice:
+        print(f"错误: 不支持的语言代码 {language_code}")
+        return False
 
     for attempt in range(max_retries):
         try:
-            # 合成语音
-            result = speech_synthesizer.speak_text_async(text).get()
+            # 使用subprocess调用edge-tts命令
+            cmd = [
+                "edge-tts",
+                "--voice",
+                voice,
+                "--text",
+                text,
+                "--write-media",
+                output_file,
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
 
-            # 检查结果
-            if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+            if result.returncode == 0:
                 print(f"语音合成成功: {output_file}")
                 return True
-            elif result.reason == speechsdk.ResultReason.Canceled:
-                cancellation_details = result.cancellation_details
-                print(f"语音合成被取消: {cancellation_details.reason}")
-                if cancellation_details.reason == speechsdk.CancellationReason.Error:
-                    print(f"错误详情: {cancellation_details.error_details}")
+            else:
+                print(f"语音合成失败: {result.stderr}")
 
                 if attempt < max_retries - 1:
                     print(f"等待2秒后重试 (尝试 {attempt+1}/{max_retries})...")
@@ -214,8 +148,6 @@ def find_missing_indices(total_lines, existing_indices):
 
 def process_txt_file(input_file, output_dir, language_code, force=False, batch_size=5):
     """处理一个TXT文件，为每行文本生成对应的MP3文件"""
-    global exit_flag
-
     if not os.path.exists(input_file):
         print(f"错误: 输入文件 '{input_file}' 不存在")
         return False
@@ -225,26 +157,29 @@ def process_txt_file(input_file, output_dir, language_code, force=False, batch_s
         os.makedirs(output_dir)
         print(f"创建输出目录: {output_dir}")
 
-    # 检查是否有已生成的MP3文件及缺失的索引
-    already_generated, existing_indices = check_mp3_progress(output_dir)
-
-    # 读取所有行
+    # 读取所有行，确定总行数
     with open(input_file, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
     total_lines = len(lines)
 
+    # 检查是否有已生成的MP3文件及缺失的索引
+    already_generated, existing_indices = check_mp3_progress(output_dir)
+
     # 查找缺失的索引
     missing_indices = find_missing_indices(total_lines, existing_indices)
 
     print(f"共有 {total_lines} 行文本，已生成 {already_generated} 个MP3文件")
+
     if missing_indices:
         print(
             f"发现 {len(missing_indices)} 个缺失的索引: {missing_indices[:10]}{'...' if len(missing_indices) > 10 else ''}"
         )
 
-    # 如果所有行都已处理完成且没有缺失索引，直接返回
-    if already_generated >= total_lines and not missing_indices and not force:
+    # 如果MP3数量与TXT行数不一致或强制重新生成，则处理
+    need_process = (already_generated != total_lines) or force
+
+    if not need_process:
         print("所有MP3文件都已生成完成，无需重新生成")
         return True
 
@@ -273,7 +208,7 @@ def process_txt_file(input_file, output_dir, language_code, force=False, batch_s
             lines_to_process = [
                 (i, lines[i])
                 for i in range(total_lines)
-                if i + 1 in missing_indices
+                if (i + 1) in missing_indices
                 or not os.path.exists(os.path.join(output_dir, f"{i+1}.mp3"))
             ]
 
@@ -288,27 +223,6 @@ def process_txt_file(input_file, output_dir, language_code, force=False, batch_s
         with tqdm(total=total_to_process, desc="生成MP3进度") as pbar:
             # 批量处理需处理的行
             for batch_start in range(0, total_to_process, batch_size):
-                # 检查退出标志
-                if exit_flag:
-                    print("检测到退出请求，完成当前批次后退出...")
-                    # 只处理当前批次，不再继续下一批次
-                    batch_end = min(batch_start + batch_size, total_to_process)
-                    batch_lines = lines_to_process[batch_start:batch_end]
-
-                    # 并发处理本批次
-                    with concurrent.futures.ThreadPoolExecutor(
-                        max_workers=batch_size
-                    ) as executor:
-                        results = list(executor.map(process_line, batch_lines))
-
-                    # 更新进度条
-                    for _, success in results:
-                        if success:
-                            pbar.update(1)
-
-                    print("当前批次处理完成，正在安全退出...")
-                    return False
-
                 batch_end = min(batch_start + batch_size, total_to_process)
                 batch_lines = lines_to_process[batch_start:batch_end]
 
@@ -347,8 +261,6 @@ def process_txt_file(input_file, output_dir, language_code, force=False, batch_s
 
 def process_all_channels(languages=None, force=False, batch_size=5):
     """处理multi_lang_txt目录下的所有频道和TXT文件"""
-    global exit_flag
-
     if languages is None:
         languages = list(VOICE_NAMES.keys())
 
@@ -370,70 +282,129 @@ def process_all_channels(languages=None, force=False, batch_size=5):
 
     print(f"找到 {len(channels)} 个频道目录")
 
-    for channel in channels:
-        # 检查退出标志
-        if exit_flag:
-            print("检测到退出请求，正在安全退出...")
-            return
+    # 记录所有需要处理的视频信息
+    video_tasks = []
+    partially_complete_tasks = []
 
+    # 首先扫描所有频道和视频，查找哪些是部分完成的
+    for channel in channels:
         channel_path = os.path.join(INPUT_TXT_PATH, channel)
 
-        # 检查频道下的所有语言目录
+        # 收集该频道下所有视频
+        all_videos = set()
         for language in languages:
-            # 检查退出标志
-            if exit_flag:
-                print("检测到退出请求，正在安全退出...")
-                return
-
             lang_path = os.path.join(channel_path, language)
-
             if not os.path.exists(lang_path):
-                print(f"语言目录不存在，跳过: {lang_path}")
                 continue
 
-            # 获取当前语言目录中的所有TXT文件
+            # 获取当前语言目录中的所有TXT文件（视频）
             txt_files = [f for f in os.listdir(lang_path) if f.endswith(".txt")]
-
-            if not txt_files:
-                print(f"在 '{lang_path}' 中未找到任何TXT文件，跳过")
-                continue
-
-            print(
-                f"\n处理频道: {channel}，语言: {language}，找到 {len(txt_files)} 个TXT文件"
-            )
-
             for txt_file in txt_files:
-                # 检查退出标志
-                if exit_flag:
-                    print("检测到退出请求，正在安全退出...")
-                    return
-
-                input_file_path = os.path.join(lang_path, txt_file)
-
-                # 提取视频名称（去除.txt后缀）
                 video_name = os.path.splitext(txt_file)[0]
+                all_videos.add(video_name)
 
-                # 构建输出目录路径
+        # 对每个视频，检查是否有部分完成的语言
+        for video_name in all_videos:
+            video_info = {
+                "channel": channel,
+                "video_name": video_name,
+                "langs_status": {},
+            }
+
+            for language in languages:
+                lang_path = os.path.join(channel_path, language)
+                if not os.path.exists(lang_path):
+                    continue
+
+                input_file_path = os.path.join(lang_path, f"{video_name}.txt")
+                if not os.path.exists(input_file_path):
+                    continue
+
+                # 检查输出目录中是否已有MP3文件
                 output_dir = os.path.join(
                     OUTPUT_MP3_PATH, channel, video_name, language
                 )
 
-                print(f"\n处理文件: {txt_file}")
-                print(f"从 {input_file_path}")
-                print(f"到 {output_dir}")
+                # 读取输入文件的总行数
+                with open(input_file_path, "r", encoding="utf-8") as f:
+                    total_lines = len(f.readlines())
 
-                # 处理TXT文件
-                success = process_txt_file(
-                    input_file_path, output_dir, language, force, batch_size
-                )
+                if os.path.exists(output_dir):
+                    # 检查已生成的MP3文件数量
+                    mp3_count, existing_indices = check_mp3_progress(output_dir)
 
-                if success:
-                    print(f"成功完成 {txt_file} 的MP3生成!")
+                    # 判断完成状态
+                    if mp3_count < total_lines:
+                        video_info["langs_status"][language] = {
+                            "status": "partial",
+                            "path": input_file_path,
+                            "output_dir": output_dir,
+                        }
+                    elif mp3_count > total_lines:
+                        video_info["langs_status"][language] = {
+                            "status": "excess",
+                            "path": input_file_path,
+                            "output_dir": output_dir,
+                        }
+                    else:  # mp3_count == total_lines
+                        video_info["langs_status"][language] = {
+                            "status": "complete",
+                            "path": input_file_path,
+                            "output_dir": output_dir,
+                        }
                 else:
-                    if exit_flag:
-                        print("程序已按用户请求安全退出")
-                    else:
-                        print(f"{txt_file} 的MP3生成未完全完成，将继续下一个文件")
+                    video_info["langs_status"][language] = {
+                        "status": "not_started",
+                        "path": input_file_path,
+                        "output_dir": output_dir,
+                    }
+
+            # 优先处理的情况：部分完成的视频、MP3数量与TXT行数不一致的视频
+            if any(
+                info["status"] in ["partial", "excess"]
+                for info in video_info["langs_status"].values()
+            ):
+                partially_complete_tasks.append(video_info)
+            else:
+                video_tasks.append(video_info)
+
+    # 优先处理部分完成或有问题的视频
+    print(f"\n发现 {len(partially_complete_tasks)} 个需要优先处理的视频")
+    all_tasks = partially_complete_tasks + video_tasks
+
+    # 开始处理所有视频任务
+    for task_idx, task in enumerate(all_tasks):
+        channel = task["channel"]
+        video_name = task["video_name"]
+
+        print(
+            f"\n========= 处理视频: {channel}/{video_name} ({task_idx+1}/{len(all_tasks)}) ========="
+        )
+
+        # 按照语言顺序处理每个语言版本
+        for language in languages:
+            if language not in task["langs_status"]:
+                print(f"语言 {language} 不存在对应的文本文件，跳过")
+                continue
+
+            lang_info = task["langs_status"][language]
+            input_file_path = lang_info["path"]
+            output_dir = lang_info["output_dir"]
+            status = lang_info["status"]
+
+            print(f"\n处理语言: {language} (状态: {status})")
+            print(f"从 {input_file_path}")
+            print(f"到 {output_dir}")
+
+            # 处理TXT文件
+            success = process_txt_file(
+                input_file_path, output_dir, language, force, batch_size
+            )
+
+            if success:
+                print(f"成功完成 {video_name} 的 {language} 语言MP3生成!")
+            else:
+                print(f"{video_name} 的 {language} 语言MP3生成未完全完成")
 
 
 def main():
@@ -453,7 +424,7 @@ def main():
         "-f", "--force", action="store_true", help="强制重新生成，忽略已有MP3文件"
     )
     parser.add_argument(
-        "-b", "--batch_size", type=int, default=5, help="并发处理的批量大小，默认为5"
+        "-b", "--batch_size", type=int, default=10, help="并发处理的批量大小，默认为10"
     )
     parser.add_argument(
         "-s", "--single_file", type=str, help="指定单独处理一个TXT文件路径"
@@ -463,8 +434,12 @@ def main():
     # 解析命令行参数
     args = parser.parse_args()
 
-    # 启动键盘监听线程
-    listener_thread = start_keyboard_listener()
+    # 检查edge-tts是否已安装
+    try:
+        subprocess.run(["edge-tts", "--version"], capture_output=True, text=True)
+    except FileNotFoundError:
+        print("错误: 未找到edge-tts命令。请先安装edge-tts: pip install edge-tts")
+        return
 
     try:
         # 处理单个文件模式
@@ -499,22 +474,18 @@ def main():
             if success:
                 print(f"成功完成 {args.single_file} 的MP3生成!")
             else:
-                if exit_flag:
-                    print("程序已按用户请求安全退出")
-                else:
-                    print(f"{args.single_file} 的MP3生成未完全完成")
+                print(f"{args.single_file} 的MP3生成未完全完成")
         else:
             # 处理所有频道和TXT文件
             process_all_channels(args.languages, args.force, args.batch_size)
-
-            if exit_flag:
-                print("程序已按用户请求安全退出")
+            print("所有任务已处理完成")
 
     except KeyboardInterrupt:
         print("\n处理被用户中断")
+    except Exception as e:
+        print(f"\n程序运行时发生错误: {e}")
     finally:
-        # 确保设置退出标志，让键盘监听线程也能退出
-        exit_flag = True
+        print("程序已退出。")
 
 
 if __name__ == "__main__":

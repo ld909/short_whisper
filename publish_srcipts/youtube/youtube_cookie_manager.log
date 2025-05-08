@@ -1,0 +1,17 @@
+2025-05-07 00:53:44,254 - youtube_cookie_manager - INFO - 已加载 Cookie: /Users/donghaoliu/doc/short_whisper/publish_srcipts/youtube/cookies/youtube_cookies_dhliu.eth.json
+2025-05-07 00:53:52,091 - youtube_cookie_manager - ERROR - 验证 Cookie 时出错: Page.query_selector: Target page, context or browser has been closed
+2025-05-07 00:53:52,091 - youtube_cookie_manager - INFO - Cookie 无效，尝试重新登录
+2025-05-07 00:53:52,091 - youtube_cookie_manager - INFO - 开始登录 YouTube 账号: dhliu.eth@gmail.com...
+2025-05-07 00:53:52,093 - youtube_cookie_manager - ERROR - 登录过程中出错: Page.goto: Target page, context or browser has been closed
+2025-05-07 00:53:52,093 - youtube_cookie_manager - ERROR - 登录失败，请检查用户名和密码或手动完成验证
+2025-05-07 00:53:52,628 - youtube_cookie_manager - INFO - 浏览器已关闭
+2025-05-07 00:56:20,841 - youtube_cookie_manager - INFO - 已加载 Cookie: /Users/donghaoliu/doc/short_whisper/publish_srcipts/youtube/cookies/youtube_cookies_dhliu.eth.json
+2025-05-07 00:56:26,245 - youtube_cookie_manager - INFO - Cookie 无效或已过期，需要重新登录
+2025-05-07 00:56:26,245 - youtube_cookie_manager - INFO - Cookie 无效，尝试重新登录
+2025-05-07 00:56:26,245 - youtube_cookie_manager - INFO - 开始登录 YouTube 账号: dhliu.eth@gmail.com...
+2025-05-07 00:56:32,762 - youtube_cookie_manager - ERROR - 登录过程中出错: Page.wait_for_selector: Target page, context or browser has been closed
+Call log:
+  - waiting for locator("input[type=\"email\"]") to be visible
+
+2025-05-07 00:56:32,763 - youtube_cookie_manager - ERROR - 登录失败，请检查用户名和密码或手动完成验证
+2025-05-07 00:56:33,490 - youtube_cookie_manager - INFO - 浏览器已关闭

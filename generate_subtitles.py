@@ -9,8 +9,8 @@
 支持多语言处理，包括英语(en)、日语(ja)、越南语(vi)和韩语(ko)。
 
 目录结构:
-- 输入文本目录: /Volumes/dhl/buda_videos_youtube/multi_lang_txt_split/ (macOS) 或
-              /media/dhl/buda_videos_youtube/multi_lang_txt_split/ (Linux)
+- 输入文本目录: /Volumes/dhl/buda_videos_youtube/multi_lang_txt/ (macOS) 或
+              /media/dhl/buda_videos_youtube/multi_lang_txt/ (Linux)
  - 输入MP3目录: /Volumes/dhl/buda_videos_youtube/multi_lang_mp3/
 - 合并MP3目录: /Volumes/dhl/buda_videos_youtube/merge_multi_lange_mp3/
 - 输出SRT目录: /Volumes/dhl/buda_videos_youtube/multi_lang_srt/
@@ -59,7 +59,7 @@ INPUT_MP3_PATH = os.path.join(BASE_PATH, "multi_lang_mp3")
 # 合并后的MP3目录
 MERGED_MP3_PATH = os.path.join(BASE_PATH, "merge_multi_lange_mp3")
 # 输入TXT目录
-INPUT_TXT_PATH = os.path.join(BASE_PATH, "multi_lang_txt_split")
+INPUT_TXT_PATH = os.path.join(BASE_PATH, "multi_lang_txt")
 # 输出SRT目录
 OUTPUT_SRT_PATH = os.path.join(BASE_PATH, "multi_lang_srt")
 # 支持的语言
