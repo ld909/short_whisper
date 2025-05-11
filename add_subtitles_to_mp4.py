@@ -123,7 +123,7 @@ def add_subtitle_to_video(video_path, srt_path, output_path, language):
             "-i",
             video_path,
             "-vf",
-            f"subtitles={srt_path}:fontsdir={fonts_dir}:force_style='Fontname={font_name},FontSize=16,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,BorderStyle=1,Outline=0,MarginV=20'",
+            f"subtitles={srt_path}:fontsdir={fonts_dir}:force_style='Fontname={font_name},FontSize=16,FontWeight=500,PrimaryColour=&HFFFFFF,OutlineColour=&H383838,BorderStyle=1,Outline=0.6,MarginV=20'",
             "-c:a",
             "copy",
             "-y",  # 覆盖已存在的文件
