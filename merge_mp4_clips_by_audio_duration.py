@@ -329,7 +329,7 @@ def process_audio_file(mp3_file, channel_name, language):
         print(f"需要 {needed_clips} 个视频片段来匹配音频时长")
 
         # 获取所有可用的视频片段
-        all_clips = glob.glob(os.path.join(MP4_CLIPS_DIR, "clip_*.mp4"))
+        all_clips = glob.glob(os.path.join(MP4_CLIPS_DIR, "*.mp4"))
         if len(all_clips) == 0:
             print(f"错误: 未找到任何视频片段在 {MP4_CLIPS_DIR}")
             return
