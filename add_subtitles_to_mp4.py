@@ -22,12 +22,13 @@
 5. 顺序处理每个视频（一个处理完成后再处理下一个）
 
 使用方法:
-python add_subtitles_to_mp4.py [-l LANGUAGES] [-f] [-s CHANNEL/VIDEO]
+python add_subtitles_to_mp4.py [-l LANGUAGES] [-f] [-s CHANNEL/VIDEO] [--gpu]
 
 参数说明:
 - -l, --languages: 指定需要处理的语言，默认处理所有支持的语言
 - -f, --force: 强制重新生成已存在的视频文件
 - -s, --single: 指定只处理单个视频，格式为"频道名/视频名"
+- --gpu: 使用GPU加速ffmpeg处理
 """
 
 import os
@@ -39,6 +40,7 @@ from tqdm import tqdm
 import logging
 import time
 import glob
+import multiprocessing
 
 
 def get_base_path():
@@ -92,7 +94,45 @@ def check_required_tools():
         return False
 
 
-def add_subtitle_to_video(video_path, srt_path, output_path, language):
+def check_nvidia_gpu():
+    """检查系统是否有NVIDIA GPU可用，以及获取GPU内存信息"""
+    if platform.system() != "Linux":
+        return False, None
+    
+    try:
+        # 检查nvidia-smi命令是否可用
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.total,memory.free", "--format=csv,noheader,nounits"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        if result.returncode != 0:
+            logger.warning("nvidia-smi命令不可用，无法使用NVIDIA GPU硬件加速")
+            return False, None
+        
+        # 解析GPU内存信息
+        lines = result.stdout.strip().split('\n')
+        if not lines:
+            return False, None
+            
+        # 获取第一个GPU的信息
+        parts = lines[0].strip().split(',')
+        if len(parts) >= 2:
+            total_memory = int(parts[0].strip())
+            free_memory = int(parts[1].strip())
+            
+            logger.info(f"检测到NVIDIA GPU，总内存: {total_memory}MB，可用内存: {free_memory}MB")
+            return True, {"total": total_memory, "free": free_memory}
+        
+        return False, None
+    except Exception as e:
+        logger.warning(f"检查NVIDIA GPU时出错: {str(e)}")
+        return False, None
+
+
+def add_subtitle_to_video(video_path, srt_path, output_path, language, use_gpu=False):
     """为单个视频添加字幕"""
     try:
         # 获取该语言对应的字体
@@ -117,23 +157,134 @@ def add_subtitle_to_video(video_path, srt_path, output_path, language):
         # 创建输出目录
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-        # 构建ffmpeg命令
-        cmd = [
-            "ffmpeg",
+        # 基础ffmpeg命令
+        cmd = ["ffmpeg"]
+        
+        # GPU加速相关变量
+        hw_accel_used = False
+        gpu_memory = None
+        
+        # 如果启用GPU，添加相应的硬件加速选项
+        if use_gpu:
+            system = platform.system()
+            if system == "Linux":
+                # 检查GPU是否可用
+                has_gpu, memory_info = check_nvidia_gpu()
+                if has_gpu:
+                    gpu_memory = memory_info
+                    # 使用CUDA硬件加速解码
+                    cmd.extend([
+                        "-hwaccel", "cuda",
+                        "-hwaccel_output_format", "cuda"
+                    ])
+                    
+                    # 根据GPU内存大小设置额外帧数
+                    if memory_info and memory_info["free"] > 4000:  # 如果有超过4GB可用内存
+                        cmd.extend(["-extra_hw_frames", "5"])
+                    else:
+                        cmd.extend(["-extra_hw_frames", "3"])
+                        
+                    hw_accel_used = True
+                    logger.info("已启用NVIDIA GPU硬件加速")
+                else:
+                    logger.warning("未检测到可用的NVIDIA GPU，将使用CPU处理")
+                    # 如果GPU不可用，设置线程数以充分利用CPU
+                    cpu_count = multiprocessing.cpu_count()
+                    cmd.extend(["-threads", str(cpu_count)])
+                    logger.info(f"设置CPU线程数为: {cpu_count}")
+            elif system == "Darwin":  # macOS
+                cmd.extend(["-hwaccel", "videotoolbox"])
+                hw_accel_used = True
+                logger.info("已启用macOS VideoToolbox硬件加速")
+
+        # 添加输入文件
+        cmd.extend([
             "-i",
             video_path,
-            "-vf",
-            f"subtitles={srt_path}:fontsdir={fonts_dir}:force_style='Fontname={font_name},FontSize=16,FontWeight=500,PrimaryColour=&HFFFFFF,OutlineColour=&H383838,BorderStyle=1,Outline=0.6,MarginV=20'",
-            "-c:a",
-            "copy",
+        ])
+        
+        # 字幕滤镜设置
+        if hw_accel_used and platform.system() == "Linux":
+            # 对于GPU加速，需要在硬件和软件处理之间进行转换
+            # 使用更高效的方式处理字幕，避免多次格式转换
+            subtitle_filter = f"hwdownload,format=nv12,subtitles={srt_path}:fontsdir={fonts_dir}:force_style='Fontname={font_name},FontSize=16,FontWeight=500,PrimaryColour=&HFFFFFF,OutlineColour=&H383838,BorderStyle=1,Outline=0.6,MarginV=20',hwupload_cuda"
+            
+            # 添加额外的高效处理选项
+            cmd.extend([
+                "-rc-lookahead", "20",      # 速率控制预测帧数
+                "-g", "120",                # GOP大小，降低关键帧频率
+                "-strict", "experimental"   # 允许使用实验性质的编码选项
+            ])
+        else:
+            subtitle_filter = f"subtitles={srt_path}:fontsdir={fonts_dir}:force_style='Fontname={font_name},FontSize=16,FontWeight=500,PrimaryColour=&HFFFFFF,OutlineColour=&H383838,BorderStyle=1,Outline=0.6,MarginV=20'"
+        
+        # 添加滤镜和音频复制设置
+        cmd.extend([
+            "-vf", subtitle_filter,
+            "-c:a", "copy",
             "-y",  # 覆盖已存在的文件
-            output_path,
-        ]
+        ])
+        
+        # 如果使用GPU，添加对应的视频编码器
+        if hw_accel_used:
+            system = platform.system()
+            if system == "Linux":
+                # 对于Linux，使用NVIDIA GPU硬件编码
+                # 基础编码器设置
+                encoder_params = ["-c:v", "h264_nvenc", "-preset", "p1"]
+                
+                if gpu_memory and gpu_memory["free"] > 5000:  # 如果有超过5GB可用内存
+                    # 优化的设置，保持质量但减小文件大小
+                    encoder_params.extend([
+                        "-profile:v", "high",
+                        "-tune", "hq",
+                        "-b:v", "2.5M",     # 更低的视频比特率
+                        "-maxrate", "128M",    # 降低最大比特率
+                        "-bufsize", "128M",    # 适当的缓冲区
+                        "-rc", "constqp",    # 使用恒定量化参数模式
+                        "-qp", "26",         # 量化参数 (较高=更小文件，较低=更高质量)
+                        "-spatial_aq", "1",
+                        "-temporal_aq", "1",
+                        "-rc-lookahead", "1000"
+                    ])
+                    logger.info("使用优化质量编码设置（平衡大小与质量）")
+                else:
+                    # 轻量级设置，适用于内存有限的情况
+                    encoder_params.extend([
+                        "-profile:v", "main",
+                        "-tune", "ll",       # 低延迟模式
+                        "-b:v", "2M",
+                        "-maxrate", "3M",
+                        "-bufsize", "3M",
+                        "-rc", "constqp",
+                        "-qp", "26",
+                        "-spatial_aq", "1",
+                        "-rc-lookahead", "10"
+                    ])
+                    logger.info("使用轻量级编码设置（优化文件大小）")
+                
+                cmd.extend(encoder_params)
+            elif system == "Darwin":  # macOS
+                # 对于macOS，使用VideoToolbox硬件编码，优化大小
+                cmd.extend([
+                    "-c:v", "h264_videotoolbox", 
+                    "-b:v", "2.5M",             # 降低比特率
+                    "-maxrate", "3.5M",
+                    "-q:v", "75",               # 增加q值以减小文件大小 (VideoToolbox的q值范围为1-100)
+                    "-allow_sw", "1",           # 允许软件回退
+                    "-profile:v", "main",       # 使用main配置文件
+                    "-pix_fmt", "yuv420p"       # 使用更高效的像素格式
+                ])
+                logger.info("使用macOS VideoToolbox硬件加速（优化文件大小）")
+        
+        # 添加输出文件路径
+        cmd.append(output_path)
 
         # 执行ffmpeg命令
         logger.info(f"正在处理视频: {os.path.basename(video_path)}")
         logger.info(f"使用字幕: {os.path.basename(srt_path)}")
         logger.info(f"使用字体: {font_name}")
+        logger.info(f"FFmpeg命令: {' '.join(cmd)}")
 
         process = subprocess.run(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
@@ -144,6 +295,10 @@ def add_subtitle_to_video(video_path, srt_path, output_path, language):
             return True
         else:
             logger.error(f"添加字幕失败: {process.stderr}")
+            # 如果使用GPU加速失败，尝试回退到CPU模式
+            if use_gpu:
+                logger.warning("GPU加速失败，尝试使用CPU模式重新处理...")
+                return add_subtitle_to_video(video_path, srt_path, output_path, language, False)
             return False
 
     except Exception as e:
@@ -151,7 +306,7 @@ def add_subtitle_to_video(video_path, srt_path, output_path, language):
         return False
 
 
-def process_video(channel, video_name, language, force=False):
+def process_video(channel, video_name, language, force=False, use_gpu=False):
     """处理单个视频的字幕添加"""
     # 构建输入视频文件路径
     input_video_path = os.path.join(
@@ -185,11 +340,11 @@ def process_video(channel, video_name, language, force=False):
 
     # 为视频添加字幕
     return add_subtitle_to_video(
-        input_video_path, input_srt_path, output_video_path, language
+        input_video_path, input_srt_path, output_video_path, language, use_gpu
     )
 
 
-def process_all_videos(languages=None, force=False):
+def process_all_videos(languages=None, force=False, use_gpu=False):
     """处理所有频道的所有视频（顺序处理）"""
     if languages is None:
         languages = SUPPORTED_LANGUAGES
@@ -278,7 +433,7 @@ def process_all_videos(languages=None, force=False):
         logger.info(f"处理任务 {i}/{total_tasks}: {channel}/{video_name}/{language}")
 
         try:
-            if process_video(channel, video_name, language, force):
+            if process_video(channel, video_name, language, force, use_gpu):
                 logger.info(f"成功处理 {channel}/{video_name}/{language}")
                 success_count += 1
             else:
@@ -312,6 +467,9 @@ def main():
     parser.add_argument(
         "-s", "--single", type=str, help="只处理指定的单个视频，格式: 频道名/视频名"
     )
+    parser.add_argument(
+        "--gpu", action="store_true", help="使用GPU加速ffmpeg处理"
+    )
 
     # 解析命令行参数
     args = parser.parse_args()
@@ -325,10 +483,12 @@ def main():
         channel, video_name = args.single.split("/", 1)
 
         logger.info(f"处理单个视频: {channel}/{video_name}")
+        if args.gpu:
+            logger.info("已启用GPU加速")
 
         success_count = 0
         for language in args.languages:
-            if process_video(channel, video_name, language, args.force):
+            if process_video(channel, video_name, language, args.force, args.gpu):
                 success_count += 1
 
         logger.info(
@@ -337,7 +497,9 @@ def main():
     else:
         # 处理所有频道和视频
         start_time = time.time()
-        process_all_videos(args.languages, args.force)
+        if args.gpu:
+            logger.info("已启用GPU加速")
+        process_all_videos(args.languages, args.force, args.gpu)
         end_time = time.time()
         logger.info(f"所有处理完成，总耗时: {end_time - start_time:.2f}秒")
 
