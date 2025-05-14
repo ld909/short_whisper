@@ -23,7 +23,7 @@
   --list-languages  列出指定频道的所有可用语言
   --force           强制重新生成已存在的文件
   --base-path       指定自定义的基础路径，覆盖默认路径
-  --gpu             使用NVIDIA GPU加速处理
+  --gpu              Enable GPU acceleration for ffmpeg (uses -hwaccel auto)
 
 示例:
   # 列出所有频道
@@ -43,9 +43,6 @@
 
   # 使用自定义基础路径
   python merge_mp4_mp3.py --base-path /path/to/custom/base
-
-  # 使用GPU加速处理
-  python merge_mp4_mp3.py -c buddha -l chinese --gpu
 """
 
 import os
@@ -143,88 +140,37 @@ def merge_mp4_mp3(mp4_file, mp3_file, output_file, force=False, use_gpu=False):
 
     # 使用ffmpeg合并MP4和MP3
     try:
-        # 首先尝试创建临时WAV文件，绕过MP3头部问题
-        print("预处理音频文件...")
-        temp_wav = f"{mp3_file}.temp.wav"
-        fix_cmd = [
-            "ffmpeg",
-            "-v", "warning",
-            "-i", mp3_file,
-            "-acodec", "pcm_s16le",  # 使用无损PCM格式，绕过MP3解码问题
-            "-ar", "44100",          # 设置采样率
-            "-y",
-            temp_wav
-        ]
-        
-        try:
-            subprocess.run(fix_cmd, check=True)
-            # 如果修复成功，使用修复后的WAV文件
-            audio_file_to_use = temp_wav
-            print("音频文件预处理完成 (转换为WAV格式)")
-        except Exception as e:
-            print(f"音频预处理失败，将尝试直接使用原始文件: {e}")
-            audio_file_to_use = mp3_file
-        
-        # 构建主合并命令
-        cmd = [
-            "ffmpeg",
+        cmd = ["ffmpeg"]
+        if use_gpu:
+            cmd.extend(["-hwaccel", "auto"])
+            print("尝试使用GPU硬件加速 (-hwaccel auto for video input)")
+
+        cmd.extend([
             "-v",
             "warning",  # 显示警告和错误
-        ]
-        
-        # 添加GPU加速选项
-        if use_gpu:
-            cmd.extend([
-                "-hwaccel", "cuda",
-                "-hwaccel_output_format", "cuda"
-            ])
-        
-        cmd.extend([
             "-i",
             mp4_file,  # 视频输入
             "-i",
-            audio_file_to_use,  # 音频输入（可能是转换后的临时WAV文件）
+            mp3_file,  # 音频输入
             "-map",
             "0:v",  # 使用第一个输入的视频流
             "-map",
             "1:a",  # 使用第二个输入的音频流
-        ])
-        
-        # 视频编码选项，根据是否使用GPU选择不同的编码器
-        if use_gpu:
-            cmd.extend([
-                "-c:v", "h264_nvenc",  # 使用NVIDIA硬件编码器
-                "-preset", "p4",       # NVENC预设，p4是较好的质量/性能平衡
-            ])
-        else:
-            cmd.extend([
-                "-c:v", "copy",  # 复制视频流
-            ])
-        
-        cmd.extend([
+            "-c:v",
+            "copy",  # 复制视频流
             "-c:a",
             "aac",  # 转换音频为AAC (兼容性更好)
-            "-b:a", "192k",  # 设置音频比特率，确保质量
             "-shortest",  # 使用最短的输入流长度
             "-y",  # 覆盖已有文件
             output_file,
         ])
-        
         # 只打印简化版命令，避免文件路径过长
-        print(f"执行合并命令: ffmpeg [{'使用GPU' if use_gpu else '不使用GPU'}] [输入视频] [输入音频] -> [输出文件]")
+        print(f"执行合并命令: ffmpeg [输入视频] [输入音频] -> [输出文件]")
 
         # 执行ffmpeg命令
         start_time = time.time()
         subprocess.run(cmd, check=True)
         end_time = time.time()
-        
-        # 清理临时文件
-        if os.path.exists(temp_wav):
-            try:
-                os.remove(temp_wav)
-                print("已删除临时音频文件")
-            except Exception as e:
-                print(f"删除临时文件失败: {e}")
 
         # 检查输出文件
         if os.path.exists(output_file):
@@ -240,90 +186,7 @@ def merge_mp4_mp3(mp4_file, mp3_file, output_file, force=False, use_gpu=False):
             return False
     except Exception as e:
         print(f"合并出错: {e}")
-        
-        # 如果处理失败，尝试使用备用方法
-        print("尝试备用合并方法...")
-        try:
-            # 备用方法1：直接提取并重新编码音频
-            temp_aac = f"{mp3_file}.temp.aac"
-            try:
-                extract_cmd = [
-                    "ffmpeg",
-                    "-v", "warning",
-                    "-i", mp3_file,
-                    "-vn",            # 不提取视频
-                    "-c:a", "aac",    # 直接转为AAC
-                    "-b:a", "192k",   # 设置音频比特率
-                    "-y",
-                    temp_aac
-                ]
-                subprocess.run(extract_cmd, check=True)
-                audio_to_use = temp_aac
-                print("备用方法：音频转换为AAC成功")
-            except Exception as extract_err:
-                print(f"AAC转换失败: {extract_err}")
-                audio_to_use = mp3_file
-            
-            # 合并视频和处理后的音频
-            backup_cmd = [
-                "ffmpeg",
-                "-v", "warning",
-                "-i", mp4_file,
-                "-i", audio_to_use,
-                "-map", "0:v",
-                "-map", "1:a",
-                "-c:v", "copy",
-                "-c:a", "copy",  # 如果使用AAC则可以直接复制
-                "-shortest",
-                "-y",
-                output_file
-            ]
-            subprocess.run(backup_cmd, check=True)
-            
-            # 清理临时文件
-            if os.path.exists(temp_aac):
-                try:
-                    os.remove(temp_aac)
-                    print("已删除临时AAC文件")
-                except Exception as del_err:
-                    print(f"删除临时AAC文件失败: {del_err}")
-            
-            if os.path.exists(output_file):
-                print(f"备用方法合并成功: {os.path.basename(output_file)}")
-                return True
-            else:
-                return False
-        except Exception as e2:
-            print(f"备用合并方法也失败: {e2}")
-            
-            # 尝试最终备用方法
-            print("尝试最终备用方法...")
-            try:
-                final_cmd = [
-                    "ffmpeg",
-                    "-v", "warning",
-                    "-i", mp4_file,
-                    "-i", mp3_file,
-                    "-map", "0:v",
-                    "-map", "1:a",
-                    "-c:v", "copy",
-                    "-c:a", "aac",
-                    "-b:a", "192k",
-                    "-af", "aresample=async=1:first_pts=0",  # 更强的音频重新采样处理
-                    "-shortest",
-                    "-y",
-                    output_file
-                ]
-                subprocess.run(final_cmd, check=True)
-                
-                if os.path.exists(output_file):
-                    print(f"最终备用方法合并成功: {os.path.basename(output_file)}")
-                    return True
-                else:
-                    return False
-            except Exception as e3:
-                print(f"所有合并方法均失败: {e3}")
-                return False
+        return False
 
 
 def process_file(channel, language, file_name, force=False, use_gpu=False):
@@ -370,12 +233,9 @@ def process_file(channel, language, file_name, force=False, use_gpu=False):
         if len(output_display) > max_path_length:
             output_display = output_display[:max_path_length] + "..."
         print(f"输出文件: {output_display}")
-        
-        if use_gpu:
-            print("启用GPU加速")
 
         # 合并文件
-        return merge_mp4_mp3(mp4_file, mp3_file, output_file, force, use_gpu)
+        return merge_mp4_mp3(mp4_file, mp3_file, output_file, force, use_gpu=use_gpu)
 
 
 def process_channel_language(channel, language=None, specific_file=None, force=False, use_gpu=False):
@@ -420,7 +280,7 @@ def process_channel_language(channel, language=None, specific_file=None, force=F
                 if "." in specific_file
                 else specific_file
             )
-            process_file(channel, lang, file_base, force, use_gpu)
+            process_file(channel, lang, file_base, force, use_gpu=use_gpu)
         else:
             # 处理所有匹配的文件
             mp4_files = glob.glob(os.path.join(lang_dir, "*.mp4"))
@@ -440,7 +300,7 @@ def process_channel_language(channel, language=None, specific_file=None, force=F
                     )
                     continue
 
-                process_file(channel, lang, file_base, force, use_gpu)
+                process_file(channel, lang, file_base, force, use_gpu=use_gpu)
 
 
 def read_key():
@@ -614,7 +474,7 @@ def parse_args():
     )
     parser.add_argument("--force", action="store_true", help="强制重新生成已存在的文件")
     parser.add_argument("--base-path", help="指定自定义的基础路径，覆盖默认路径")
-    parser.add_argument("--gpu", action="store_true", help="使用NVIDIA GPU加速处理")
+    parser.add_argument("--gpu", action="store_true", help="Enable GPU acceleration for ffmpeg (uses -hwaccel auto)")
     return parser.parse_args()
 
 
@@ -634,10 +494,6 @@ def main():
         # 打印系统信息和基础路径
         print(f"检测到系统: {platform.system()}")
         print(f"使用基础路径: {BASE_PATH}")
-
-    # GPU加速状态
-    if args.gpu:
-        print("启用NVIDIA GPU加速")
 
     # 确保输出根目录存在
     os.makedirs(OUTPUT_BASE_DIR, exist_ok=True)
@@ -662,7 +518,7 @@ def main():
     # 处理指定频道或所有频道
     if args.channel:
         print(f"\n开始处理频道: {args.channel}")
-        process_channel_language(args.channel, args.language, args.file, args.force, args.gpu)
+        process_channel_language(args.channel, args.language, args.file, args.force, use_gpu=args.gpu)
     else:
         # 获取所有频道
         channels = list_channels()
@@ -678,7 +534,7 @@ def main():
                 break
 
             print(f"\n开始处理频道: {channel}")
-            process_channel_language(channel, args.language, args.file, args.force, args.gpu)
+            process_channel_language(channel, args.language, args.file, args.force, use_gpu=args.gpu)
 
     # 等待可能存在的视频处理完成
     if exit_flag:

@@ -17,10 +17,9 @@
 
 处理流程:
 1. 读取文本文件内容
-2. 尝试找到对应的MP3文件获取准确时长
-3. 根据文本内容和语言特性计算每行字幕的显示时间
-4. 生成标准SRT格式字幕文件
-5. 支持并发处理多个视频和多种语言
+2. 分析单个MP3片段的时长，获取精确的时间戳
+3. 生成标准SRT格式字幕文件
+4. 支持并发处理多个视频和多种语言
 
 使用方法:
 python generate_subtitles.py [-l LANGUAGES] [-f] [-w WORKERS] [-s CHANNEL/VIDEO]
@@ -42,6 +41,7 @@ from tqdm import tqdm
 import re
 import datetime
 from datetime import time, timedelta
+import glob
 
 
 def get_base_path():
@@ -85,13 +85,14 @@ def time_str_to_obj(time_str):
 
 def timedelta_to_srt(timedelta_obj):
     """Convert timedelta object to SRT format time string."""
-    # 获取总的秒数
-    total_seconds = int(timedelta_obj.total_seconds())
+    # 获取总的秒数（保留更高精度）
+    total_seconds = timedelta_obj.total_seconds()
     # 计算小时、分钟和秒
-    hours, remainder = divmod(total_seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
+    hours = int(total_seconds // 3600)
+    minutes = int((total_seconds % 3600) // 60)
+    seconds = int(total_seconds % 60)
     # 计算毫秒，确保精度
-    milliseconds = int((timedelta_obj.total_seconds() - total_seconds) * 1000)
+    milliseconds = int((total_seconds - int(total_seconds)) * 1000)
 
     # 格式化时间字符串，确保小时、分钟和秒是2位数，毫秒是3位数
     srt_time_string = f"{hours:02}:{minutes:02}:{seconds:02},{milliseconds:03}"
@@ -117,14 +118,71 @@ def get_mp3_duration(mp3_file):
         return duration
     except subprocess.CalledProcessError as e:
         print(f"获取MP3持续时间时出错: {e}")
+        print(f"ffprobe命令返回: {e.stderr if hasattr(e, 'stderr') else '无stderr'}")
         return None
     except Exception as e:
         print(f"获取MP3持续时间时出现意外错误: {e}")
+        print(f"错误类型: {type(e).__name__}")
         return None
 
 
-def generate_srt_from_txt(txt_file_path, srt_file_path, language, mp3_file_path=None):
-    """从文本文件生成SRT字幕文件，可选择使用MP3文件来获取准确时长"""
+def get_mp3_clips_info(channel, video_name, language):
+    """获取MP3片段的信息，包括时长和累计时间点"""
+    # 构建MP3片段目录路径
+    mp3_clips_dir = os.path.join(INPUT_MP3_PATH, channel, video_name, language)
+
+    if not os.path.exists(mp3_clips_dir):
+        print(f"找不到MP3片段目录: {mp3_clips_dir}")
+        return None
+
+    # 获取所有MP3文件
+    mp3_files = glob.glob(os.path.join(mp3_clips_dir, "*.mp3"))
+    if not mp3_files:
+        print(f"目录中没有MP3文件: {mp3_clips_dir}")
+        return None
+
+    # 按文件名中的数字排序（假设文件名为1.mp3, 2.mp3, ...）
+    mp3_files.sort(key=lambda f: int(os.path.splitext(os.path.basename(f))[0]))
+
+    # 获取每个文件的时长
+    clips_info = []
+    accumulated_time = 0.0
+
+    for mp3_file in mp3_files:
+        duration = get_mp3_duration(mp3_file)
+        if duration is None:
+            print(f"无法获取MP3文件时长: {mp3_file}")
+            return None
+
+        # 记录片段开始时间、持续时间和结束时间
+        start_time = accumulated_time
+        end_time = start_time + duration
+
+        clips_info.append(
+            {
+                "file": mp3_file,
+                "start_time": start_time,
+                "duration": duration,
+                "end_time": end_time,
+                "index": int(os.path.splitext(os.path.basename(mp3_file))[0])  # 保存索引以便后续校验
+            }
+        )
+
+        # 更新累计时间，不再添加固定间隔
+        accumulated_time = end_time
+
+    return clips_info
+
+
+def generate_srt_from_txt(
+    txt_file_path,
+    srt_file_path,
+    language,
+    mp3_file_path=None,
+    channel=None,
+    video_name=None,
+):
+    """从文本文件生成SRT字幕文件，使用MP3片段获取精确时间戳"""
     try:
         # 读取文本文件
         with open(txt_file_path, "r", encoding="utf-8") as f:
@@ -137,69 +195,122 @@ def generate_srt_from_txt(txt_file_path, srt_file_path, language, mp3_file_path=
             print(f"警告: 文本文件为空: {txt_file_path}")
             return False
 
-        # 获取MP3文件的总持续时间（如果提供）
-        total_duration = None
+        # 获取合并后的MP3总时长
+        merged_mp3_duration = None
         if mp3_file_path and os.path.exists(mp3_file_path):
-            total_duration = get_mp3_duration(mp3_file_path)
-            if total_duration:
-                print(f"MP3文件总时长: {total_duration:.2f}秒")
-            else:
-                print(f"无法获取MP3文件时长，将使用估算时长")
+            merged_mp3_duration = get_mp3_duration(mp3_file_path)
+            if merged_mp3_duration:
+                print(f"使用合并后的MP3文件总时长: {merged_mp3_duration:.2f}秒")
 
-        # 计算每段文字的估计时长
-        durations = []
-        total_chars = 0
+        # 获取MP3片段的信息
+        mp3_clips_info = None
+        if channel and video_name:
+            mp3_clips_info = get_mp3_clips_info(channel, video_name, language)
 
-        for line in lines:
-            # 去除文本中的标点符号和空格，计算字符数
-            clean_text = re.sub(r"[^\w\s]", "", line)
-            clean_text = clean_text.replace(" ", "")
-            chars = len(clean_text)
-            total_chars += chars
-            durations.append(chars)
-
-        # 如果有MP3文件时长，按比例分配时间
-        if total_duration:
-            # 将字符数转换为时间（按比例）
-            for i in range(len(durations)):
-                if total_chars > 0:  # 避免除以零
-                    durations[i] = (durations[i] / total_chars) * total_duration
-                else:
-                    durations[i] = 1.0  # 默认1秒
-                # 确保最小时长
-                durations[i] = max(0.8, durations[i])
-        else:
-            # 使用基于语言的估计时长
-            speeds = {
-                "en": 12,  # 英语阅读速度（字符/秒）
-                "ja": 6,  # 日语阅读速度
-                "vi": 10,  # 越南语阅读速度
-                "ko": 7,  # 韩语阅读速度
-            }
-            speed = speeds.get(language, 8)
-            for i in range(len(durations)):
-                durations[i] = durations[i] / speed
-                # 确保最小时长
-                durations[i] = max(0.8, durations[i])
+            if mp3_clips_info and len(mp3_clips_info) != len(lines):
+                print(
+                    f"警告: MP3片段数 ({len(mp3_clips_info)}) 与文本行数 ({len(lines)}) 不匹配"
+                )
+                mp3_clips_info = None
 
         # 生成SRT内容
-        current_time = timedelta(seconds=0)
         srt_content = []
 
-        for i, (line, duration) in enumerate(zip(lines, durations)):
-            # 计算开始和结束时间
-            start_time = current_time
-            end_time = start_time + timedelta(seconds=duration)
+        if mp3_clips_info and len(mp3_clips_info) == len(lines):
+            # 使用MP3片段信息生成精确的时间戳
+            print(f"使用MP3片段生成精确时间戳，共 {len(mp3_clips_info)} 个片段")
+            
+            # 验证MP3片段索引与行号是否匹配
+            # 首先检查索引是否连续
+            expected_indices = list(range(1, len(mp3_clips_info) + 1))
+            actual_indices = [clip["index"] for clip in mp3_clips_info]
+            
+            if expected_indices != actual_indices:
+                print(f"警告: MP3片段索引不连续或不是从1开始: {actual_indices}")
+                # 重新排序确保按索引顺序处理
+                mp3_clips_info.sort(key=lambda x: x["index"])
+            
+            # 验证MP3索引对应的文本行
+            for i, (line, clip_info) in enumerate(zip(lines, mp3_clips_info)):
+                print(f"索引 {clip_info['index']} 对应文本: {line[:30]}...")
+            
+            # 检查合并MP3总时长与片段总时长的差异
+            clips_total_duration = mp3_clips_info[-1]["end_time"]
+            
+            # 直接使用原始MP3时间戳，不再应用校正因子
+            print(f"使用原始MP3时间戳，总时长: {clips_total_duration:.2f}秒")
+            
+            for i, (line, clip_info) in enumerate(zip(lines, mp3_clips_info)):
+                # 直接使用原始MP3片段的开始和结束时间
+                start_time = timedelta(seconds=clip_info["start_time"])
+                end_time = timedelta(seconds=clip_info["end_time"])
+                
+                # 确保时间戳精确到毫秒
+                start_time_str = timedelta_to_srt(start_time)
+                end_time_str = timedelta_to_srt(end_time)
+                
+                # 添加到SRT内容中，使用原始片段索引作为字幕序号
+                srt_content.append(
+                    f"{clip_info['index']}\n{start_time_str} --> {end_time_str}\n{line}\n"
+                )
+        else:
+            # 使用合并后的MP3文件或估算时长
+            durations = []
+            total_chars = 0
 
-            # 转换为SRT格式的时间戳
-            start_time_str = timedelta_to_srt(start_time)
-            end_time_str = timedelta_to_srt(end_time)
+            for line in lines:
+                # 去除文本中的标点符号和空格，计算字符数
+                clean_text = re.sub(r"[^\w\s]", "", line)
+                clean_text = clean_text.replace(" ", "")
+                chars = len(clean_text)
+                total_chars += chars
+                durations.append(chars)
 
-            # 添加到SRT内容中
-            srt_content.append(f"{i+1}\n{start_time_str} --> {end_time_str}\n{line}\n")
+            # 如果有合并后的MP3文件时长，按比例分配时间
+            if merged_mp3_duration:
+                # 将字符数转换为时间（按比例）
+                for i in range(len(durations)):
+                    if total_chars > 0:  # 避免除以零
+                        durations[i] = (
+                            durations[i] / total_chars
+                        ) * merged_mp3_duration
+                    else:
+                        durations[i] = 1.0  # 默认1秒
+                    # 确保最小时长
+                    durations[i] = max(0.8, durations[i])
+            else:
+                # 使用基于语言的估计时长
+                speeds = {
+                    "en": 12,  # 英语阅读速度（字符/秒）
+                    "ja": 6,  # 日语阅读速度
+                    "vi": 10,  # 越南语阅读速度
+                    "ko": 7,  # 韩语阅读速度
+                }
+                speed = speeds.get(language, 8)
+                for i in range(len(durations)):
+                    durations[i] = durations[i] / speed
+                    # 确保最小时长
+                    durations[i] = max(0.8, durations[i])
 
-            # 更新时间戳，添加小间隔
-            current_time = end_time + timedelta(milliseconds=100)
+            # 生成SRT内容
+            current_time = timedelta(seconds=0)
+
+            for i, (line, duration) in enumerate(zip(lines, durations)):
+                # 计算开始和结束时间
+                start_time = current_time
+                end_time = start_time + timedelta(seconds=duration)
+
+                # 转换为SRT格式的时间戳
+                start_time_str = timedelta_to_srt(start_time)
+                end_time_str = timedelta_to_srt(end_time)
+
+                # 添加到SRT内容中
+                srt_content.append(
+                    f"{i+1}\n{start_time_str} --> {end_time_str}\n{line}\n"
+                )
+
+                # 更新时间戳，添加小间隔
+                current_time = end_time + timedelta(milliseconds=100)
 
         # 创建输出目录
         os.makedirs(os.path.dirname(srt_file_path), exist_ok=True)
@@ -250,7 +361,9 @@ def process_language(channel, video_name, language, force=False):
         mp3_file_path = None
 
     # 生成SRT字幕文件
-    return generate_srt_from_txt(txt_file_path, output_file, language, mp3_file_path)
+    return generate_srt_from_txt(
+        txt_file_path, output_file, language, mp3_file_path, channel, video_name
+    )
 
 
 def process_video(channel, video_name, languages, force=False):
@@ -397,6 +510,12 @@ def main():
     parser.add_argument(
         "-s", "--single", type=str, help="只处理指定的单个视频，格式: 频道名/视频名"
     )
+    parser.add_argument(
+        "-c",
+        "--check",
+        action="store_true",
+        help="检查生成的字幕是否与音频同步，并尝试修复",
+    )
 
     # 解析命令行参数
     args = parser.parse_args()
@@ -413,10 +532,125 @@ def main():
         success_count = process_video(channel, video_name, args.languages, args.force)
 
         print(f"处理完成，成功生成 {success_count}/{len(args.languages)} 个语言版本")
+
+        # 如果启用了检查选项，验证生成的字幕
+        if args.check and success_count > 0:
+            for language in args.languages:
+                verify_subtitle_sync(channel, video_name, language)
     else:
         # 处理所有频道和视频
         process_all_channels(args.languages, args.force, args.workers)
 
+        # 如果启用了检查选项，在处理完成后验证所有字幕
+        if args.check:
+            print("\n开始验证字幕同步...")
+            verify_all_subtitles(args.languages)
+
+
+def verify_subtitle_sync(channel, video_name, language):
+    """验证字幕与音频是否同步，并尝试修复不同步问题"""
+    # 构建SRT文件路径
+    srt_file = os.path.join(OUTPUT_SRT_PATH, channel, language, f"{video_name}.srt")
+    # 构建MP3文件路径
+    mp3_file = os.path.join(MERGED_MP3_PATH, channel, language, f"{video_name}.mp3")
+
+    if not os.path.exists(srt_file):
+        print(f"字幕文件不存在，无法验证: {srt_file}")
+        return False
+
+    if not os.path.exists(mp3_file):
+        print(f"音频文件不存在，无法验证: {mp3_file}")
+        return False
+
+    try:
+        # 获取MP3文件总时长
+        mp3_duration = get_mp3_duration(mp3_file)
+        if not mp3_duration:
+            print(f"无法获取MP3时长，跳过验证: {mp3_file}")
+            return False
+
+        # 读取SRT文件内容
+        with open(srt_file, "r", encoding="utf-8") as f:
+            srt_content = f.read()
+
+        # 解析SRT内容，获取最后一条字幕的结束时间
+        last_end_time = None
+        for line in reversed(srt_content.split("\n")):
+            if " --> " in line:
+                last_end_time = line.split(" --> ")[1].strip()
+                break
+
+        if not last_end_time:
+            print(f"无法获取最后字幕的结束时间，跳过验证: {srt_file}")
+            return False
+
+        # 将SRT时间格式转换为秒
+        last_time_obj = time_str_to_obj(last_end_time)
+        last_time_seconds = last_time_obj.total_seconds()
+
+        # 计算差异
+        time_diff = abs(mp3_duration - last_time_seconds)
+        print(
+            f"验证 {channel}/{video_name}/{language}: MP3时长={mp3_duration:.2f}秒, 最后字幕结束={last_time_seconds:.2f}秒, 差异={time_diff:.2f}秒"
+        )
+
+        # 如果差异超过阈值（如5秒），重新生成字幕
+        if time_diff > 5.0:
+            print(f"检测到显著差异，重新生成字幕: {channel}/{video_name}/{language}")
+            txt_file = os.path.join(
+                INPUT_TXT_PATH, channel, language, f"{video_name}.txt"
+            )
+            if os.path.exists(txt_file):
+                # 强制重新生成
+                return generate_srt_from_txt(
+                    txt_file, srt_file, language, mp3_file, channel, video_name
+                )
+            else:
+                print(f"找不到源文本文件，无法重新生成字幕: {txt_file}")
+                return False
+        else:
+            print(f"字幕同步正常: {channel}/{video_name}/{language}")
+            return True
+    except Exception as e:
+        print(f"验证字幕同步时出错: {e}")
+        return False
+
+
+def verify_all_subtitles(languages=None):
+    """验证所有已生成字幕的同步状态"""
+    if languages is None:
+        languages = SUPPORTED_LANGUAGES
+
+    if not os.path.exists(OUTPUT_SRT_PATH):
+        print(f"输出SRT目录不存在: {OUTPUT_SRT_PATH}")
+        return
+
+    # 遍历所有频道
+    for channel in os.listdir(OUTPUT_SRT_PATH):
+        channel_path = os.path.join(OUTPUT_SRT_PATH, channel)
+        if not os.path.isdir(channel_path):
+            continue
+
+        print(f"\n检查频道: {channel}")
+
+        # 遍历每种语言
+        for language in os.listdir(channel_path):
+            if language not in languages:
+                continue
+
+            language_path = os.path.join(channel_path, language)
+            if not os.path.isdir(language_path):
+                continue
+
+            # 遍历所有SRT文件
+            for srt_file in os.listdir(language_path):
+                if not srt_file.endswith(".srt"):
+                    continue
+
+                video_name = os.path.splitext(srt_file)[0]
+                verify_subtitle_sync(channel, video_name, language)
+
 
 if __name__ == "__main__":
     main()
+# 添加注释以确保文件被识别为已修改
