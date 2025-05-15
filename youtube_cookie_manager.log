@@ -1,1 +1,0 @@
-2025-05-07 00:58:47,035 - manual_cookie - ERROR - 准备 Cookie 过程中出错: YouTubeCookieManager.__init__() got an unexpected keyword argument 'browser_type'
