@@ -98,34 +98,40 @@ def check_nvidia_gpu():
     """检查系统是否有NVIDIA GPU可用，以及获取GPU内存信息"""
     if platform.system() != "Linux":
         return False, None
-    
+
     try:
         # 检查nvidia-smi命令是否可用
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.total,memory.free", "--format=csv,noheader,nounits"],
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.total,memory.free",
+                "--format=csv,noheader,nounits",
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
         )
-        
+
         if result.returncode != 0:
             logger.warning("nvidia-smi命令不可用，无法使用NVIDIA GPU硬件加速")
             return False, None
-        
+
         # 解析GPU内存信息
-        lines = result.stdout.strip().split('\n')
+        lines = result.stdout.strip().split("\n")
         if not lines:
             return False, None
-            
+
         # 获取第一个GPU的信息
-        parts = lines[0].strip().split(',')
+        parts = lines[0].strip().split(",")
         if len(parts) >= 2:
             total_memory = int(parts[0].strip())
             free_memory = int(parts[1].strip())
-            
-            logger.info(f"检测到NVIDIA GPU，总内存: {total_memory}MB，可用内存: {free_memory}MB")
+
+            logger.info(
+                f"检测到NVIDIA GPU，总内存: {total_memory}MB，可用内存: {free_memory}MB"
+            )
             return True, {"total": total_memory, "free": free_memory}
-        
+
         return False, None
     except Exception as e:
         logger.warning(f"检查NVIDIA GPU时出错: {str(e)}")
@@ -159,11 +165,11 @@ def add_subtitle_to_video(video_path, srt_path, output_path, language, use_gpu=F
 
         # 基础ffmpeg命令
         cmd = ["ffmpeg"]
-        
+
         # GPU加速相关变量
         hw_accel_used = False
         gpu_memory = None
-        
+
         # 如果启用GPU，添加相应的硬件加速选项
         if use_gpu:
             system = platform.system()
@@ -173,17 +179,16 @@ def add_subtitle_to_video(video_path, srt_path, output_path, language, use_gpu=F
                 if has_gpu:
                     gpu_memory = memory_info
                     # 使用CUDA硬件加速解码
-                    cmd.extend([
-                        "-hwaccel", "cuda",
-                        "-hwaccel_output_format", "cuda"
-                    ])
-                    
+                    cmd.extend(["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"])
+
                     # 根据GPU内存大小设置额外帧数
-                    if memory_info and memory_info["free"] > 4000:  # 如果有超过4GB可用内存
+                    if (
+                        memory_info and memory_info["free"] > 4000
+                    ):  # 如果有超过4GB可用内存
                         cmd.extend(["-extra_hw_frames", "5"])
                     else:
                         cmd.extend(["-extra_hw_frames", "3"])
-                        
+
                     hw_accel_used = True
                     logger.info("已启用NVIDIA GPU硬件加速")
                 else:
@@ -198,33 +203,44 @@ def add_subtitle_to_video(video_path, srt_path, output_path, language, use_gpu=F
                 logger.info("已启用macOS VideoToolbox硬件加速")
 
         # 添加输入文件
-        cmd.extend([
-            "-i",
-            video_path,
-        ])
-        
+        cmd.extend(
+            [
+                "-i",
+                video_path,
+            ]
+        )
+
         # 字幕滤镜设置
         if hw_accel_used and platform.system() == "Linux":
             # 对于GPU加速，需要在硬件和软件处理之间进行转换
             # 使用更高效的方式处理字幕，避免多次格式转换
             subtitle_filter = f"hwdownload,format=nv12,subtitles={srt_path}:fontsdir={fonts_dir}:force_style='Fontname={font_name},FontSize=16,FontWeight=500,PrimaryColour=&HFFFFFF,OutlineColour=&H383838,BorderStyle=1,Outline=0.6,MarginV=20',hwupload_cuda"
-            
+
             # 添加额外的高效处理选项
-            cmd.extend([
-                "-rc-lookahead", "20",      # 速率控制预测帧数
-                "-g", "120",                # GOP大小，降低关键帧频率
-                "-strict", "experimental"   # 允许使用实验性质的编码选项
-            ])
+            cmd.extend(
+                [
+                    "-rc-lookahead",
+                    "20",  # 速率控制预测帧数
+                    "-g",
+                    "120",  # GOP大小，降低关键帧频率
+                    "-strict",
+                    "experimental",  # 允许使用实验性质的编码选项
+                ]
+            )
         else:
             subtitle_filter = f"subtitles={srt_path}:fontsdir={fonts_dir}:force_style='Fontname={font_name},FontSize=16,FontWeight=500,PrimaryColour=&HFFFFFF,OutlineColour=&H383838,BorderStyle=1,Outline=0.6,MarginV=20'"
-        
+
         # 添加滤镜和音频复制设置
-        cmd.extend([
-            "-vf", subtitle_filter,
-            "-c:a", "copy",
-            "-y",  # 覆盖已存在的文件
-        ])
-        
+        cmd.extend(
+            [
+                "-vf",
+                subtitle_filter,
+                "-c:a",
+                "copy",
+                "-y",  # 覆盖已存在的文件
+            ]
+        )
+
         # 如果使用GPU，添加对应的视频编码器
         if hw_accel_used:
             system = platform.system()
@@ -232,51 +248,83 @@ def add_subtitle_to_video(video_path, srt_path, output_path, language, use_gpu=F
                 # 对于Linux，使用NVIDIA GPU硬件编码
                 # 基础编码器设置
                 encoder_params = ["-c:v", "h264_nvenc", "-preset", "p1"]
-                
+
                 if gpu_memory and gpu_memory["free"] > 5000:  # 如果有超过5GB可用内存
                     # 优化的设置，保持质量但减小文件大小
-                    encoder_params.extend([
-                        "-profile:v", "high",
-                        "-tune", "hq",
-                        "-b:v", "2.5M",     # 更低的视频比特率
-                        "-maxrate", "128M",    # 降低最大比特率
-                        "-bufsize", "128M",    # 适当的缓冲区
-                        "-rc", "constqp",    # 使用恒定量化参数模式
-                        "-qp", "26",         # 量化参数 (较高=更小文件，较低=更高质量)
-                        "-spatial_aq", "1",
-                        "-temporal_aq", "1",
-                        "-rc-lookahead", "1000"
-                    ])
+                    encoder_params.extend(
+                        [
+                            "-profile:v",
+                            "high",
+                            "-tune",
+                            "hq",
+                            "-b:v",
+                            "2.5M",  # 更低的视频比特率
+                            "-maxrate",
+                            "128M",  # 降低最大比特率
+                            "-bufsize",
+                            "128M",  # 适当的缓冲区
+                            "-rc",
+                            "constqp",  # 使用恒定量化参数模式
+                            "-qp",
+                            "26",  # 量化参数 (较高=更小文件，较低=更高质量)
+                            "-spatial_aq",
+                            "1",
+                            "-temporal_aq",
+                            "1",
+                            "-rc-lookahead",
+                            "1000",
+                        ]
+                    )
                     logger.info("使用优化质量编码设置（平衡大小与质量）")
                 else:
                     # 轻量级设置，适用于内存有限的情况
-                    encoder_params.extend([
-                        "-profile:v", "main",
-                        "-tune", "ll",       # 低延迟模式
-                        "-b:v", "2M",
-                        "-maxrate", "3M",
-                        "-bufsize", "3M",
-                        "-rc", "constqp",
-                        "-qp", "26",
-                        "-spatial_aq", "1",
-                        "-rc-lookahead", "10"
-                    ])
+                    encoder_params.extend(
+                        [
+                            "-profile:v",
+                            "main",
+                            "-tune",
+                            "ll",  # 低延迟模式
+                            "-b:v",
+                            "2M",
+                            "-maxrate",
+                            "3M",
+                            "-bufsize",
+                            "3M",
+                            "-rc",
+                            "constqp",
+                            "-qp",
+                            "26",
+                            "-spatial_aq",
+                            "1",
+                            "-rc-lookahead",
+                            "10",
+                        ]
+                    )
                     logger.info("使用轻量级编码设置（优化文件大小）")
-                
+
                 cmd.extend(encoder_params)
             elif system == "Darwin":  # macOS
                 # 对于macOS，使用VideoToolbox硬件编码，优化大小
-                cmd.extend([
-                    "-c:v", "h264_videotoolbox", 
-                    "-b:v", "2.5M",             # 降低比特率
-                    "-maxrate", "3.5M",
-                    "-q:v", "75",               # 增加q值以减小文件大小 (VideoToolbox的q值范围为1-100)
-                    "-allow_sw", "1",           # 允许软件回退
-                    "-profile:v", "main",       # 使用main配置文件
-                    "-pix_fmt", "yuv420p"       # 使用更高效的像素格式
-                ])
+                cmd.extend(
+                    [
+                        "-c:v",
+                        "h264_videotoolbox",
+                        "-b:v",
+                        "2.5M",  # 降低比特率
+                        "-maxrate",
+                        "3.5M",
+                        "-q:v",
+                        "75",  # 增加q值以减小文件大小 (VideoToolbox的q值范围为1-100)
+                        "-allow_sw",
+                        "1",  # 允许软件回退
+                        "-profile:v",
+                        "main",  # 使用main配置文件
+                        "-pix_fmt",
+                        "yuv420p",  # 使用更高效的像素格式
+                    ]
+                )
                 logger.info("使用macOS VideoToolbox硬件加速（优化文件大小）")
-        
+
         # 添加输出文件路径
         cmd.append(output_path)
 
@@ -298,7 +346,9 @@ def add_subtitle_to_video(video_path, srt_path, output_path, language, use_gpu=F
             # 如果使用GPU加速失败，尝试回退到CPU模式
             if use_gpu:
                 logger.warning("GPU加速失败，尝试使用CPU模式重新处理...")
-                return add_subtitle_to_video(video_path, srt_path, output_path, language, False)
+                return add_subtitle_to_video(
+                    video_path, srt_path, output_path, language, False
+                )
             return False
 
     except Exception as e:
@@ -368,7 +418,7 @@ def process_all_videos(languages=None, force=False, use_gpu=False):
     channels = [
         d
         for d in os.listdir(INPUT_MP4_PATH)
-        if os.path.isdir(os.path.join(INPUT_MP4_PATH, d))
+        if os.path.isdir(os.path.join(INPUT_MP4_PATH, d)) and not d.startswith(".")
     ]
 
     if not channels:
@@ -388,7 +438,9 @@ def process_all_videos(languages=None, force=False, use_gpu=False):
         lang_dirs = [
             d
             for d in os.listdir(channel_path)
-            if os.path.isdir(os.path.join(channel_path, d)) and d in languages
+            if os.path.isdir(os.path.join(channel_path, d))
+            and d in languages
+            and not d.startswith(".")
         ]
 
         if not lang_dirs:
@@ -399,8 +451,12 @@ def process_all_videos(languages=None, force=False, use_gpu=False):
         for lang in lang_dirs:
             lang_path = os.path.join(channel_path, lang)
 
-            # 获取该语言下的所有MP4文件
-            video_files = glob.glob(os.path.join(lang_path, "*.mp4"))
+            # 获取该语言下的所有MP4文件，过滤掉点开头的文件
+            video_files = [
+                f
+                for f in glob.glob(os.path.join(lang_path, "*.mp4"))
+                if not os.path.basename(f).startswith(".")
+            ]
 
             for video_file in video_files:
                 video_name = os.path.basename(video_file).split(".")[0]
@@ -467,9 +523,7 @@ def main():
     parser.add_argument(
         "-s", "--single", type=str, help="只处理指定的单个视频，格式: 频道名/视频名"
     )
-    parser.add_argument(
-        "--gpu", action="store_true", help="使用GPU加速ffmpeg处理"
-    )
+    parser.add_argument("--gpu", action="store_true", help="使用GPU加速ffmpeg处理")
 
     # 解析命令行参数
     args = parser.parse_args()

@@ -271,7 +271,9 @@ def merge_mp3_files(input_dir, output_file, force=False):
         print(f"创建输出目录: {output_dir}")
 
     # 检查所有MP3文件
-    mp3_files = [f for f in os.listdir(input_dir) if f.endswith(".mp3")]
+    mp3_files = [
+        f for f in os.listdir(input_dir) if f.endswith(".mp3") and not f.startswith(".")
+    ]
     if not mp3_files:
         print(f"警告: 目录 {input_dir} 中没有MP3文件")
         return False
@@ -343,42 +345,47 @@ def merge_mp3_files(input_dir, output_file, force=False):
     # 更改合并策略，使用FFmpeg完整解码重新编码所有片段
     # 这确保语速保持一致并且不会有空白段
     print(f"使用完整解码重新编码方法合并 {len(mp3_files)} 个MP3文件...")
-    
+
     try:
         # 创建一个临时文件夹用于中间文件
         temp_dir = os.path.join(output_dir, "temp_merge")
         os.makedirs(temp_dir, exist_ok=True)
-        
+
         # 首先将所有MP3转换为WAV，确保采样率和格式一致
         wav_files = []
         print("步骤1: 转换MP3为标准WAV格式...")
-        
+
         for i, mp3_file in enumerate(mp3_files):
             src_file = os.path.join(input_dir, mp3_file)
             temp_wav = os.path.join(temp_dir, f"{i:04d}.wav")
             wav_files.append(temp_wav)
-            
+
             # 将MP3转换为统一采样率和格式的WAV
             convert_cmd = [
                 "ffmpeg",
                 "-y",
-                "-v", "error",  # 只显示错误
-                "-i", src_file,
-                "-ar", "44100",  # 统一采样率
-                "-ac", "2",      # 统一声道数
-                "-acodec", "pcm_s16le",  # 统一编码
-                temp_wav
+                "-v",
+                "error",  # 只显示错误
+                "-i",
+                src_file,
+                "-ar",
+                "44100",  # 统一采样率
+                "-ac",
+                "2",  # 统一声道数
+                "-acodec",
+                "pcm_s16le",  # 统一编码
+                temp_wav,
             ]
-            
+
             try:
                 result = subprocess.run(
-                    convert_cmd, 
-                    check=True, 
-                    stdout=subprocess.PIPE, 
+                    convert_cmd,
+                    check=True,
+                    stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True
+                    text=True,
                 )
-                
+
                 # 验证WAV文件是否生成
                 if not os.path.exists(temp_wav) or os.path.getsize(temp_wav) == 0:
                     print(f"警告: 无法转换文件 {mp3_file} 为WAV")
@@ -386,39 +393,47 @@ def merge_mp3_files(input_dir, output_file, force=False):
                     alternative_cmd = [
                         "ffmpeg",
                         "-y",
-                        "-v", "error",
-                        "-i", src_file,
-                        "-ar", "44100",
-                        "-ac", "2",
-                        "-acodec", "pcm_s16le",
-                        "-af", "aresample=44100", # 强制重采样
-                        temp_wav
+                        "-v",
+                        "error",
+                        "-i",
+                        src_file,
+                        "-ar",
+                        "44100",
+                        "-ac",
+                        "2",
+                        "-acodec",
+                        "pcm_s16le",
+                        "-af",
+                        "aresample=44100",  # 强制重采样
+                        temp_wav,
                     ]
-                    
+
                     subprocess.run(
-                        alternative_cmd, 
-                        check=True, 
-                        stdout=subprocess.PIPE, 
+                        alternative_cmd,
+                        check=True,
+                        stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        text=True
+                        text=True,
                     )
-                    
+
                     if not os.path.exists(temp_wav) or os.path.getsize(temp_wav) == 0:
-                        print(f"错误: 所有方法都无法转换文件 {mp3_file} 为WAV，跳过此文件")
+                        print(
+                            f"错误: 所有方法都无法转换文件 {mp3_file} 为WAV，跳过此文件"
+                        )
                         wav_files.remove(temp_wav)
             except subprocess.CalledProcessError as e:
                 print(f"警告: 转换文件 {mp3_file} 时出错: {e.stderr}")
                 # 跳过这个文件
                 if temp_wav in wav_files:
                     wav_files.remove(temp_wav)
-        
+
         if not wav_files:
             print("错误: 没有有效的WAV文件可以合并")
             return False
-            
+
         # 步骤2: 合并所有WAV文件
         print(f"步骤2: 合并 {len(wav_files)} 个WAV文件...")
-        
+
         # 创建合并用的文件列表
         concat_list = os.path.join(temp_dir, "concat_list.txt")
         with open(concat_list, "w", encoding="utf-8") as f:
@@ -426,89 +441,122 @@ def merge_mp3_files(input_dir, output_file, force=False):
                 # 处理路径中的特殊字符
                 escaped_path = wav_file.replace("'", "'\\''").replace("\\", "\\\\")
                 f.write(f"file '{escaped_path}'\n")
-        
+
         # 使用concat合并WAV文件为一个临时WAV文件
         temp_merged_wav = os.path.join(temp_dir, "merged.wav")
         concat_cmd = [
             "ffmpeg",
             "-y",
-            "-v", "error",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", concat_list,
-            "-c:a", "pcm_s16le",
-            "-ar", "44100",
-            "-ac", "2",
-            temp_merged_wav
+            "-v",
+            "error",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            concat_list,
+            "-c:a",
+            "pcm_s16le",
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            temp_merged_wav,
         ]
-        
+
         print(f"运行命令: {' '.join(concat_cmd)}")
-        subprocess.run(concat_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        
+        subprocess.run(
+            concat_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+
         # 验证合并WAV
         if not os.path.exists(temp_merged_wav) or os.path.getsize(temp_merged_wav) == 0:
             print("错误: 合并WAV文件失败")
-            
+
             # 尝试使用filter_complex方式合并
             print("尝试使用filter_complex方式合并...")
             filter_inputs = ""
             for i in range(len(wav_files)):
                 filter_inputs += f"[{i}:a]"
-            
+
             filter_concat = f"{filter_inputs}concat=n={len(wav_files)}:v=0:a=1[out]"
-            
+
             filter_cmd = ["ffmpeg", "-y", "-v", "error"]
             for wav_file in wav_files:
                 filter_cmd.extend(["-i", wav_file])
-            
-            filter_cmd.extend([
-                "-filter_complex", filter_concat,
-                "-map", "[out]",
-                "-ar", "44100",
-                "-ac", "2",
-                temp_merged_wav
-            ])
-            
+
+            filter_cmd.extend(
+                [
+                    "-filter_complex",
+                    filter_concat,
+                    "-map",
+                    "[out]",
+                    "-ar",
+                    "44100",
+                    "-ac",
+                    "2",
+                    temp_merged_wav,
+                ]
+            )
+
             print(f"运行命令: {' '.join(filter_cmd)}")
-            subprocess.run(filter_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
-            if not os.path.exists(temp_merged_wav) or os.path.getsize(temp_merged_wav) == 0:
+            subprocess.run(
+                filter_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+
+            if (
+                not os.path.exists(temp_merged_wav)
+                or os.path.getsize(temp_merged_wav) == 0
+            ):
                 print("错误: 所有合并方法都失败")
                 return False
-        
+
         # 步骤3: 将合并后的WAV转换为MP3
         print("步骤3: 将合并后的WAV转换为MP3...")
         mp3_cmd = [
             "ffmpeg",
             "-y",
-            "-v", "error",
-            "-i", temp_merged_wav,
-            "-ar", "44100",
-            "-ac", "2",
-            "-b:a", "128k",
-            "-codec:a", "libmp3lame",
-            output_file
+            "-v",
+            "error",
+            "-i",
+            temp_merged_wav,
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            "-b:a",
+            "128k",
+            "-codec:a",
+            "libmp3lame",
+            output_file,
         ]
-        
+
         print(f"运行命令: {' '.join(mp3_cmd)}")
-        subprocess.run(mp3_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        
+        subprocess.run(
+            mp3_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+
         # 验证最终输出文件
-        if os.path.exists(output_file) and os.path.getsize(output_file) > 0 and verify_mp3_file(output_file):
+        if (
+            os.path.exists(output_file)
+            and os.path.getsize(output_file) > 0
+            and verify_mp3_file(output_file)
+        ):
             print(f"成功合并并保存到: {output_file}")
-            
+
             # 清理临时文件
             try:
                 import shutil
+
                 shutil.rmtree(temp_dir)
             except Exception as cleanup_e:
                 print(f"清理临时文件时出错: {cleanup_e}")
-                
+
             return True
         else:
             print("错误: 无法创建有效的输出MP3文件")
             return False
-            
+
     except Exception as e:
         print(f"合并过程中出错: {e}")
         return False

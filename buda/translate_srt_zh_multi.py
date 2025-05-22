@@ -258,7 +258,7 @@ def process_all_channels(languages=None, force=False, batch_size=20, check_only=
     channels = [
         d
         for d in os.listdir(INPUT_SRT_PATH)
-        if os.path.isdir(os.path.join(INPUT_SRT_PATH, d))
+        if os.path.isdir(os.path.join(INPUT_SRT_PATH, d)) and not d.startswith(".")
     ]
 
     if not channels:
@@ -270,8 +270,12 @@ def process_all_channels(languages=None, force=False, batch_size=20, check_only=
     for channel in channels:
         channel_input_path = os.path.join(INPUT_SRT_PATH, channel)
 
-        # 获取当前频道中的所有TXT文件
-        txt_files = [f for f in os.listdir(channel_input_path) if f.endswith(".txt")]
+        # 获取当前频道中的所有TXT文件，过滤掉点开头的文件
+        txt_files = [
+            f
+            for f in os.listdir(channel_input_path)
+            if f.endswith(".txt") and not f.startswith(".")
+        ]
 
         if not txt_files:
             print(f"在频道 '{channel}' 中未找到任何TXT文件，跳过")
@@ -344,12 +348,18 @@ def translate_txt_files_multi_lang(languages=None, force=False, batch_size=20):
         print(f"错误: 输入目录不存在: {input_base}")
         return
     channels = [
-        d for d in os.listdir(input_base) if os.path.isdir(os.path.join(input_base, d))
+        d
+        for d in os.listdir(input_base)
+        if os.path.isdir(os.path.join(input_base, d)) and not d.startswith(".")
     ]
     print(f"找到 {len(channels)} 个频道目录")
     for channel in channels:
         input_channel_dir = os.path.join(input_base, channel)
-        txt_files = [f for f in os.listdir(input_channel_dir) if f.endswith(".txt")]
+        txt_files = [
+            f
+            for f in os.listdir(input_channel_dir)
+            if f.endswith(".txt") and not f.startswith(".")
+        ]
         print(f"频道 {channel} 下找到 {len(txt_files)} 个txt文件")
         for language in languages:
             lang_code = LANGUAGE_CODES[language]

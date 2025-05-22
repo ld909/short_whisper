@@ -145,25 +145,27 @@ def merge_mp4_mp3(mp4_file, mp3_file, output_file, force=False, use_gpu=False):
             cmd.extend(["-hwaccel", "auto"])
             print("尝试使用GPU硬件加速 (-hwaccel auto for video input)")
 
-        cmd.extend([
-            "-v",
-            "warning",  # 显示警告和错误
-            "-i",
-            mp4_file,  # 视频输入
-            "-i",
-            mp3_file,  # 音频输入
-            "-map",
-            "0:v",  # 使用第一个输入的视频流
-            "-map",
-            "1:a",  # 使用第二个输入的音频流
-            "-c:v",
-            "copy",  # 复制视频流
-            "-c:a",
-            "aac",  # 转换音频为AAC (兼容性更好)
-            "-shortest",  # 使用最短的输入流长度
-            "-y",  # 覆盖已有文件
-            output_file,
-        ])
+        cmd.extend(
+            [
+                "-v",
+                "warning",  # 显示警告和错误
+                "-i",
+                mp4_file,  # 视频输入
+                "-i",
+                mp3_file,  # 音频输入
+                "-map",
+                "0:v",  # 使用第一个输入的视频流
+                "-map",
+                "1:a",  # 使用第二个输入的音频流
+                "-c:v",
+                "copy",  # 复制视频流
+                "-c:a",
+                "aac",  # 转换音频为AAC (兼容性更好)
+                "-shortest",  # 使用最短的输入流长度
+                "-y",  # 覆盖已有文件
+                output_file,
+            ]
+        )
         # 只打印简化版命令，避免文件路径过长
         print(f"执行合并命令: ffmpeg [输入视频] [输入音频] -> [输出文件]")
 
@@ -238,7 +240,9 @@ def process_file(channel, language, file_name, force=False, use_gpu=False):
         return merge_mp4_mp3(mp4_file, mp3_file, output_file, force, use_gpu=use_gpu)
 
 
-def process_channel_language(channel, language=None, specific_file=None, force=False, use_gpu=False):
+def process_channel_language(
+    channel, language=None, specific_file=None, force=False, use_gpu=False
+):
     """处理指定频道和语言的所有文件"""
     channel_dir = os.path.join(MP4_BASE_DIR, channel)
     if not os.path.exists(channel_dir):
@@ -257,7 +261,7 @@ def process_channel_language(channel, language=None, specific_file=None, force=F
         language_dirs = [
             d
             for d in os.listdir(channel_dir)
-            if os.path.isdir(os.path.join(channel_dir, d))
+            if os.path.isdir(os.path.join(channel_dir, d)) and not d.startswith(".")
         ]
 
     for lang in language_dirs:
@@ -282,8 +286,12 @@ def process_channel_language(channel, language=None, specific_file=None, force=F
             )
             process_file(channel, lang, file_base, force, use_gpu=use_gpu)
         else:
-            # 处理所有匹配的文件
-            mp4_files = glob.glob(os.path.join(lang_dir, "*.mp4"))
+            # 处理所有匹配的文件，过滤掉点开头的文件
+            mp4_files = [
+                f
+                for f in glob.glob(os.path.join(lang_dir, "*.mp4"))
+                if not os.path.basename(f).startswith(".")
+            ]
             for mp4_file in mp4_files:
                 if exit_flag:
                     print(f"接收到退出信号，停止处理新文件")
@@ -395,14 +403,14 @@ def list_channels():
         [
             d
             for d in os.listdir(MP4_BASE_DIR)
-            if os.path.isdir(os.path.join(MP4_BASE_DIR, d))
+            if os.path.isdir(os.path.join(MP4_BASE_DIR, d)) and not d.startswith(".")
         ]
     )
     mp3_channels = set(
         [
             d
             for d in os.listdir(MP3_BASE_DIR)
-            if os.path.isdir(os.path.join(MP3_BASE_DIR, d))
+            if os.path.isdir(os.path.join(MP3_BASE_DIR, d)) and not d.startswith(".")
         ]
     )
 
@@ -438,14 +446,14 @@ def list_languages(channel_name):
         [
             d
             for d in os.listdir(mp4_channel_dir)
-            if os.path.isdir(os.path.join(mp4_channel_dir, d))
+            if os.path.isdir(os.path.join(mp4_channel_dir, d)) and not d.startswith(".")
         ]
     )
     mp3_languages = set(
         [
             d
             for d in os.listdir(mp3_channel_dir)
-            if os.path.isdir(os.path.join(mp3_channel_dir, d))
+            if os.path.isdir(os.path.join(mp3_channel_dir, d)) and not d.startswith(".")
         ]
     )
 
@@ -474,7 +482,11 @@ def parse_args():
     )
     parser.add_argument("--force", action="store_true", help="强制重新生成已存在的文件")
     parser.add_argument("--base-path", help="指定自定义的基础路径，覆盖默认路径")
-    parser.add_argument("--gpu", action="store_true", help="Enable GPU acceleration for ffmpeg (uses -hwaccel auto)")
+    parser.add_argument(
+        "--gpu",
+        action="store_true",
+        help="Enable GPU acceleration for ffmpeg (uses -hwaccel auto)",
+    )
     return parser.parse_args()
 
 
@@ -518,7 +530,9 @@ def main():
     # 处理指定频道或所有频道
     if args.channel:
         print(f"\n开始处理频道: {args.channel}")
-        process_channel_language(args.channel, args.language, args.file, args.force, use_gpu=args.gpu)
+        process_channel_language(
+            args.channel, args.language, args.file, args.force, use_gpu=args.gpu
+        )
     else:
         # 获取所有频道
         channels = list_channels()
@@ -534,7 +548,9 @@ def main():
                 break
 
             print(f"\n开始处理频道: {channel}")
-            process_channel_language(channel, args.language, args.file, args.force, use_gpu=args.gpu)
+            process_channel_language(
+                channel, args.language, args.file, args.force, use_gpu=args.gpu
+            )
 
     # 等待可能存在的视频处理完成
     if exit_flag:

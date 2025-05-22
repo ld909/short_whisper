@@ -428,7 +428,7 @@ def main():
         channels = [
             d
             for d in os.listdir(input_base_dir)
-            if os.path.isdir(os.path.join(input_base_dir, d))
+            if os.path.isdir(os.path.join(input_base_dir, d)) and not d.startswith(".")
         ]
         print(f"找到 {len(channels)} 个频道目录")
 
@@ -458,7 +458,11 @@ def main():
 
         # 获取当前频道下的所有SRT文件
         try:
-            srt_files = [f for f in os.listdir(input_channel_dir) if f.endswith(".srt")]
+            srt_files = [
+                f
+                for f in os.listdir(input_channel_dir)
+                if f.endswith(".srt") and not f.startswith(".")
+            ]
             print(f"找到 {len(srt_files)} 个SRT文件")
 
             if not srt_files:

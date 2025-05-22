@@ -254,7 +254,7 @@ def process_channel_audio(channel_name, specific_language=None, specific_file=No
         language_dirs = [
             d
             for d in os.listdir(channel_dir)
-            if os.path.isdir(os.path.join(channel_dir, d))
+            if os.path.isdir(os.path.join(channel_dir, d)) and not d.startswith(".")
         ]
 
     for language in language_dirs:
@@ -328,8 +328,12 @@ def process_audio_file(mp3_file, channel_name, language):
         needed_clips = int((audio_duration + CLIP_DURATION - 1) // CLIP_DURATION)
         print(f"需要 {needed_clips} 个视频片段来匹配音频时长")
 
-        # 获取所有可用的视频片段
-        all_clips = glob.glob(os.path.join(MP4_CLIPS_DIR, "*.mp4"))
+        # 获取所有可用的视频片段，过滤掉点开头的文件
+        all_clips = [
+            f
+            for f in glob.glob(os.path.join(MP4_CLIPS_DIR, "*.mp4"))
+            if not os.path.basename(f).startswith(".")
+        ]
         if len(all_clips) == 0:
             print(f"错误: 未找到任何视频片段在 {MP4_CLIPS_DIR}")
             return
@@ -394,7 +398,7 @@ def list_channels():
     channel_dirs = [
         d
         for d in os.listdir(MP3_BASE_DIR)
-        if os.path.isdir(os.path.join(MP3_BASE_DIR, d))
+        if os.path.isdir(os.path.join(MP3_BASE_DIR, d)) and not d.startswith(".")
     ]
     if not channel_dirs:
         print("未找到任何频道目录")
@@ -415,7 +419,7 @@ def list_languages(channel_name):
     language_dirs = [
         d
         for d in os.listdir(channel_dir)
-        if os.path.isdir(os.path.join(channel_dir, d))
+        if os.path.isdir(os.path.join(channel_dir, d)) and not d.startswith(".")
     ]
     if not language_dirs:
         print(f"未在频道 {channel_name} 中找到任何语言目录")
@@ -548,7 +552,7 @@ def main():
         channel_dirs = [
             d
             for d in os.listdir(MP3_BASE_DIR)
-            if os.path.isdir(os.path.join(MP3_BASE_DIR, d))
+            if os.path.isdir(os.path.join(MP3_BASE_DIR, d)) and not d.startswith(".")
         ]
 
         if not channel_dirs:

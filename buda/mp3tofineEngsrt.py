@@ -7,6 +7,9 @@ MP3到英文SRT字幕转换控制器
 3. 对SRT格式进行优化，使其更易读
 4. 处理字幕断句，提高可读性
 
+输入路径：/media/dhl/buda_videos_youtube/{主题名称}/{频道名称}/*.mp3
+输出路径：/media/dhl/buda_videos_youtube/format_srt_zh/{主题名称}/{频道名称}/*.srt
+
 注意：此脚本需要在Nvidia GPU上运行，否则Whisper模型处理速度会很慢！
 
 使用方法：
@@ -114,7 +117,11 @@ def controller_mp3_to_format_srt(topic):
 
         print("处理频道: ", channel)
         # read all mp3 files in the folder
-        for mp3_file in tqdm(os.listdir(os.path.join(mp3_abs_path, channel))):
+        mp3_files = os.listdir(os.path.join(mp3_abs_path, channel))
+        # 过滤掉点开头的文件
+        mp3_files = [f for f in mp3_files if not f.startswith(".")]
+
+        for mp3_file in tqdm(mp3_files):
             if mp3_file.endswith(".mp3"):
                 # check if base_name +'.srt' exists in the dst_srt
                 base_name = os.path.splitext(mp3_file)[0]

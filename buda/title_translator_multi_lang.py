@@ -164,8 +164,12 @@ def process_channel_titles(
         os.makedirs(output_base_path)
         print(f"创建输出目录: {output_base_path}")
 
-    # 获取所有MP3文件
-    mp3_files = [f for f in os.listdir(mp3_input_path) if f.endswith(".mp3")]
+    # 获取所有MP3文件，过滤掉点开头的文件
+    mp3_files = [
+        f
+        for f in os.listdir(mp3_input_path)
+        if f.endswith(".mp3") and not f.startswith(".")
+    ]
 
     if not mp3_files:
         print(f"在频道 '{channel}' 中未找到任何MP3文件，跳过")
@@ -255,9 +259,11 @@ def process_all_channels(client, topic, languages=None, force=False, batch_size=
         print(f"错误: 主题路径 '{topic_path}' 不存在")
         return
 
-    # 获取所有频道目录
+    # 获取所有频道目录，过滤掉点开头的目录
     channels = [
-        d for d in os.listdir(topic_path) if os.path.isdir(os.path.join(topic_path, d))
+        d
+        for d in os.listdir(topic_path)
+        if os.path.isdir(os.path.join(topic_path, d)) and not d.startswith(".")
     ]
 
     if not channels:

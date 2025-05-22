@@ -463,7 +463,7 @@ def generate_thumbnails(
         channels = [
             d
             for d in os.listdir(key_words_dir)
-            if os.path.isdir(os.path.join(key_words_dir, d))
+            if os.path.isdir(os.path.join(key_words_dir, d)) and not d.startswith(".")
         ]
 
     print(f"处理 {len(channels)} 个频道")
@@ -495,7 +495,11 @@ def generate_thumbnails(
         if video_name:
             video_files = [f"{video_name}.json"]
         else:
-            video_files = [f for f in os.listdir(first_lang_dir) if f.endswith(".json")]
+            video_files = [
+                f
+                for f in os.listdir(first_lang_dir)
+                if f.endswith(".json") and not f.startswith(".")
+            ]
 
         print(f"找到 {len(video_files)} 个关键词文件")
 

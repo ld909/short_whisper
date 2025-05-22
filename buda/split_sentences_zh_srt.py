@@ -338,7 +338,7 @@ def process_all_channels(force=False):
     channels = [
         d
         for d in os.listdir(INPUT_SRT_PATH)
-        if os.path.isdir(os.path.join(INPUT_SRT_PATH, d))
+        if os.path.isdir(os.path.join(INPUT_SRT_PATH, d)) and not d.startswith(".")
     ]
 
     if not channels:
@@ -351,8 +351,12 @@ def process_all_channels(force=False):
         channel_input_path = os.path.join(INPUT_SRT_PATH, channel)
         channel_output_path = os.path.join(OUTPUT_TXT_PATH, channel)
 
-        # 获取所有SRT文件
-        srt_files = glob.glob(os.path.join(channel_input_path, "*.srt"))
+        # 获取所有SRT文件，过滤掉点开头的文件
+        srt_files = [
+            f
+            for f in glob.glob(os.path.join(channel_input_path, "*.srt"))
+            if not os.path.basename(f).startswith(".")
+        ]
 
         if not srt_files:
             print(f"在 {channel_input_path} 中未找到任何SRT文件，跳过")

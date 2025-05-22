@@ -8,6 +8,32 @@
 2. 使用随机的zoom效果(in或out)和随机position
 3. 保存到/Volumes/dhl/buda_videos_youtube/mp4_clips/目录，使用随机UID命名
 4. 支持连续按三个q退出，但会保存正在生成的片段后再退出
+
+使用方法:
+1. 基本使用:
+   python generate_video_clips.py
+   这将使用默认参数生成10个视频片段
+
+2. 指定生成数量:
+   python generate_video_clips.py -n 20
+   或
+   python generate_video_clips.py --number 20
+   这将生成20个视频片段
+
+3. 使用多进程加速:
+   python generate_video_clips.py -n 20 -p 4
+   或
+   python generate_video_clips.py --number 20 --processes 4
+   这将使用4个进程并行生成20个视频片段
+
+参数说明:
+-n, --number: 要生成的视频片段数量（默认：10）
+-p, --processes: 并行处理的进程数（默认：1）
+
+运行时控制:
+- 在运行过程中，连续按三次'q'键可以安全退出程序
+- 按Ctrl+C也可以安全退出程序
+- 程序会等待当前正在生成的视频片段完成后再退出
 """
 
 import os
@@ -76,11 +102,14 @@ def get_random_image():
     if not os.path.exists(IMAGES_PATH):
         raise FileNotFoundError(f"图片目录不存在: {IMAGES_PATH}")
 
-    # 获取所有图片文件
+    # 获取所有图片文件，排除以.开头的隐藏文件
     image_files = []
     for root, _, files in os.walk(IMAGES_PATH):
         for file in files:
-            if file.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+            # 排除.开头的隐藏文件和._开头的macOS元数据文件
+            if not file.startswith(".") and file.lower().endswith(
+                (".jpg", ".jpeg", ".png", ".webp")
+            ):
                 image_files.append(os.path.join(root, file))
 
     if not image_files:

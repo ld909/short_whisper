@@ -136,7 +136,11 @@ def get_mp3_clips_info(channel, video_name, language):
         return None
 
     # 获取所有MP3文件
-    mp3_files = glob.glob(os.path.join(mp3_clips_dir, "*.mp3"))
+    mp3_files = [
+        f
+        for f in glob.glob(os.path.join(mp3_clips_dir, "*.mp3"))
+        if not os.path.basename(f).startswith(".")
+    ]
     if not mp3_files:
         print(f"目录中没有MP3文件: {mp3_clips_dir}")
         return None
@@ -164,7 +168,9 @@ def get_mp3_clips_info(channel, video_name, language):
                 "start_time": start_time,
                 "duration": duration,
                 "end_time": end_time,
-                "index": int(os.path.splitext(os.path.basename(mp3_file))[0])  # 保存索引以便后续校验
+                "index": int(
+                    os.path.splitext(os.path.basename(mp3_file))[0]
+                ),  # 保存索引以便后续校验
             }
         )
 
@@ -219,36 +225,36 @@ def generate_srt_from_txt(
         if mp3_clips_info and len(mp3_clips_info) == len(lines):
             # 使用MP3片段信息生成精确的时间戳
             print(f"使用MP3片段生成精确时间戳，共 {len(mp3_clips_info)} 个片段")
-            
+
             # 验证MP3片段索引与行号是否匹配
             # 首先检查索引是否连续
             expected_indices = list(range(1, len(mp3_clips_info) + 1))
             actual_indices = [clip["index"] for clip in mp3_clips_info]
-            
+
             if expected_indices != actual_indices:
                 print(f"警告: MP3片段索引不连续或不是从1开始: {actual_indices}")
                 # 重新排序确保按索引顺序处理
                 mp3_clips_info.sort(key=lambda x: x["index"])
-            
+
             # 验证MP3索引对应的文本行
             for i, (line, clip_info) in enumerate(zip(lines, mp3_clips_info)):
                 print(f"索引 {clip_info['index']} 对应文本: {line[:30]}...")
-            
+
             # 检查合并MP3总时长与片段总时长的差异
             clips_total_duration = mp3_clips_info[-1]["end_time"]
-            
+
             # 直接使用原始MP3时间戳，不再应用校正因子
             print(f"使用原始MP3时间戳，总时长: {clips_total_duration:.2f}秒")
-            
+
             for i, (line, clip_info) in enumerate(zip(lines, mp3_clips_info)):
                 # 直接使用原始MP3片段的开始和结束时间
                 start_time = timedelta(seconds=clip_info["start_time"])
                 end_time = timedelta(seconds=clip_info["end_time"])
-                
+
                 # 确保时间戳精确到毫秒
                 start_time_str = timedelta_to_srt(start_time)
                 end_time_str = timedelta_to_srt(end_time)
-                
+
                 # 添加到SRT内容中，使用原始片段索引作为字幕序号
                 srt_content.append(
                     f"{clip_info['index']}\n{start_time_str} --> {end_time_str}\n{line}\n"
@@ -433,7 +439,9 @@ def process_all_channels(languages=None, force=False, max_workers=3):
             videos = [
                 f[:-4]  # 去除.txt后缀
                 for f in os.listdir(lang_path)
-                if f.endswith(".txt") and os.path.isfile(os.path.join(lang_path, f))
+                if f.endswith(".txt")
+                and not f.startswith(".")
+                and os.path.isfile(os.path.join(lang_path, f))
             ]
             all_videos.update(videos)
 

@@ -1,6 +1,37 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""
+图像批量裁剪工具 (Image Batch Cropping Tool)
+
+功能说明：
+    此脚本用于批量处理图像文件，将图像裁剪到指定的最大高度（默认1000像素）。
+    支持多种处理方式：标准处理、NumPy优化、CUDA GPU加速和CuPy GPU加速。
+    会自动选择最优的处理方法，并支持多进程并行处理以提高效率。
+
+目录结构：
+    输入目录（默认）：/Volumes/dhl/buda_videos_youtube/buda_images (macOS)
+                    或 /media/dhl/buda_videos_youtube/buda_images (Linux)
+    输出目录（默认）：/Volumes/dhl/buda_videos_youtube/buda_images_crop (macOS)
+                    或 /media/dhl/buda_videos_youtube/buda_images_crop (Linux)
+
+使用方法：
+    python crop_images.py [--source 源目录] [--target 目标目录]
+                        [--method {standard,numpy,cuda,cupy,auto,benchmark}]
+                        [--height 裁剪高度] [--workers 工作进程数]
+
+处理逻辑：
+    1. 如果图像高度 ≤ 指定高度：直接复制文件
+    2. 如果图像高度 > 指定高度：裁剪保留顶部指定高度的部分
+    3. 对于已处理的文件：检查时间戳，如果目标文件较新则跳过
+
+支持的图像格式：
+    - PNG (.png)
+    - JPEG (.jpg, .jpeg)
+    - GIF (.gif)
+    - BMP (.bmp)
+"""
+
 import os
 import sys
 import cv2

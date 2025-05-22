@@ -134,7 +134,11 @@ def check_mp3_progress(output_dir):
     if not os.path.exists(output_dir):
         return 0, []
 
-    mp3_files = [f for f in os.listdir(output_dir) if f.endswith(".mp3")]
+    mp3_files = [
+        f
+        for f in os.listdir(output_dir)
+        if f.endswith(".mp3") and not f.startswith(".")
+    ]
     # 获取已生成的MP3文件的行号索引
     existing_indices = set(int(os.path.splitext(f)[0]) for f in mp3_files)
     return len(mp3_files), existing_indices
@@ -273,7 +277,7 @@ def process_all_channels(languages=None, force=False, batch_size=5):
     channels = [
         d
         for d in os.listdir(INPUT_TXT_PATH)
-        if os.path.isdir(os.path.join(INPUT_TXT_PATH, d))
+        if os.path.isdir(os.path.join(INPUT_TXT_PATH, d)) and not d.startswith(".")
     ]
 
     if not channels:
@@ -297,8 +301,12 @@ def process_all_channels(languages=None, force=False, batch_size=5):
             if not os.path.exists(lang_path):
                 continue
 
-            # 获取当前语言目录中的所有TXT文件（视频）
-            txt_files = [f for f in os.listdir(lang_path) if f.endswith(".txt")]
+            # 获取当前语言目录中的所有TXT文件（视频），过滤掉点开头的文件
+            txt_files = [
+                f
+                for f in os.listdir(lang_path)
+                if f.endswith(".txt") and not f.startswith(".")
+            ]
             for txt_file in txt_files:
                 video_name = os.path.splitext(txt_file)[0]
                 all_videos.add(video_name)

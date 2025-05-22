@@ -196,7 +196,7 @@ def process_all_channels(languages=None, force=False, specific_channel=None):
         channels = [
             d
             for d in os.listdir(input_base)
-            if os.path.isdir(os.path.join(input_base, d))
+            if os.path.isdir(os.path.join(input_base, d)) and not d.startswith(".")
         ]
 
     print(f"找到 {len(channels)} 个频道目录")
@@ -212,7 +212,11 @@ def process_all_channels(languages=None, force=False, specific_channel=None):
                 print(f"跳过: 未找到语言目录 {language_dir}")
                 continue
 
-            txt_files = [f for f in os.listdir(language_dir) if f.endswith(".txt")]
+            txt_files = [
+                f
+                for f in os.listdir(language_dir)
+                if f.endswith(".txt") and not f.startswith(".")
+            ]
 
             if not txt_files:
                 print(f"在 {channel}/{lang_code} 中未找到任何TXT文件，跳过")

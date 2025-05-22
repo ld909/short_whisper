@@ -346,8 +346,12 @@ def process_channel(client, channel, languages=None, force=False, batch_size=20)
         os.makedirs(input_path, exist_ok=True)
         return
 
-    # 获取所有JSON标题文件
-    title_files = [f for f in os.listdir(input_path) if f.endswith(".json")]
+    # 获取所有JSON标题文件，过滤掉点开头的文件
+    title_files = [
+        f
+        for f in os.listdir(input_path)
+        if f.endswith(".json") and not f.startswith(".")
+    ]
 
     if not title_files:
         print(f"在频道 '{channel}' 中未找到任何已翻译的标题文件，跳过")
@@ -457,11 +461,11 @@ def process_all_channels(client, languages=None, force=False, batch_size=20):
         print(f"已创建目录: {input_base_path}")
         return
 
-    # 获取所有频道目录
+    # 获取所有频道目录，过滤掉点开头的目录
     channels = [
         d
         for d in os.listdir(input_base_path)
-        if os.path.isdir(os.path.join(input_base_path, d))
+        if os.path.isdir(os.path.join(input_base_path, d)) and not d.startswith(".")
     ]
 
     if not channels:
@@ -483,8 +487,8 @@ def ensure_base_directories():
         os.makedirs(titles_base_dir, exist_ok=True)
         print(f"已创建多语种标题基础目录: {titles_base_dir}")
 
-    # 为每种语言创建频道子目录
-    for channel in os.listdir(titles_base_dir):
+    # 为每种语言创建频道子目录，过滤掉点开头的目录
+    for channel in [d for d in os.listdir(titles_base_dir) if not d.startswith(".")]:
         channel_path = os.path.join(titles_base_dir, channel)
         if os.path.isdir(channel_path):
             # 创建多语种生成标题目录结构
