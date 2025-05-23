@@ -214,6 +214,7 @@ Descriptions or explanations of background music
 Any other miscellaneous items, formatting, or meta-comments.
 Ensure the entire output is just this uninterrupted plain text, optimized for clear audio rendering.
 The full text must be over ten thousand English words. Let me repeat: this is a requirement that absolutely must be met.
+Ensure content is non-conversational in format.
 """
     return prompt
 
