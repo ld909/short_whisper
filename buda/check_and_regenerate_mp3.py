@@ -474,10 +474,34 @@ def main():
         print("错误: 未找到edge-tts命令。请先安装edge-tts: pip install edge-tts")
         return
 
-    # 检查目录是否存在
+    # 检查并创建必要的目录
     if not os.path.exists(args.mp3_dir):
-        print(f"错误: 指定的目录不存在: {args.mp3_dir}")
-        return
+        print(f"目录不存在: {args.mp3_dir}")
+        print("正在创建目录结构...")
+        try:
+            os.makedirs(args.mp3_dir, exist_ok=True)
+            print(f"✅ 已创建目录: {args.mp3_dir}")
+
+            # 同时创建一些基本的子目录结构示例
+            print("提示: 目录已创建，但可能为空。请确保您有相应的多语言文本文件。")
+            print(
+                f"文本文件应该位于: {os.path.join(BASE_MEDIA_PATH, 'multi_lang_txt')}"
+            )
+        except Exception as e:
+            print(f"❌ 创建目录失败: {e}")
+            return
+
+    # 如果目录存在但为空，给出提示
+    elif not any(
+        os.path.exists(os.path.join(args.mp3_dir, item))
+        for item in os.listdir(args.mp3_dir)
+        if not item.startswith(".")
+    ):
+        print(f"⚠️  目录存在但为空: {args.mp3_dir}")
+        print(
+            f"请确保您有相应的多语言文本文件位于: {os.path.join(BASE_MEDIA_PATH, 'multi_lang_txt')}"
+        )
+        print("或者使用 generate_mp3_clips.py 脚本先生成MP3文件")
 
     # 如果是测试模式，只处理少量文件
     if args.test:

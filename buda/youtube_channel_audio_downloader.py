@@ -30,6 +30,42 @@ logger = logging.getLogger(__name__)
 OUTPUT_DIR = "/Volumes/dhl/buda_videos_youtube/channel_mp3_raw"
 
 
+def cleanup_non_mp3_files(directory):
+    """清理目录中的非mp3文件和以点开头的meta类型文件"""
+    logger.info(f"开始清理目录: {directory}")
+
+    if not os.path.exists(directory):
+        logger.info(f"目录不存在，跳过清理: {directory}")
+        return
+
+    total_deleted = 0
+
+    # 遍历所有子目录
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            file_path = os.path.join(root, file)
+            should_delete = False
+
+            # 删除以点开头的文件（meta文件等）
+            if file.startswith("."):
+                should_delete = True
+                logger.info(f"删除meta文件: {file_path}")
+
+            # 删除非mp3文件
+            elif not file.lower().endswith(".mp3"):
+                should_delete = True
+                logger.info(f"删除非mp3文件: {file_path}")
+
+            if should_delete:
+                try:
+                    os.remove(file_path)
+                    total_deleted += 1
+                except Exception as e:
+                    logger.error(f"删除文件失败 {file_path}: {str(e)}")
+
+    logger.info(f"清理完成，共删除 {total_deleted} 个文件")
+
+
 def sanitize_filename(filename):
     """清理文件名，保留中文字符但去除非法字符"""
     # 替换Windows和Unix系统中不允许的文件名字符
@@ -127,6 +163,9 @@ def process_channel_list(channel_list_file):
 
     logger.info(f"创建输出目录: {OUTPUT_DIR}")
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    # 启动时清理非mp3文件和meta文件
+    cleanup_non_mp3_files(OUTPUT_DIR)
 
     with open(channel_list_file, "r", encoding="utf-8") as f:
         channels = [line.strip() for line in f if line.strip()]
