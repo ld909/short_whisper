@@ -4,13 +4,25 @@ import re
 import os
 import argparse
 import glob
+import platform
 
 # 获取当前脚本的目录
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # 配置文件路径
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "config.json")
+
+
+def get_base_output_path():
+    """根据操作系统返回适当的输出路径"""
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        return "/Volumes/dhl/audio/scifi/story_param/en"
+    else:  # 默认为Linux/Ubuntu
+        return "/media/dhl/audio/scifi/story_param/en"
+
+
 # 默认输出目录
-DEFAULT_OUTPUT_DIR = "/media/dhl/audio/scifi/story_param/en"
+DEFAULT_OUTPUT_DIR = get_base_output_path()
 
 
 def load_config():
@@ -222,26 +234,26 @@ def save_prompt_to_file(prompt, output_dir=DEFAULT_OUTPUT_DIR, filename=None):
     try:
         # 确保输出目录存在
         os.makedirs(output_dir, exist_ok=True)
-        
+
         if filename is None:
             # 查找目录中现有的.txt文件
             existing_files = glob.glob(os.path.join(output_dir, "*.txt"))
             existing_numbers = []
-            
+
             # 提取文件名中的数字部分
             for file_path in existing_files:
                 basename = os.path.basename(file_path)
                 match = re.match(r"(\d+)\.txt", basename)
                 if match:
                     existing_numbers.append(int(match.group(1)))
-            
+
             # 找到下一个可用的序号
             next_number = 1
             if existing_numbers:
                 next_number = max(existing_numbers) + 1
-            
+
             filename = f"{next_number}.txt"
-        
+
         full_path = os.path.join(output_dir, filename)
         with open(full_path, "w", encoding="utf-8") as f:
             f.write(prompt)
@@ -255,21 +267,28 @@ def save_prompt_to_file(prompt, output_dir=DEFAULT_OUTPUT_DIR, filename=None):
 def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description="生成科幻小说提示")
-    parser.add_argument("-n", "--num", type=int, default=1, help="要生成的提示数量（默认为1）")
-    parser.add_argument("-o", "--output", type=str, default=DEFAULT_OUTPUT_DIR, 
-                        help=f"输出目录（默认为{DEFAULT_OUTPUT_DIR}）")
+    parser.add_argument(
+        "-n", "--num", type=int, default=1, help="要生成的提示数量（默认为1）"
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        default=DEFAULT_OUTPUT_DIR,
+        help=f"输出目录（默认为{DEFAULT_OUTPUT_DIR}）",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     # 解析命令行参数
     args = parse_arguments()
-    
+
     # 生成指定数量的提示
     saved_files = []
     for i in range(args.num):
         print(f"正在生成第 {i+1}/{args.num} 个提示...")
-        
+
         # 生成提示
         generated_story_prompt = generate_prompt()
 
