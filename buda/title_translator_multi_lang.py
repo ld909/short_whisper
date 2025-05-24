@@ -6,11 +6,11 @@
 脚本使用OpenAI API进行翻译，特别针对佛教内容优化，支持并发处理和断点续传。
 
 输入:
-- MP3文件名（从mp3tofineEngsrt.py的mp3路径）
+- SRT文件名（从mp3toscripts_faster.py的输出路径）
 
 输出:
 - JSON文件，包含原始标题（去除标签）和四种语言的翻译
-- 输出路径: [媒体路径]/multi_lang_titles/[频道名称]/[视频名称].json
+- 输出路径: /home/dhl/Documents/video_materials/multi_lang_titles/[频道名称]/[视频名称].json
 
 使用方法:
 1. 基本使用: python title_translator_multi_lang.py [主题名称]
@@ -21,6 +21,7 @@
 注意:
 - 需要设置环境变量UNI_API_KEY以提供OpenAI API密钥
 - 脚本支持断点续传，中断后可从上次停止的位置继续翻译
+- 输入路径与mp3toscripts_faster.py的输出路径保持一致
 """
 
 import os
@@ -35,17 +36,19 @@ import concurrent.futures
 from tqdm import tqdm
 
 
-def get_base_media_path():
-    """根据操作系统返回适当的媒体路径"""
-    system = platform.system()
-    if system == "Darwin":  # macOS
-        return "/Volumes/dhl/buda_videos_youtube"
-    else:  # 默认为Linux/Ubuntu
-        return "/media/dhl/buda_videos_youtube"
+def get_srt_input_path():
+    """返回mp3toscripts_faster.py的输出路径作为输入路径"""
+    return "/home/dhl/Documents/video_materials/format_srt"
 
 
-# 获取媒体基础路径
-BASE_MEDIA_PATH = get_base_media_path()
+def get_output_base_path():
+    """返回翻译结果的输出基础路径"""
+    return "/home/dhl/Documents/video_materials/multi_lang_titles"
+
+
+# 获取输入和输出路径
+SRT_INPUT_PATH = get_srt_input_path()
+OUTPUT_BASE_PATH = get_output_base_path()
 
 # 定义支持的语言列表
 LANGUAGES = ["English", "Japanese", "Vietnamese", "Korean"]
@@ -156,31 +159,36 @@ def process_channel_titles(
         languages = LANGUAGES
 
     # 定义输入和输出路径
-    mp3_input_path = os.path.join(BASE_MEDIA_PATH, topic, channel)
-    output_base_path = os.path.join(BASE_MEDIA_PATH, "multi_lang_titles", channel)
+    srt_input_path = os.path.join(SRT_INPUT_PATH, topic, channel)
+    output_base_path = os.path.join(OUTPUT_BASE_PATH, channel)
+
+    # 检查输入路径是否存在
+    if not os.path.exists(srt_input_path):
+        print(f"警告: 输入路径 '{srt_input_path}' 不存在，跳过频道 '{channel}'")
+        return
 
     # 确保输出目录存在
     if not os.path.exists(output_base_path):
         os.makedirs(output_base_path)
         print(f"创建输出目录: {output_base_path}")
 
-    # 获取所有MP3文件，过滤掉点开头的文件
-    mp3_files = [
+    # 获取所有SRT文件，过滤掉点开头的文件
+    srt_files = [
         f
-        for f in os.listdir(mp3_input_path)
-        if f.endswith(".mp3") and not f.startswith(".")
+        for f in os.listdir(srt_input_path)
+        if f.endswith(".srt") and not f.startswith(".")
     ]
 
-    if not mp3_files:
-        print(f"在频道 '{channel}' 中未找到任何MP3文件，跳过")
+    if not srt_files:
+        print(f"在频道 '{channel}' 中未找到任何SRT文件，跳过")
         return
 
-    print(f"\n处理频道: {channel}，找到 {len(mp3_files)} 个MP3文件")
+    print(f"\n处理频道: {channel}，找到 {len(srt_files)} 个SRT文件")
 
     # 收集需要处理的文件
     files_to_process = []
-    for mp3_file in mp3_files:
-        video_name = os.path.splitext(mp3_file)[0]  # 去掉.mp3扩展名
+    for srt_file in srt_files:
+        video_name = os.path.splitext(srt_file)[0]  # 去掉.srt扩展名
         output_file = os.path.join(output_base_path, f"{video_name}.json")
 
         # 检查是否需要处理此文件
@@ -199,7 +207,7 @@ def process_channel_titles(
                 # 文件损坏或不完整，需要重新处理
                 pass
 
-        files_to_process.append((video_name, mp3_file))
+        files_to_process.append((video_name, srt_file))
 
     # 如果没有需要处理的文件，返回
     if not files_to_process:
@@ -214,7 +222,7 @@ def process_channel_titles(
             batch = files_to_process[i : i + batch_size]
 
             def process_file(file_info):
-                video_name, mp3_file = file_info
+                video_name, srt_file = file_info
                 title = video_name  # 使用文件名作为标题
 
                 try:
@@ -254,7 +262,7 @@ def process_all_channels(client, topic, languages=None, force=False, batch_size=
         languages = LANGUAGES
 
     # 检查输入路径是否存在
-    topic_path = os.path.join(BASE_MEDIA_PATH, topic)
+    topic_path = os.path.join(SRT_INPUT_PATH, topic)
     if not os.path.exists(topic_path):
         print(f"错误: 主题路径 '{topic_path}' 不存在")
         return

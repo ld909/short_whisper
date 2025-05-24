@@ -9,10 +9,15 @@
 使用OpenAI API通过uniapi.io进行处理，特别针对简化标题优化，支持并发处理和断点续传。
 
 输入目录:
-- 标题文件：[媒体路径]/buda_videos_youtube/multi_lang_txt/[频道名称]/[语言代码]/[视频名].txt (第一行为标题)
+- 标题文件：
+  macOS: /Users/dhl/Documents/video_materials/multi_lang_titles/[频道名称]/[视频名].json
+  Ubuntu: /home/dhl/Documents/video_materials/multi_lang_titles/[频道名称]/[视频名].json
+  (来自title_translator_multi_lang.py的输出，包含多语言翻译的JSON文件)
 
 输出目录:
-- 简化标题: [媒体路径]/buda_videos_youtube/title_shorten_multi_lang/[频道名称]/[语言代码]/[视频名].txt
+- 简化标题: 
+  macOS: /Volumes/dhl/buda_videos_youtube/title_shorten_multi_lang/[频道名称]/[语言代码]/[视频名].txt
+  Ubuntu: /media/dhl/buda_videos_youtube/title_shorten_multi_lang/[频道名称]/[语言代码]/[视频名].txt
 
 使用方法:
 1. 基本使用: python shorten_titles_multi_lang.py
@@ -24,6 +29,8 @@
 注意:
 - 需要设置环境变量UNI_API_KEY以提供OpenAI API密钥，或在.env文件中设置
 - 脚本支持断点续传，中断后可从上次停止的位置继续处理
+- 输入路径来自title_translator_multi_lang.py的输出，自动适配Mac和Ubuntu系统路径
+- JSON文件格式包含多语言字段：en(英语), ja(日语), vi(越南语), ko(韩语)
 """
 
 import os
@@ -31,6 +38,7 @@ import argparse
 import platform
 import concurrent.futures
 import sys
+import json
 from tqdm import tqdm
 from openai import OpenAI
 
@@ -43,8 +51,16 @@ except ImportError:
     print("提示: 如需使用.env文件，请安装python-dotenv: pip install python-dotenv")
 
 
-def get_base_path():
-    """根据操作系统类型返回对应的基础路径"""
+def get_input_base_path():
+    """根据操作系统类型返回title_translator_multi_lang.py的输出路径作为输入路径"""
+    if platform.system() == "Darwin":  # macOS
+        return "/Users/dhl/Documents/video_materials/multi_lang_titles"
+    else:  # 默认为Linux/Ubuntu
+        return "/home/dhl/Documents/video_materials/multi_lang_titles"
+
+
+def get_output_base_path():
+    """根据操作系统类型返回对应的输出基础路径"""
     if platform.system() == "Darwin":  # macOS
         return "/Volumes/dhl/buda_videos_youtube"
     else:  # 默认为Linux/Ubuntu
@@ -52,11 +68,10 @@ def get_base_path():
 
 
 # 定义全局路径变量
-BASE_PATH = get_base_path()
-# 输入多语言TXT目录
-INPUT_TXT_PATH = os.path.join(BASE_PATH, "multi_lang_txt")
+# 输入路径：来自title_translator_multi_lang.py的输出
+INPUT_JSON_PATH = get_input_base_path()
 # 输出简化标题目录
-OUTPUT_TITLE_PATH = os.path.join(BASE_PATH, "title_shorten_multi_lang")
+OUTPUT_TITLE_PATH = os.path.join(get_output_base_path(), "title_shorten_multi_lang")
 # 支持的语言代码
 SUPPORTED_LANGUAGES = ["en", "ja", "vi", "ko"]
 # 语言代码到完整语言名称的映射
@@ -83,10 +98,10 @@ def setup_openai_client():
 
 
 def get_original_title(channel, video_name, language):
-    """获取原始标题"""
-    # 构建输入文件路径
+    """从JSON文件中获取指定语言的标题"""
+    # 构建输入JSON文件路径
     input_file_path = os.path.join(
-        INPUT_TXT_PATH, channel, language, f"{video_name}.txt"
+        INPUT_JSON_PATH, channel, f"{video_name}.json"
     )
 
     if not os.path.exists(input_file_path):
@@ -95,16 +110,25 @@ def get_original_title(channel, video_name, language):
 
     try:
         with open(input_file_path, "r", encoding="utf-8") as f:
-            # 读取第一行作为标题
-            lines = f.readlines()
-            if not lines:
-                print(f"文件为空: {input_file_path}")
+            data = json.load(f)
+            
+            # 根据语言代码获取对应的标题
+            if language in data:
+                title = data[language]
+                if title and title.strip():
+                    return title.strip()
+                else:
+                    print(f"语言 {language} 的标题为空: {input_file_path}")
+                    return None
+            else:
+                print(f"JSON文件中未找到语言 {language}: {input_file_path}")
                 return None
-
-            title = lines[0].strip()
-            return title
+                
+    except json.JSONDecodeError as e:
+        print(f"JSON文件格式错误: {input_file_path}, 错误: {e}")
+        return None
     except Exception as e:
-        print(f"读取原始标题时出错: {e}")
+        print(f"读取JSON文件时出错: {e}")
         return None
 
 
@@ -227,77 +251,81 @@ def process_all_channels(languages=None, force=False, max_workers=3, client=None
         return
 
     # 检查输入路径是否存在
-    if not os.path.exists(INPUT_TXT_PATH):
-        print(f"错误: 输入路径不存在: {INPUT_TXT_PATH}")
+    if not os.path.exists(INPUT_JSON_PATH):
+        print(f"错误: 输入路径不存在: {INPUT_JSON_PATH}")
         return
 
     # 获取所有频道目录
     channels = [
         d
-        for d in os.listdir(INPUT_TXT_PATH)
-        if os.path.isdir(os.path.join(INPUT_TXT_PATH, d)) and not d.startswith(".")
+        for d in os.listdir(INPUT_JSON_PATH)
+        if os.path.isdir(os.path.join(INPUT_JSON_PATH, d)) and not d.startswith(".")
     ]
 
     if not channels:
-        print(f"在 {INPUT_TXT_PATH} 中未找到任何频道目录")
+        print(f"在 {INPUT_JSON_PATH} 中未找到任何频道目录")
         return
 
     print(f"找到 {len(channels)} 个频道目录")
 
     # 处理每个频道
     for channel in channels:
-        channel_path = os.path.join(INPUT_TXT_PATH, channel)
+        channel_path = os.path.join(INPUT_JSON_PATH, channel)
         print(f"\n处理频道: {channel}")
 
         # 创建任务列表
         tasks = []
 
-        # 获取当前频道下的所有语言目录
-        lang_dirs = [
-            d
-            for d in os.listdir(channel_path)
-            if os.path.isdir(os.path.join(channel_path, d))
-            and d in languages
-            and not d.startswith(".")
-        ]
-
-        if not lang_dirs:
-            print(f"在频道 {channel} 中未找到任何支持的语言目录")
+        # 获取当前频道下的所有JSON文件
+        if not os.path.exists(channel_path):
+            print(f"频道目录不存在: {channel_path}")
             continue
 
-        # 获取所有视频名称
-        all_videos = set()
-        for lang in lang_dirs:
-            lang_path = os.path.join(channel_path, lang)
-            videos = [
-                f[:-4]  # 去除.txt后缀
-                for f in os.listdir(lang_path)
-                if f.endswith(".txt")
-                and not f.startswith(".")
-                and os.path.isfile(os.path.join(lang_path, f))
-            ]
-            all_videos.update(videos)
+        json_files = [
+            f
+            for f in os.listdir(channel_path)
+            if f.endswith(".json")
+            and not f.startswith(".")
+            and os.path.isfile(os.path.join(channel_path, f))
+        ]
 
-        print(f"找到 {len(all_videos)} 个视频")
+        if not json_files:
+            print(f"在频道 {channel} 中未找到任何JSON文件")
+            continue
 
-        # 添加任务
-        for video_name in all_videos:
-            for lang in lang_dirs:
-                # 检查该语言下是否有对应的TXT文件
-                txt_path = os.path.join(channel_path, lang, f"{video_name}.txt")
-                if not os.path.exists(txt_path):
-                    continue
+        print(f"找到 {len(json_files)} 个JSON文件")
 
-                # 构建输出文件路径
-                output_dir = os.path.join(OUTPUT_TITLE_PATH, channel, lang)
-                output_file = os.path.join(output_dir, f"{video_name}.txt")
+        # 添加任务 - 为每个视频的每种支持语言创建任务
+        for json_file in json_files:
+            video_name = json_file[:-5]  # 去除.json后缀
+            
+            # 检查JSON文件中包含哪些语言
+            json_path = os.path.join(channel_path, json_file)
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    
+                # 为该视频的每种目标语言创建任务
+                for lang in languages:
+                    # 检查JSON文件中是否包含该语言的翻译
+                    if lang not in data:
+                        print(f"跳过 {video_name}，JSON文件中未包含语言 {lang}")
+                        continue
+                        
+                    # 构建输出文件路径
+                    output_dir = os.path.join(OUTPUT_TITLE_PATH, channel, lang)
+                    output_file = os.path.join(output_dir, f"{video_name}.txt")
 
-                # 如果输出文件已存在且不强制重新生成，则跳过
-                if os.path.exists(output_file) and not force:
-                    continue
+                    # 如果输出文件已存在且不强制重新生成，则跳过
+                    if os.path.exists(output_file) and not force:
+                        continue
 
-                # 添加任务
-                tasks.append((channel, video_name, lang))
+                    # 添加任务
+                    tasks.append((channel, video_name, lang))
+                    
+            except (json.JSONDecodeError, FileNotFoundError, Exception) as e:
+                print(f"读取JSON文件 {json_path} 时出错: {e}")
+                continue
 
         print(f"找到 {len(tasks)} 个待处理任务")
 

@@ -7,7 +7,7 @@ MP3到英文SRT字幕转换控制器
 3. 对SRT格式进行优化，使其更易读
 4. 处理字幕断句，提高可读性
 
-输入路径：/media/dhl/buda_videos_youtube/{主题名称}/{频道名称}/*.mp3
+输入路径：/media/dhl/buda_videos_youtube/channel_mp3_raw/{频道名称}/*.mp3
 输出路径：/media/dhl/buda_videos_youtube/format_srt_zh/{主题名称}/{频道名称}/*.srt
 
 注意：此脚本需要在Nvidia GPU上运行，否则Whisper模型处理速度会很慢！
@@ -17,15 +17,74 @@ MP3到英文SRT字幕转换控制器
 
 示例：
     python mp3tofineEngsrt.py code
+
+更新说明：
+    - 使用faster-whisper替代原版whisper解决PyTorch 2.7.0兼容性问题
+    - faster-whisper速度更快，内存占用更少，兼容性更好
 """
 
 import os
 import sys
+import requests
 from tqdm import tqdm
-from mp3toscripts import mp3totxt, save_srt
+from mp3toscripts_faster import mp3totxt, save_srt
 from srt_format import format_srt, break_srt_txt_into_sentences
 from mutagen import File
 
+# 设置代理环境变量，加速Whisper模型下载
+def setup_proxy():
+    """
+    设置代理环境变量以加速模型下载
+    根据截图中的代理设置，支持多种代理端口
+    """
+    # 根据截图中的代理端口配置
+    proxy_configs = [
+        {"name": "混合代理", "port": "7897"},
+        {"name": "HTTP(S)代理", "port": "7899"},
+        {"name": "SOCKS代理", "port": "7898"},
+    ]
+    
+    proxy_host = "127.0.0.1"
+    
+    # 尝试不同的代理端口，找到可用的
+    for config in proxy_configs:
+        proxy_url = f"http://{proxy_host}:{config['port']}"
+        print(f"尝试使用{config['name']}端口 {config['port']}...")
+        
+        try:
+            # 测试代理连接
+            test_response = requests.get(
+                'https://httpbin.org/ip', 
+                proxies={'http': proxy_url, 'https': proxy_url},
+                timeout=5
+            )
+            if test_response.status_code == 200:
+                print(f"✓ {config['name']}连接成功！")
+                
+                # 设置环境变量
+                os.environ['HTTP_PROXY'] = proxy_url
+                os.environ['HTTPS_PROXY'] = proxy_url
+                os.environ['http_proxy'] = proxy_url
+                os.environ['https_proxy'] = proxy_url
+                
+                # 设置不使用代理的地址（本地地址）
+                os.environ['NO_PROXY'] = 'localhost,127.0.0.1,::1'
+                os.environ['no_proxy'] = 'localhost,127.0.0.1,::1'
+                
+                print(f"已设置代理: {proxy_url}")
+                print("代理设置完成，Whisper模型下载将通过代理进行")
+                return True
+                
+        except Exception as e:
+            print(f"✗ {config['name']}连接失败: {e}")
+            continue
+    
+    print("⚠️  所有代理端口都无法连接，将使用直连方式")
+    print("如果下载速度较慢，请检查代理软件是否正常运行")
+    return False
+
+# 在导入whisper相关模块之前设置代理
+setup_proxy()
 
 def get_duration(file_path):
     """get the duration of the media file in seconds"""
@@ -80,21 +139,21 @@ def controller_mp3_to_format_srt(topic):
 
     此函数控制整个处理流程：
     1. 清理垃圾文件
-    2. 遍历指定主题下的所有频道和MP3文件
-    3. 使用Whisper模型转录音频为文本
+    2. 遍历channel_mp3_raw目录下的所有频道和MP3文件
+    3. 使用faster-whisper模型转录音频为文本
     4. 格式化文本为SRT格式
     5. 优化SRT字幕的断句
     6. 保存格式化后的SRT文件
 
     函数会自动跳过：
     - 已处理过的文件
-    - 时长超过30分钟的音频文件
+    - 时长超过120分钟的音频文件
 
     参数:
-        topic (str): 主题名称，用于确定处理的文件夹
+        topic (str): 主题名称，用于确定输出SRT文件夹的分类
     """
     hard_dive_path = "/media/dhl"
-    mp3_abs_path = f"{hard_dive_path}/buda_videos_youtube/{topic}"  # fill in the absolute path of the mp3 folder
+    mp3_abs_path = f"{hard_dive_path}/buda_videos_youtube/channel_mp3_raw"  # 读取youtube_channel_audio_downloader.py的输出
 
     remove_trash_files(mp3_abs_path)
     dst_srt_abs_path = f"{hard_dive_path}/buda_videos_youtube/format_srt_zh/{topic}"  # fill in the absolute path of the srt folder
@@ -112,16 +171,43 @@ def controller_mp3_to_format_srt(topic):
 
     print("所有频道包括:", all_channels)
 
-    # read all mp3 files in the folder
-    for channel in tqdm(all_channels):
+    # 统计总任务数
+    print("\n=== 正在统计总任务数 ===")
+    total_mp3_files = 0
+    channel_file_counts = {}
+    
+    for channel in all_channels:
+        channel_path = os.path.join(mp3_abs_path, channel)
+        if os.path.isdir(channel_path):
+            mp3_files = [f for f in os.listdir(channel_path) if f.endswith('.mp3') and not f.startswith('.')]
+            channel_file_counts[channel] = len(mp3_files)
+            total_mp3_files += len(mp3_files)
+            print(f"  频道 '{channel}': {len(mp3_files)} 个MP3文件")
+    
+    print(f"\n📊 总计发现 {total_mp3_files} 个MP3文件需要处理")
+    print(f"📂 涉及 {len(all_channels)} 个频道")
+    print("=" * 50)
 
-        print("处理频道: ", channel)
+    # 初始化进度计数器
+    completed_count = 0
+    skipped_existing_count = 0
+    skipped_duration_count = 0
+    error_count = 0
+    
+    # 记录超时跳过的文件
+    timeout_skipped_files = []
+
+    # read all mp3 files in the folder
+    for channel_idx, channel in enumerate(all_channels, 1):
+        print(f"\n🎯 [{channel_idx}/{len(all_channels)}] 正在处理频道: {channel}")
+        print(f"📁 频道 '{channel}' 包含 {channel_file_counts[channel]} 个MP3文件")
+        
         # read all mp3 files in the folder
         mp3_files = os.listdir(os.path.join(mp3_abs_path, channel))
         # 过滤掉点开头的文件
         mp3_files = [f for f in mp3_files if not f.startswith(".")]
 
-        for mp3_file in tqdm(mp3_files):
+        for file_idx, mp3_file in enumerate(mp3_files, 1):
             if mp3_file.endswith(".mp3"):
                 # check if base_name +'.srt' exists in the dst_srt
                 base_name = os.path.splitext(mp3_file)[0]
@@ -131,35 +217,78 @@ def controller_mp3_to_format_srt(topic):
                 if not os.path.exists(os.path.join(dst_srt_abs_path, channel)):
                     os.makedirs(os.path.join(dst_srt_abs_path, channel))
 
+                print(f"\n  📄 [{file_idx}/{len(mp3_files)}] 文件: {mp3_file}")
+                print(f"  📈 总体进度: {completed_count + skipped_existing_count + skipped_duration_count + error_count + 1}/{total_mp3_files}")
+
                 # 检查之前是否完成过此任务，完成就跳过
                 if os.path.exists(dst_srt):
-                    print(f"SRT文件已存在，跳过 {channel} 中的 {base_name}")
+                    skipped_existing_count += 1
+                    print(f"  ✅ SRT文件已存在，跳过 - 已跳过: {skipped_existing_count}")
                     continue
+                
                 mp3_path = os.path.join(mp3_abs_path, channel, mp3_file)
-                print("正在处理: ", mp3_path, " 频道: ", channel)
-                # if mp3 duration is larger than 30 minutes, skip
-                mp3_duration_seconds = get_duration(mp3_path)
-                if mp3_duration_seconds > 1800:
-                    print(f"MP3 {mp3_file} 时长超过30分钟，跳过")
+                print(f"  🔍 检查文件时长...")
+                
+                try:
+                    # if mp3 duration is larger than 120 minutes, skip
+                    mp3_duration_seconds = get_duration(mp3_path)
+                    duration_minutes = mp3_duration_seconds / 60
+                    print(f"  ⏱️  文件时长: {duration_minutes:.1f} 分钟")
+                    
+                    if mp3_duration_seconds > 7200:
+                        skipped_duration_count += 1
+                        timeout_skipped_files.append(f"{channel}/{mp3_file}")
+                        print(f"  ⚠️  时长超过120分钟，跳过 - 因时长跳过: {skipped_duration_count}")
+                        continue
+
+                    print(f"  🚀 开始处理音频转录...")
+                    print(f"  🤖 使用faster-whisper模型将MP3转录为文本...")
+                    ts_list, txt_list = mp3totxt(mp3_path)
+
+                    print(f"  🔧 格式化SRT字幕...")
+                    # format srt
+                    ts_list, txt_list = format_srt(ts_list, txt_list)
+
+                    print(f"  ✂️  优化字幕断句...")
+                    # break into sub sentences
+                    ts_list, txt_list = break_srt_txt_into_sentences(ts_list, txt_list)
+
+                    # check if the number of timestamps and subtitles are the same
+                    assert len(ts_list) == len(txt_list)
+
+                    # get base name without extension
+                    save_srt(ts_list, txt_list, dst_srt)
+                    completed_count += 1
+                    
+                    print(f"  ✅ 处理完成！字幕已保存到: {dst_srt}")
+                    print(f"  📊 已完成: {completed_count}/{total_mp3_files} ({completed_count/total_mp3_files*100:.1f}%)")
+                    
+                except Exception as e:
+                    error_count += 1
+                    print(f"  ❌ 处理出错: {str(e)}")
+                    print(f"  📊 错误计数: {error_count}")
                     continue
 
-                mp3_path = os.path.join(mp3_abs_path, channel, mp3_file)
-
-                print("开始使用OpenAI whisper模型将MP3转录为文本...")
-                ts_list, txt_list = mp3totxt(mp3_path)
-
-                # format srt
-                ts_list, txt_list = format_srt(ts_list, txt_list)
-
-                # break into sub sentences
-                ts_list, txt_list = break_srt_txt_into_sentences(ts_list, txt_list)
-
-                # check if the number of timestamps and subtitles are the same
-                assert len(ts_list) == len(txt_list)
-
-                # get base name without extension
-                save_srt(ts_list, txt_list, dst_srt)
-                print(f"格式化后的字幕已保存到 {dst_srt}")
+    # 最终统计报告
+    print("\n" + "=" * 60)
+    print("🎉 处理完成！最终统计报告:")
+    print("=" * 60)
+    print(f"📊 总文件数: {total_mp3_files}")
+    print(f"✅ 成功处理: {completed_count}")
+    print(f"⚠️  已存在跳过: {skipped_existing_count}")
+    print(f"⏱️  超时跳过: {skipped_duration_count}")
+    print(f"❌ 处理出错: {error_count}")
+    print(f"📈 成功率: {completed_count/(total_mp3_files-skipped_existing_count)*100:.1f}%" if (total_mp3_files-skipped_existing_count) > 0 else "📈 成功率: 100.0%")
+    
+    # 显示超时跳过的文件详情
+    if timeout_skipped_files:
+        print("\n⏱️  超时跳过的文件详情:")
+        print("-" * 40)
+        for i, file_name in enumerate(timeout_skipped_files, 1):
+            print(f"  {i}. {file_name}")
+        print("-" * 40)
+    
+    print("=" * 60)
 
 
 if __name__ == "__main__":

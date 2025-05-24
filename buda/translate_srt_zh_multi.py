@@ -2,7 +2,7 @@
 多语言字幕/文本翻译工具
 
 功能说明:
-此脚本用于将中文SRT字幕文件或纯文本文件批量翻译成多种语言（英语、日语、越南语、韩语）。
+此脚本用于将中文SRT字幕文件或纯文本文件批量翻译成多种语言（英语、韩语）。
 脚本使用OpenAI API进行翻译，特别针对佛教内容优化，支持并发处理和断点续传。
 
 输入目录:
@@ -15,7 +15,7 @@
 
 使用方法:
 1. 基本使用: python translate_srt_zh_multi.py
-2. 指定目标语言: python translate_srt_zh_multi.py -l English Japanese
+2. 指定目标语言: python translate_srt_zh_multi.py -l English Korean
 3. 强制重新翻译: python translate_srt_zh_multi.py -f
 4. 设置批处理大小: python translate_srt_zh_multi.py -b 30
 5. 单文件处理: python translate_srt_zh_multi.py -s /path/to/file.txt
@@ -76,8 +76,8 @@ def setup_openai_client():
 client = None  # 将在main函数中初始化
 
 # 定义支持的语言列表
-LANGUAGES = ["English", "Japanese", "Vietnamese", "Korean"]
-LANGUAGE_CODES = {"English": "en", "Japanese": "ja", "Vietnamese": "vi", "Korean": "ko"}
+LANGUAGES = ["English", "Korean"]
+LANGUAGE_CODES = {"English": "en", "Korean": "ko"}
 
 
 def parse_srt(file_path):

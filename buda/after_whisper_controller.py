@@ -215,8 +215,8 @@ def retain_pipe_status(
             mp4_file = os.path.join(eng_mp4_abs_path, channel, video_id + ".mp4")
             mp4_duration = get_duration(mp4_file)
 
-            # 超过60min的视频，跳过
-            if mp4_duration > 3600:
+            # 超过120min的视频，跳过
+            if mp4_duration > 7200:
                 lookup_dict[video_id]["jump60"] = True
             else:
                 lookup_dict[video_id]["jump60"] = False
@@ -362,10 +362,10 @@ def controller_after_whisper(topic):
         # 遍历所有的srt文件
         for srt in tqdm(formatted_srts_all):
             video_id = srt.replace(".srt", "")
-            # 超过30min的视频，跳过
+            # 超过120min的视频，跳过
             if jump60:
                 if lookup_dict[video_id]["jump60"]:
-                    print(f"频道{channel}的{srt} 超过60min，跳过...")
+                    print(f"频道{channel}的{srt} 超过120min，跳过...")
                     continue
 
             ###### step0: 读取bad.json文件，如果当前srt在bad.json中，跳过 ######

@@ -51,10 +51,10 @@ def setup_proxy():
     print("如果下载速度较慢，请检查代理软件是否正常运行")
     return False
 
-# 在导入whisper之前设置代理
+# 在导入faster_whisper之前设置代理
 setup_proxy()
 
-import whisper
+from faster_whisper import WhisperModel, BatchedInferencePipeline
 from datetime import timedelta
 from datetime import datetime
 from datetime import time
@@ -84,31 +84,41 @@ def float_to_srt_timestamp(seconds):
 
 
 def mp3totxt(mp3_path):
-    """this function using whisper larger v3 turbo model to generate pure transcriptions"""
-    model = whisper.load_model("large-v2")
+    """使用faster-whisper large-v2模型生成转录文本"""
+    # 使用CUDA模式获得最佳性能
+    print("🚀 使用CUDA模式运行faster-whisper批处理管道，获得最佳转录性能")
+    model = WhisperModel("large-v2", device="cuda", compute_type="float16")
+    batched_model = BatchedInferencePipeline(model=model)
 
     print(f"开始转录 {mp3_path}...")
-    result = model.transcribe(
+    
+    # 使用批处理管道进行转录
+    segments, info = batched_model.transcribe(
         mp3_path,
         word_timestamps=True,
         initial_prompt="你好，欢迎来到我的佛法课程。佛法无边。",
-        verbose=True,  # 添加verbose=True参数来显示转换进度
+        vad_filter=True,  # 开启VAD过滤以提高质量
+        vad_parameters=dict(min_silence_duration_ms=500),
+        beam_size=5,
+        batch_size=8
     )
-    print("转录完成")
+    
+    print(f"转录完成，检测到的语言: {info.language} (置信度: {info.language_probability:.2f})")
+    
     ts_list = []
     txt_list = []
-    for segment in result["segments"]:
-        start_time = float_to_srt_timestamp(float(segment["start"]))
-        end_time = float_to_srt_timestamp(float(segment["end"]))
-        text = segment["text"]
-        # strip the text of any newline characters using strip()
-        text = text.strip()
+    
+    for segment in segments:
+        start_time = float_to_srt_timestamp(segment.start)
+        end_time = float_to_srt_timestamp(segment.end)
+        text = segment.text.strip()
+        
         if len(text) == 0:
             continue
-        segmentId = segment["id"] + 1
-        segment = f"{segmentId}\n{start_time} --> {end_time}\n{text}\n\n"
+            
         ts_list.append((start_time, end_time))
         txt_list.append(text)
+    
     return ts_list, txt_list
 
 
@@ -137,7 +147,7 @@ def save_srt(ts_list, txt_list, srt_dst):
 
 
 def transcribemp3(topic):
-    """读入mp3文件，使用openai Whisper模型，转换为srt文件"""
+    """读入mp3文件，使用faster-whisper模型，转换为srt文件"""
     mp3_abs_path = f"/home/dhl/Downloads/27c99b155e2448f9a91dbf31d79f8d6f/video/mp3/mp3/{topic}"  # fill in the absolute path of the mp3 folder
     dst_srt_abs_path = f"/home/dhl/Documents/video_materials/format_srt/{topic}"  # fill in the absolute path of the srt folder
 
@@ -148,6 +158,9 @@ def transcribemp3(topic):
     all_channels = os.listdir(mp3_abs_path)
     # remove the .DS_Store file using list comprehension
     all_channels = [channel for channel in all_channels if channel != ".DS_Store"]
+
+    # 用于记录转录失败的文件
+    failed_files = []
 
     # read all mp3 files in the folder
     for single_channel in all_channels:
@@ -171,12 +184,29 @@ def transcribemp3(topic):
 
                 print("processing:", base_name + ".mp3", f"位于频道{single_channel}")
                 mp3_path = os.path.join(mp3_abs_path, single_channel, mp3_file)
-                ts_list, txt_list = mp3totxt(mp3_path)
-                # get base name without extension
-                print(f"保存srt文件到{dst_srt}...")
-                # save_srt(ts_list, txt_list, dst_srt)
+                
+                try:
+                    ts_list, txt_list = mp3totxt(mp3_path)
+                    # get base name without extension
+                    print(f"保存srt文件到{dst_srt}...")
+                    save_srt(ts_list, txt_list, dst_srt)
+                    print(f"✓ 成功转录: {mp3_file}")
+                except Exception as e:
+                    print(f"✗ 转录失败: {mp3_file}, 错误: {str(e)}")
+                    failed_files.append(f"{single_channel}/{mp3_file}")
+    
+    # 在最后打印所有失败的文件
+    if failed_files:
+        print("\n" + "="*50)
+        print(f"转录失败的文件 ({len(failed_files)} 个):")
+        print("="*50)
+        for failed_file in failed_files:
+            print(f"- {failed_file}")
+        print("="*50)
+    else:
+        print("\n🎉 所有文件都转录成功了！")
 
 
 # if __name__ == "__main__":
 #     topic = "code"
-#     transcribemp3(topic=topic)
+#     transcribemp3(topic=topic) 

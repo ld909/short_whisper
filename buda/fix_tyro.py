@@ -1,3 +1,96 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+SRT字幕错别字修复工具
+
+功能描述：
+    使用大模型API自动检查和修复SRT字幕文件中的错别字，特别针对佛教/佛学主题内容优化。
+    支持并发处理、断点续传、多种API服务。
+
+主要特性：
+    - 智能错别字检测和修复（特别优化佛教专业术语）
+    - 并发处理提高效率
+    - 断点续传功能，避免重复处理
+    - 支持多种大模型API（阿里云千问、uniapi）
+    - 自动处理目录结构中的所有SRT文件
+
+目录结构：
+    输入目录结构：
+    input_base_dir/
+    ├── 频道1/
+    │   ├── 视频1.srt
+    │   ├── 视频2.srt
+    │   └── ...
+    ├── 频道2/
+    │   ├── 视频1.srt
+    │   └── ...
+    └── ...
+
+    输出目录结构：
+    output_base_dir/
+    ├── 频道1/
+    │   ├── 视频1.srt (修复后)
+    │   ├── 视频2.srt (修复后)
+    │   └── ...
+    └── ...
+
+默认路径：
+    Linux系统输入路径：/media/dhl/buda_videos_youtube/format_srt_zh
+    macOS系统输入路径：/Volumes/dhl/buda_videos_youtube/format_srt_zh
+    
+    Linux系统输出路径：/media/dhl/buda_videos_youtube/zh_srt_tyro_fix
+    macOS系统输出路径：/Volumes/dhl/buda_videos_youtube/zh_srt_tyro_fix
+
+使用方法：
+    1. 基本使用（使用默认路径和uniapi）：
+       python fix_tyro.py
+
+    2. 使用阿里云千问API：
+       python fix_tyro.py -a ali
+
+    3. 自定义输入输出路径：
+       python fix_tyro.py -i /path/to/input -o /path/to/output
+
+    4. 使用本地目录输出（避免权限问题）：
+       python fix_tyro.py -l
+
+    5. 调整并发数量：
+       python fix_tyro.py -b 10
+
+    6. 完整参数示例：
+       python fix_tyro.py -a ali -o /custom/output -b 8
+
+命令行参数：
+    -a, --api {ali,uni}     选择API服务（ali=阿里云千问，uni=uniapi，默认uni）
+    -i, --input PATH        输入SRT文件基础目录路径（默认使用系统对应的挂载路径）
+    -o, --output PATH       输出SRT文件基础目录路径
+    -l, --local             使用本地目录 ~/srt_fixed 作为输出（避免权限问题）
+    -b, --batch_size NUM    并发处理批量大小（默认5）
+    -h, --help             显示帮助信息
+
+环境变量设置：
+    使用阿里云千问API时：
+        export DASHSCOPE_API_KEY=你的阿里云API密钥
+    
+    使用uniapi时：
+        export UNI_API_KEY=你的uniapi密钥
+
+注意事项：
+    1. 确保已安装所需依赖：pip install openai tqdm
+    2. 确保API密钥已正确设置
+    3. 如遇权限问题，使用 -l 选项或手动指定可写目录
+    4. 脚本支持断点续传，可随时中断并重新运行
+    5. 处理过程中会显示原句、AI返回结果和最终修正结果
+
+示例输出：
+    原句: 须云菩提对师尊说
+    AI返回: 须菩提对释尊说
+    结果: 已修正为: 须菩提对释尊说
+
+作者：dhl
+版本：1.0
+"""
+
 import os
 import re
 import sys
@@ -327,8 +420,16 @@ def process_srt_file(
         print(f"错误信息: {str(e)}")
 
 
+def get_transcription_base_path():
+    """获取转录文件的基础路径（实际SRT文件位置）"""
+    if platform.system() == "Darwin":  # Mac OS
+        return "/Volumes/dhl/buda_videos_youtube/format_srt_zh"
+    else:  # 默认为Linux/Ubuntu
+        return "/media/dhl/buda_videos_youtube/format_srt_zh"
+
+
 def get_base_path():
-    """根据操作系统类型返回对应的基础路径"""
+    """根据操作系统类型返回对应的基础路径（用于输出）"""
     if platform.system() == "Darwin":  # Mac OS
         return "/Volumes/dhl/buda_videos_youtube"
     else:  # 默认为Linux/Ubuntu
@@ -339,6 +440,7 @@ def main():
     """处理指定目录结构中的中文SRT文件"""
     # 获取基础路径
     base_path = get_base_path()
+    transcription_base_path = get_transcription_base_path()
     home_path = os.path.expanduser("~")
 
     # 创建命令行参数解析器
@@ -350,11 +452,12 @@ def main():
         choices=["ali", "uni"],
         help="选择使用的API服务（ali=阿里云千问模型，uni=uniapi）",
     )
+
     parser.add_argument(
         "-i",
         "--input",
-        default=f"{base_path}/format_srt_zh/mp3",
-        help="输入SRT基础目录路径",
+        default=None,
+        help="输入SRT基础目录路径（默认使用mp3toscripts_faster.py的输出路径）",
     )
     parser.add_argument(
         "-o",
@@ -378,10 +481,16 @@ def main():
 
     # 解析命令行参数
     args = parser.parse_args()
-    input_base_dir = args.input
-    output_base_dir = args.output
     api_type = args.api
     batch_size = args.batch_size
+    
+    # 设置输入路径：如果没有指定-i参数，则使用转录输出路径
+    if args.input is None:
+        input_base_dir = transcription_base_path  # 直接使用基础路径，不再添加topic
+    else:
+        input_base_dir = args.input
+    
+    output_base_dir = args.output
 
     # 如果选择使用本地目录
     if args.local:
@@ -391,7 +500,7 @@ def main():
 
     print(f"使用 {api_type} API 进行错别字修复")
     print(f"检测到系统: {platform.system()}")
-    print(f"使用基础路径: {base_path}")
+    print(f"转录基础路径: {transcription_base_path}")
     print(f"输入目录: {input_base_dir}")
     print(f"输出目录: {output_base_dir}")
     print(f"并发批量大小: {batch_size}")
@@ -456,11 +565,23 @@ def main():
             print(f"错误: 没有权限创建频道输出目录: {output_channel_dir}")
             continue
 
-        # 获取当前频道下的所有SRT文件
+        # 检查是否为双层目录结构 (format_srt_zh/channel/channel/XXX.srt)
+        # 先检查当前频道目录下是否有子目录与频道同名
+        inner_channel_dir = os.path.join(input_channel_dir, channel)
+        if os.path.exists(inner_channel_dir) and os.path.isdir(inner_channel_dir):
+            # 使用双层目录结构
+            actual_input_dir = inner_channel_dir
+            print(f"检测到双层目录结构，使用: {actual_input_dir}")
+        else:
+            # 使用单层目录结构
+            actual_input_dir = input_channel_dir
+            print(f"使用单层目录结构，使用: {actual_input_dir}")
+
+        # 获取实际目录下的所有SRT文件
         try:
             srt_files = [
                 f
-                for f in os.listdir(input_channel_dir)
+                for f in os.listdir(actual_input_dir)
                 if f.endswith(".srt") and not f.startswith(".")
             ]
             print(f"找到 {len(srt_files)} 个SRT文件")
@@ -473,7 +594,7 @@ def main():
             continue
 
         for srt_file in srt_files:
-            input_file_path = os.path.join(input_channel_dir, srt_file)
+            input_file_path = os.path.join(actual_input_dir, srt_file)
             output_file_path = os.path.join(output_channel_dir, srt_file)
 
             # 使用新的处理函数处理文件
