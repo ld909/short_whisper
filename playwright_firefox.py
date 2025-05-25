@@ -1,3 +1,28 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+脚本功能：使用 Playwright 自动化打开多个 Google AI Studio 页面
+作用：批量打开5个Chrome浏览器页面，每个页面都访问Google AI Studio的新聊天界面
+
+输入要求：
+- 无需输入文件或目录
+- 需要系统已安装 Google Chrome 浏览器
+- 需要安装 playwright 依赖：pip install playwright
+
+输出效果：
+- 打开5个Chrome浏览器标签页
+- 每个页面访问：https://aistudio.google.com/prompts/new_chat
+- 浏览器数据临时存储在：/tmp/playwright_chrome_data
+
+使用方法：
+python playwright_firefox.py
+
+注意事项：
+- 脚本会以非无头模式运行（浏览器可见）
+- 需要手动按回车键才会关闭浏览器
+- Chrome路径默认为 /usr/bin/google-chrome，可根据实际情况修改
+"""
+
 import asyncio
 from playwright.async_api import async_playwright
 
