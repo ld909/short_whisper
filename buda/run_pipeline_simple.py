@@ -75,6 +75,48 @@ def check_environment_variables():
     
     return True
 
+def check_dependencies():
+    """检查必要的依赖包"""
+    print("🔧 检查必要的依赖包...")
+    
+    dependencies = {
+        'edge-tts': '用于生成多语种MP3音频文件'
+    }
+    
+    missing_deps = []
+    for dep, description in dependencies.items():
+        try:
+            # 尝试运行命令检查是否安装
+            result = subprocess.run([dep, '--help'], capture_output=True, text=True)
+            if result.returncode in [0, 2]:  # 0=成功, 2=参数错误但命令存在
+                print(f"✅ {dep}: 已安装")
+            else:
+                missing_deps.append(f"  - {dep}: {description}")
+        except FileNotFoundError:
+            missing_deps.append(f"  - {dep}: {description}")
+    
+    if missing_deps:
+        print("❌ 以下依赖包未安装:")
+        for dep in missing_deps:
+            print(dep)
+        print("\n安装方法:")
+        print("pip install edge-tts")
+        
+        choice = input("\n是否自动安装缺失的依赖？(y/n): ")
+        if choice.lower() == 'y':
+            try:
+                print("正在安装 edge-tts...")
+                subprocess.run([sys.executable, '-m', 'pip', 'install', 'edge-tts'], check=True)
+                print("✅ 依赖安装完成")
+                return True
+            except subprocess.CalledProcessError as e:
+                print(f"❌ 依赖安装失败: {e}")
+                return False
+        else:
+            return False
+    
+    return True
+
 def run_script_with_conda(script_name, description, args=None, conda_env="audio"):
     """使用conda环境运行脚本"""
     print(f"\n正在运行: {script_name} - {description}")
@@ -163,6 +205,11 @@ def main():
         print("❌ 环境变量检查失败，脚本退出")
         return
     
+    # 检查必要的依赖包
+    if not check_dependencies():
+        print("❌ 依赖包检查失败，脚本退出")
+        return
+    
     # 获取默认topic
     default_topic = get_default_topic()
     print(f"📝 使用默认topic: {default_topic}")
@@ -175,9 +222,9 @@ def main():
         ("fix_tyro.py", "2. 生成修复的中文 srt 文件", ["-a", "uni"]),
         ("split_sentences_zh_srt.py", "2.1. 对中文进行分句得到分句后的txt", []),
         ("translate_srt_zh_multi.py", "3. 得到不同语种的 txt", []),
-        ("generate_mp3_clips.py", "4.1. 生成多语种 mp3 clips (第1次)", []),
-        ("generate_mp3_clips.py", "4.2. 生成多语种 mp3 clips (第2次)", []),
-        ("generate_mp3_clips.py", "4.3. 生成多语种 mp3 clips (第3次)", []),
+        ("generate_mp3_clips.py", "4.1. 生成多语种 mp3 clips (第1次)", ["-b", "5"]),
+        ("generate_mp3_clips.py", "4.2. 生成多语种 mp3 clips (第2次)", ["-b", "3"]),
+        ("generate_mp3_clips.py", "4.3. 生成多语种 mp3 clips (第3次)", ["-b", "2"]),
         ("check_and_regenerate_mp3.py", "4.4. 检查mp3进度，删除坏mp3，重新生成对应mp3 clip", []),
         ("generate_subtitles.py", "5. 得到不同语言对应 srt 字幕", []),
         ("merge_mp3.py", "6. 把 mp3 clips 合成为一个 mp3", []),
@@ -219,15 +266,9 @@ def main():
             success_count += 1
         else:
             failed_scripts.append((script_name, description))
-            # 如果脚本失败，询问是否继续
-            choice = input(f"\n脚本 {script_name} 执行失败，是否继续执行后续脚本？(y/n/s=跳过并继续): ")
-            if choice.lower() == 'n':
-                print("⏹️  用户选择停止执行")
-                break
-            elif choice.lower() == 's':
-                print("⏭️  跳过当前脚本，继续执行")
-                continue
-            # 'y' 或其他输入都会继续执行
+            # 脚本失败，立即停止整个程序
+            print(f"\n❌ 脚本 {script_name} 执行失败，由于每一步都依赖上一步的完成，程序将停止执行")
+            break
     
     # 计算总用时
     total_time = time.time() - start_time
@@ -243,7 +284,7 @@ def main():
     if success_count == len(scripts):
         print("🎉 所有脚本都成功执行！")
     else:
-        print(f"⚠️  有 {len(scripts) - success_count} 个脚本未成功执行")
+        print(f"⚠️  管道在第 {success_count + 1} 步失败，共有 {len(scripts) - success_count} 个脚本未执行")
         
         if failed_scripts:
             print("\n❌ 失败的脚本:")
@@ -255,6 +296,8 @@ def main():
             print("2. 检查环境变量是否设置: echo $UNI_API_KEY")
             print("3. 检查输入文件和目录是否存在")
             print("4. 查看上面的详细错误信息")
+            print("5. 修复问题后，请重新运行完整的管道")
+            print("\n⚠️  注意: 由于每一步都依赖前一步的结果，建议从头开始重新运行管道")
 
 if __name__ == "__main__":
     main() 
