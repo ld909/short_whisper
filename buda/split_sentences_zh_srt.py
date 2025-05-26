@@ -5,6 +5,10 @@
 此脚本用于处理中文SRT字幕文件，将每个字幕行的文本拆分成句子，如果句子长度超过260字符，
 则使用GPT-4.1-mini对标点符号进行修正，然后再次拆分成句子。
 
+新增功能:
+- 自动过滤全部由标点符号组成的行（包括中英文标点符号）
+- 在调试模式下显示被过滤的纯标点行统计信息
+
 输入目录:
 - [媒体路径]/zh_srt_tyro_fix/[频道名称]/
 
@@ -15,6 +19,7 @@
 1. 基本使用: python split_sentences_zh_srt.py
 2. 强制重新处理: python split_sentences_zh_srt.py -f
 3. 单文件处理: python split_sentences_zh_srt.py -s /path/to/file.srt
+4. 调试模式: python split_sentences_zh_srt.py -d
 """
 
 import os
@@ -91,6 +96,36 @@ def parse_srt_with_re(srt_content):
 def clean_text(text):
     """清理文本，移除「」符号"""
     return text.replace("「", "").replace("」", "")
+
+
+def is_all_punctuation(text):
+    """
+    检查文本是否全部由标点符号组成（包括中英文标点符号）
+
+    Args:
+        text: 要检查的文本
+
+    Returns:
+        bool: 如果文本全部由标点符号组成返回True，否则返回False
+    """
+    if not text or not text.strip():
+        return True
+
+    # 移除所有空白字符
+    text = text.strip()
+
+    # 定义中英文标点符号集合
+    punctuation_chars = set(
+        '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~。！？，、；：""'
+        "（）【】《》〈〉「」『』〔〕…—–‚„‹›«»‰′″‴※‼⁇⁈⁉⁏⁗"
+    )
+
+    # 检查每个字符是否都是标点符号
+    for char in text:
+        if char not in punctuation_chars and not char.isspace():
+            return False
+
+    return True
 
 
 def split_sentences(text):
@@ -289,6 +324,8 @@ def process_srt_file(input_file, output_file):
 
         # 处理字幕文本并写入输出文件
         all_sentences = []
+        filtered_punctuation_count = 0  # 统计被过滤的纯标点行数
+
         for subtitle in tqdm(subtitles, desc="处理字幕"):
             text = subtitle["text"]
             # 拆分句子
@@ -301,7 +338,16 @@ def process_srt_file(input_file, output_file):
             for sentence in processed_sentences:
                 # 清理句子：去除换行符并规范化空格
                 cleaned_sentence = re.sub(r"\s+", " ", sentence.strip())
-                if cleaned_sentence:  # 确保句子非空
+
+                # 检查是否全是标点符号
+                if cleaned_sentence and is_all_punctuation(cleaned_sentence):
+                    filtered_punctuation_count += 1
+                    if DEBUG_MODE:
+                        print(f"过滤纯标点行: '{cleaned_sentence}'")
+                    continue
+
+                # 确保句子非空且不全是标点符号
+                if cleaned_sentence:
                     all_sentences.append(cleaned_sentence)
 
         # 写入所有收集到的有效句子，每个句子一行，没有空行
@@ -311,6 +357,12 @@ def process_srt_file(input_file, output_file):
             # 确保每行只有一个句子，每个句子后都有换行符
             with open(output_file, "w", encoding="utf-8") as f:
                 f.write("\n".join(valid_sentences))
+
+        # 显示处理统计信息
+        if DEBUG_MODE or filtered_punctuation_count > 0:
+            print(
+                f"处理完成 - 有效句子: {len(all_sentences)}, 过滤纯标点行: {filtered_punctuation_count}"
+            )
 
         return True
 

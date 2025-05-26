@@ -278,6 +278,16 @@ def regenerate_mp3(mp3_path, verbose=False, batch_size=5, debug=False):
 
         # 获取需要转换的文本
         text = lines[line_num - 1].strip()
+
+        # 总是打印原文字内容，方便查看
+        print(f"📝 准备重新生成MP3的原文字:")
+        print(f"   文件: {txt_path}")
+        print(f"   行号: {line_num}")
+        print(f"   语言: {language}")
+        print(f"   内容: {text}")
+        print(f"   字符数: {len(text)}")
+        print("-" * 50)
+
         if verbose or debug:
             print(f"从文件 {txt_path} 中提取了第 {line_num} 行: {text}")
 
