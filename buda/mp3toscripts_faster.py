@@ -52,7 +52,7 @@ def setup_proxy():
     return False
 
 # 在导入faster_whisper之前设置代理
-setup_proxy()
+# setup_proxy()  # 代理功能已关闭，需要时取消注释
 
 from faster_whisper import WhisperModel, BatchedInferencePipeline
 from datetime import timedelta

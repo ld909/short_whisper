@@ -65,7 +65,7 @@ def setup_openai_client():
         sys.exit(1)
 
     try:
-        client = OpenAI(base_url="https://api.uniapi.io/v1", api_key=api_key)
+        client = OpenAI(base_url="https://hk.uniapi.io/v1", api_key=api_key)
         return client
     except Exception as e:
         print(f"初始化OpenAI客户端时出错: {e}")
