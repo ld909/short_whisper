@@ -17,6 +17,22 @@ import json
 from pathlib import Path
 
 
+def set_clash_proxy():
+    """设置代理环境变量，用于下载模型文件"""
+    os.environ["http_proxy"] = "http://127.0.0.1:7897"
+    os.environ["https_proxy"] = "http://127.0.0.1:7897"
+    # os.environ["all_proxy"] = "socks5://127.0.0.1:7891"
+    print("🌐 成功设定clash环境proxy...")
+
+
+def unset_clash_proxy():
+    """取消代理环境变量"""
+    os.environ.pop("http_proxy", None)
+    os.environ.pop("https_proxy", None)
+    # os.environ.pop("all_proxy", None)
+    print("🌐 成功取消clash环境proxy...")
+
+
 def get_chunk_files(input_dir):
     """
     获取所有文本块文件，按故事索引和块索引排序
@@ -456,6 +472,12 @@ def process_chunk(story_index, chunk_file, ref_audio, output_base_dir, model="F5
         return False
 
 
+def cleanup_and_exit(use_proxy):
+    """清理代理设置并退出"""
+    if use_proxy:
+        unset_clash_proxy()
+
+
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(description="音频合成器 - 使用 f5-tts 将文本块合成为音频（支持断点续传）")
@@ -503,8 +525,26 @@ def main():
         default=True,
         help="断点续传模式，跳过已存在的有效音频文件 (默认: True)"
     )
+    parser.add_argument(
+        "--proxy",
+        action="store_true",
+        default=True,
+        help="启用代理设置，用于下载模型文件 (默认: True)"
+    )
+    parser.add_argument(
+        "--no-proxy",
+        action="store_true",
+        help="禁用代理设置"
+    )
     
     args = parser.parse_args()
+    
+    # 设置代理（如果需要）
+    use_proxy = args.proxy and not args.no_proxy
+    if use_proxy:
+        set_clash_proxy()
+    else:
+        print("🌐 未启用代理设置")
     
     input_dir = args.input_dir
     output_dir = args.output_dir
@@ -525,6 +565,7 @@ def main():
     # 检查参考音频文件是否存在
     if not os.path.exists(ref_audio):
         print(f"❌ 参考音频文件不存在: {ref_audio}")
+        cleanup_and_exit(use_proxy)
         return
     
     # 获取所有文本块文件
@@ -532,6 +573,7 @@ def main():
     
     if not chunk_files:
         print(f"❌ 在目录 {input_dir} 中未找到任何文本块文件")
+        cleanup_and_exit(use_proxy)
         return
     
     # 过滤文件（如果指定了特定故事或块）
@@ -545,6 +587,7 @@ def main():
     
     if not chunk_files:
         print(f"❌ 根据指定条件未找到匹配的文件")
+        cleanup_and_exit(use_proxy)
         return
     
     print(f"\n📊 找到 {len(chunk_files)} 个文本块文件")
@@ -577,12 +620,14 @@ def main():
         if stats['completed_files'] > 0:
             print(f"\n✅ 已完成的文件: {stats['completed_files']} 个")
         
+        cleanup_and_exit(use_proxy)
         return
     
     # 如果没有待处理的文件
     if not stats['pending_files']:
         print(f"\n🎉 所有文件都已完成！无需处理。")
         print(f"📁 输出目录: {output_dir}")
+        cleanup_and_exit(use_proxy)
         return
     
     # 确保输出目录存在
@@ -595,64 +640,78 @@ def main():
     successful_count = 0
     failed_count = 0
     
-    start_time = time.time()
-    
-    for i, (story_index, chunk_file) in enumerate(stats['pending_files'], 1):
-        chunk_filename = os.path.basename(chunk_file)
-        chunk_index = chunk_filename.split('.')[0]
+    try:
+        start_time = time.time()
         
-        print(f"\n处理第 {i}/{len(stats['pending_files'])} 个文件: 故事 {story_index}, 块 {chunk_index}")
-        print(f"总体进度: {stats['completed_files'] + i}/{stats['total_files']} ({(stats['completed_files'] + i)/stats['total_files']*100:.1f}%)")
+        for i, (story_index, chunk_file) in enumerate(stats['pending_files'], 1):
+            chunk_filename = os.path.basename(chunk_file)
+            chunk_index = chunk_filename.split('.')[0]
+            
+            print(f"\n处理第 {i}/{len(stats['pending_files'])} 个文件: 故事 {story_index}, 块 {chunk_index}")
+            print(f"总体进度: {stats['completed_files'] + i}/{stats['total_files']} ({(stats['completed_files'] + i)/stats['total_files']*100:.1f}%)")
+            
+            success = process_chunk(story_index, chunk_file, ref_audio, output_dir, model, args.force_regenerate)
+            
+            if success:
+                successful_count += 1
+            else:
+                failed_count += 1
+            
+            # 在每个文件处理后稍作停顿，让显卡休息一下
+            if i < len(stats['pending_files']):
+                print("⏳ 等待 2 秒...")
+                time.sleep(2)
         
-        success = process_chunk(story_index, chunk_file, ref_audio, output_dir, model, args.force_regenerate)
+        end_time = time.time()
+        total_time = end_time - start_time
         
-        if success:
-            successful_count += 1
+        # 保存进度日志
+        save_progress_log(output_dir, stats, successful_count, failed_count)
+        
+        # 统计结果
+        print(f"\n=== 🎉 处理完成 ===")
+        print(f"✅ 本次成功合成: {successful_count} 个音频文件")
+        print(f"❌ 本次合成失败: {failed_count} 个音频文件")
+        print(f"⏭️  之前已完成: {stats['completed_files']} 个音频文件")
+        print(f"📊 总体完成: {stats['completed_files'] + successful_count}/{stats['total_files']} ({(stats['completed_files'] + successful_count)/stats['total_files']*100:.1f}%)")
+        print(f"⏱️  本次耗时: {total_time:.1f} 秒 ({total_time/60:.1f} 分钟)")
+        
+        if successful_count > 0:
+            avg_time = total_time / successful_count
+            print(f"📊 平均每个文件: {avg_time:.1f} 秒")
+        
+        total_processed = successful_count + failed_count
+        if total_processed > 0:
+            success_rate = successful_count / total_processed * 100
+            print(f"📊 本次成功率: {success_rate:.1f}%")
+        
+        print(f"📁 输出目录: {output_dir}")
+        
+        # 检查是否还有未完成的文件
+        remaining = stats['remaining_files'] - successful_count - failed_count
+        if remaining > 0:
+            print(f"\n⚠️  还有 {remaining} 个文件未处理，可以重新运行程序继续处理")
+        elif failed_count > 0:
+            print(f"\n⚠️  有 {failed_count} 个文件处理失败，可以重新运行程序重试")
         else:
-            failed_count += 1
+            print(f"\n🎉 所有文件处理完成！")
         
-        # 在每个文件处理后稍作停顿，让显卡休息一下
-        if i < len(stats['pending_files']):
-            print("⏳ 等待 2 秒...")
-            time.sleep(2)
+        if successful_count > 0:
+            print(f"\n📝 音频文件已保存到: {output_dir}")
+            print(f"📁 目录结构: mp3_clips/story_index/chunk_index.mp3")
     
-    end_time = time.time()
-    total_time = end_time - start_time
-    
-    # 保存进度日志
-    save_progress_log(output_dir, stats, successful_count, failed_count)
-    
-    # 统计结果
-    print(f"\n=== 🎉 处理完成 ===")
-    print(f"✅ 本次成功合成: {successful_count} 个音频文件")
-    print(f"❌ 本次合成失败: {failed_count} 个音频文件")
-    print(f"⏭️  之前已完成: {stats['completed_files']} 个音频文件")
-    print(f"📊 总体完成: {stats['completed_files'] + successful_count}/{stats['total_files']} ({(stats['completed_files'] + successful_count)/stats['total_files']*100:.1f}%)")
-    print(f"⏱️  本次耗时: {total_time:.1f} 秒 ({total_time/60:.1f} 分钟)")
-    
-    if successful_count > 0:
-        avg_time = total_time / successful_count
-        print(f"📊 平均每个文件: {avg_time:.1f} 秒")
-    
-    total_processed = successful_count + failed_count
-    if total_processed > 0:
-        success_rate = successful_count / total_processed * 100
-        print(f"📊 本次成功率: {success_rate:.1f}%")
-    
-    print(f"📁 输出目录: {output_dir}")
-    
-    # 检查是否还有未完成的文件
-    remaining = stats['remaining_files'] - successful_count - failed_count
-    if remaining > 0:
-        print(f"\n⚠️  还有 {remaining} 个文件未处理，可以重新运行程序继续处理")
-    elif failed_count > 0:
-        print(f"\n⚠️  有 {failed_count} 个文件处理失败，可以重新运行程序重试")
-    else:
-        print(f"\n🎉 所有文件处理完成！")
-    
-    if successful_count > 0:
-        print(f"\n📝 音频文件已保存到: {output_dir}")
-        print(f"📁 目录结构: mp3_clips/story_index/chunk_index.mp3")
+    except KeyboardInterrupt:
+        print(f"\n⚠️  用户中断了程序执行")
+        print(f"✅ 已成功处理: {successful_count} 个文件")
+        print(f"❌ 处理失败: {failed_count} 个文件")
+    except Exception as e:
+        print(f"\n❌ 程序执行出错: {e}")
+        print(f"✅ 已成功处理: {successful_count} 个文件")
+        print(f"❌ 处理失败: {failed_count} 个文件")
+    finally:
+        # 清理代理设置
+        if use_proxy:
+            unset_clash_proxy()
 
 
 if __name__ == "__main__":
