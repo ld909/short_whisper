@@ -411,14 +411,19 @@ def save_generated_story(page, story_index, story_dir):
         return False
 
 
-def process_window(page, window_index, story_data, is_first_story=True):
+def process_window(
+    page, window_index, story_data, is_first_story=True, need_warmup=False
+):
     """处理单个窗口的故事生成"""
     try:
         print(f"窗口 {window_index}: 开始处理故事 {story_data['index']}")
+        print(
+            f"窗口 {window_index}: 窗口第一次={is_first_story}, 需要热身={need_warmup}"
+        )
 
-        if is_first_story:
-            # 第一个故事：先进行热身，然后开新tab进行正式生成
-            print(f"窗口 {window_index}: 第一个故事需要热身，正在打开AI Studio...")
+        if is_first_story and need_warmup:
+            # 全局第一次：先进行热身，然后开新tab进行正式生成
+            print(f"窗口 {window_index}: 全局第一次需要热身，正在打开AI Studio...")
             page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
             page.wait_for_load_state("networkidle")
             page.wait_for_timeout(8000)
@@ -515,6 +520,13 @@ def process_window(page, window_index, story_data, is_first_story=True):
                     print(f"窗口 {window_index}: 热身阶段未找到运行按钮，跳过热身")
             else:
                 print(f"窗口 {window_index}: 热身阶段未找到文本框，跳过热身")
+        elif is_first_story and not need_warmup:
+            # 窗口第一次但全局热身已完成：直接打开AI Studio
+            print(f"窗口 {window_index}: 窗口第一次（跳过热身），正在打开AI Studio...")
+            page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
+            page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(8000)
+            print(f"窗口 {window_index}: 页面已完全加载")
         else:
             # 后续故事：在当前页面创建新会话
             print(f"窗口 {window_index}: 在当前页面创建新的聊天会话...")
@@ -892,7 +904,9 @@ def main():
             all_results = []
             stories_processed = 0
 
-            # 为每个窗口跟踪是否是第一个故事
+            # 全局热身标志，只在第一次运行时进行热身
+            global_warmup_done = False
+            # 为每个窗口跟踪是否是第一个故事（用于页面初始化，不包括热身）
             window_first_story = [True] * len(windows)
 
             while stories_processed < len(stories_to_generate):
@@ -922,13 +936,20 @@ def main():
 
                             # 处理当前窗口的故事
                             try:
-                                # 传递是否是第一个故事的标志
+                                # 传递是否是第一个故事的标志和是否需要热身
                                 is_first = window_first_story[i]
+                                need_warmup = not global_warmup_done
                                 success = process_window(
-                                    window, i + 1, story_data, is_first
+                                    window, i + 1, story_data, is_first, need_warmup
                                 )
 
-                                # 更新该窗口的状态，后续都不是第一个故事了
+                                # 更新全局热身状态和窗口状态
+                                if need_warmup:
+                                    global_warmup_done = True
+                                    print(
+                                        f"🎯 全局热身已完成，后续所有故事生成将跳过热身步骤"
+                                    )
+
                                 if is_first:
                                     window_first_story[i] = False
                                     print(

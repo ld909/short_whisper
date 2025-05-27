@@ -2,4 +2,6 @@ numpy>=1.20.0
 scipy>=1.6.0
 soundfile>=0.10.3
 pydub>=0.25.1
-argparse>=1.4.0 
+argparse>=1.4.0
+openai>=1.0.0
+tqdm>=4.62.0 
