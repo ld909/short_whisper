@@ -96,6 +96,42 @@ def is_mp3_valid(file_path, verbose=False, debug=False):
         return False
 
 
+def parse_mp3_path_info(mp3_path, debug=False):
+    """从MP3文件路径中解析出语种和视频标题信息"""
+    debug_log(f"解析MP3路径信息: {mp3_path}", debug)
+
+    # MP3路径格式: <BASE_MEDIA_PATH>/multi_lang_mp3/<频道>/<视频名>/<语言>/<行号>.mp3
+    parts = mp3_path.split(os.sep)
+    relative_path_parts = []
+
+    # 找到multi_lang_mp3在路径中的位置
+    for i, part in enumerate(parts):
+        if part == "multi_lang_mp3":
+            relative_path_parts = parts[i + 1 :]
+            break
+
+    if len(relative_path_parts) < 4:
+        debug_log(f"路径组件不足，无法解析: {relative_path_parts}", debug)
+        return None
+
+    channel = relative_path_parts[0]
+    video_name = relative_path_parts[1]
+    language = relative_path_parts[2]
+    line_num_str = os.path.splitext(relative_path_parts[3])[0]
+
+    # 验证行号是否为有效数字，排除macOS系统文件
+    if line_num_str.startswith("._") or not line_num_str.isdigit():
+        debug_log(f"跳过系统文件或无效行号: {line_num_str}", debug)
+        return None
+
+    return {
+        "channel": channel,
+        "video_name": video_name,
+        "language": language,
+        "line_num": int(line_num_str),
+    }
+
+
 def find_txt_source_for_mp3(mp3_path, debug=False):
     """根据MP3文件路径找到对应的源TXT文件"""
     debug_log(f"尝试为MP3文件找到源TXT: {mp3_path}", debug)
@@ -124,10 +160,16 @@ def find_txt_source_for_mp3(mp3_path, debug=False):
     channel = relative_path_parts[0]
     video_name = relative_path_parts[1]
     language = relative_path_parts[2]
-    line_num = os.path.splitext(relative_path_parts[3])[0]  # 去除.mp3后缀，得到行号
+    line_num_str = os.path.splitext(relative_path_parts[3])[0]  # 去除.mp3后缀，得到行号
+
+    # 验证行号是否为有效数字，排除macOS系统文件
+    if line_num_str.startswith("._") or not line_num_str.isdigit():
+        print(f"错误: 无效的行号格式 '{line_num_str}'，可能是系统文件: {mp3_path}")
+        debug_log(f"跳过系统文件或无效行号: {line_num_str}", debug)
+        return None
 
     debug_log(
-        f"提取的组件 - 频道: {channel}, 视频: {video_name}, 语言: {language}, 行号: {line_num}",
+        f"提取的组件 - 频道: {channel}, 视频: {video_name}, 语言: {language}, 行号: {line_num_str}",
         debug,
     )
 
@@ -146,7 +188,7 @@ def find_txt_source_for_mp3(mp3_path, debug=False):
     return {
         "txt_path": txt_path,
         "mp3_dir": os.path.dirname(mp3_path),
-        "line_num": int(line_num),
+        "line_num": int(line_num_str),
         "language": language,
     }
 
@@ -337,11 +379,15 @@ def check_directory(directory, force=False, verbose=False, batch_size=5, debug=F
         print(f"目录不存在: {directory}")
         return
 
-    # 获取所有MP3文件
+    # 获取所有MP3文件，排除macOS系统文件
     mp3_files = []
     for root, _, files in os.walk(directory):
         for file in files:
-            if file.endswith(".mp3"):
+            if (
+                file.endswith(".mp3")
+                and not file.startswith("._")
+                and not file.startswith(".DS_Store")
+            ):
                 mp3_files.append(os.path.join(root, file))
 
     if not mp3_files:
@@ -360,6 +406,9 @@ def check_directory(directory, force=False, verbose=False, batch_size=5, debug=F
         "regenerated": 0,
         "failed": 0,
     }
+
+    # 收集失败文件的详细信息
+    failed_files = []
 
     # 测试edge-tts是否正常工作
     if debug:
@@ -411,6 +460,32 @@ def check_directory(directory, force=False, verbose=False, batch_size=5, debug=F
                         stats["regenerated"] += 1
                     else:
                         stats["failed"] += 1
+
+                        # 收集失败文件的详细信息
+                        file_info = parse_mp3_path_info(result["file"], debug)
+                        if file_info:
+                            failed_files.append(
+                                {
+                                    "file_path": result["file"],
+                                    "language": file_info["language"],
+                                    "video_name": file_info["video_name"],
+                                    "channel": file_info["channel"],
+                                    "line_num": file_info["line_num"],
+                                    "error": result["error"],
+                                }
+                            )
+                        else:
+                            failed_files.append(
+                                {
+                                    "file_path": result["file"],
+                                    "language": "未知",
+                                    "video_name": "未知",
+                                    "channel": "未知",
+                                    "line_num": "未知",
+                                    "error": result["error"],
+                                }
+                            )
+
                         if verbose:
                             print(
                                 f"无法修复文件: {result['file']}, 错误: {result['error']}"
@@ -425,6 +500,46 @@ def check_directory(directory, force=False, verbose=False, batch_size=5, debug=F
     print(f"无效文件数: {stats['invalid']}")
     print(f"已重新生成: {stats['regenerated']}")
     print(f"修复失败: {stats['failed']}")
+    
+    # 输出失败文件的详细信息
+    if failed_files:
+        print(f"\n❌ 修复失败的文件详情 ({len(failed_files)} 个):")
+        print("=" * 80)
+        
+        # 按语种分组显示
+        failed_by_language = {}
+        for failed_file in failed_files:
+            lang = failed_file["language"]
+            if lang not in failed_by_language:
+                failed_by_language[lang] = []
+            failed_by_language[lang].append(failed_file)
+        
+        for language, files in failed_by_language.items():
+            print(f"\n🌐 语种: {language} ({len(files)} 个文件)")
+            print("-" * 60)
+            
+            # 按视频名分组
+            files_by_video = {}
+            for file_info in files:
+                video = file_info["video_name"]
+                if video not in files_by_video:
+                    files_by_video[video] = []
+                files_by_video[video].append(file_info)
+            
+            for video_name, video_files in files_by_video.items():
+                print(f"  📹 视频: {video_name}")
+                print(f"     频道: {video_files[0]['channel']}")
+                print(f"     失败行数: {', '.join(str(f['line_num']) for f in video_files)}")
+                if verbose:
+                    for file_info in video_files:
+                        print(f"       - 行 {file_info['line_num']}: {file_info['error']}")
+                        print(f"         文件: {file_info['file_path']}")
+                print()
+        
+        print("=" * 80)
+        print("💡 提示: 使用 -v 参数可以查看更详细的错误信息")
+    else:
+        print("\n✅ 所有文件都已成功处理！")
 
 
 def main():
@@ -519,11 +634,15 @@ def main():
         os.makedirs(test_dir, exist_ok=True)
         print(f"测试模式：使用临时目录 {test_dir}")
 
-        # 找出前10个无效文件
+        # 找出前10个无效文件，排除macOS系统文件
         test_files = []
         for root, _, files in os.walk(args.mp3_dir):
             for file in files:
-                if file.endswith(".mp3"):
+                if (
+                    file.endswith(".mp3")
+                    and not file.startswith("._")
+                    and not file.startswith(".DS_Store")
+                ):
                     full_path = os.path.join(root, file)
                     if not is_mp3_valid(full_path, args.verbose, args.debug):
                         test_files.append(full_path)

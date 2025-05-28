@@ -7,17 +7,24 @@
 此脚本用于检查 split_sentences_zh_srt.py 输出的 txt 文件，如果发现有单行全是标点符号的文件，
 则删除该文件以及对应的多语种 srt 和 txt 文件。
 
+新增功能:
+检查 multi_lang_mp3 和 zh_subtitle_split_txt 的差异，删除在 zh_subtitle_split_txt 中不存在
+但在 multi_lang_mp3 中已经存在的对应video文件夹（孤立的video文件夹）。
+
 检查路径:
 - [媒体路径]/zh_subtitle_split_txt/[频道名称]/
 
 删除路径:
 - [媒体路径]/multi_lang_srt/[频道名称]/[语种]/
 - [媒体路径]/multi_lang_txt/[频道名称]/[语种]/
+- [媒体路径]/multi_lang_mp3/[频道名称]/[video_name]/
 
 使用方法:
 1. 基本使用: python clean_punctuation_only_files.py
 2. 调试模式: python clean_punctuation_only_files.py -d
 3. 预览模式（不实际删除）: python clean_punctuation_only_files.py -p
+4. 只清理孤立video文件夹: python clean_punctuation_only_files.py --mp3-only
+5. 同时执行两种清理: python clean_punctuation_only_files.py --all
 """
 
 import os
@@ -46,6 +53,8 @@ ZH_SPLIT_TXT_PATH = os.path.join(BASE_MEDIA_PATH, "zh_subtitle_split_txt")
 MULTI_LANG_SRT_PATH = os.path.join(BASE_MEDIA_PATH, "multi_lang_srt")
 # 多语种txt目录
 MULTI_LANG_TXT_PATH = os.path.join(BASE_MEDIA_PATH, "multi_lang_txt")
+# 多语种mp3目录
+MULTI_LANG_MP3_PATH = os.path.join(BASE_MEDIA_PATH, "multi_lang_mp3")
 
 # 调试模式标志
 DEBUG_MODE = False
@@ -73,6 +82,16 @@ def is_all_punctuation(text):
     punctuation_chars = set(
         '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~。！？，、；：""'
         "（）【】《》〈〉「」『』〔〕…—–‚„‹›«»‰′″‴※‼⁇⁈⁉⁏⁗"
+    )
+
+    # 添加常用的Unicode引号字符
+    punctuation_chars.update(
+        [
+            chr(8220),  # " 左双引号
+            chr(8221),  # " 右双引号
+            chr(8216),  # ' 左单引号
+            chr(8217),  # ' 右单引号
+        ]
     )
 
     # 检查每个字符是否都是标点符号
@@ -277,13 +296,204 @@ def process_channel(channel_path):
     )
 
 
+def get_file_basename_without_ext(file_path):
+    """
+    获取文件的基础名称（不含扩展名）
+
+    Args:
+        file_path: 文件路径
+
+    Returns:
+        str: 文件基础名称
+    """
+    return os.path.splitext(os.path.basename(file_path))[0]
+
+
+def get_orphaned_mp3_files(channel):
+    """
+    获取指定频道中孤立的mp3文件夹（在zh_subtitle_split_txt中不存在对应txt文件的video_name文件夹）
+
+    Args:
+        channel: 频道名称
+
+    Returns:
+        list: 孤立的video_name文件夹路径列表
+    """
+    # 获取zh_subtitle_split_txt中的所有txt文件基名
+    zh_txt_channel_path = os.path.join(ZH_SPLIT_TXT_PATH, channel)
+    zh_txt_basenames = set()
+
+    if os.path.exists(zh_txt_channel_path):
+        txt_files = glob.glob(os.path.join(zh_txt_channel_path, "*.txt"))
+        zh_txt_basenames = {
+            get_file_basename_without_ext(f)
+            for f in txt_files
+            if not os.path.basename(f).startswith(".")
+        }
+
+    if DEBUG_MODE:
+        print(f"  频道 {channel} 中找到 {len(zh_txt_basenames)} 个中文txt文件")
+
+    # 获取multi_lang_mp3中的所有video_name文件夹
+    mp3_channel_path = os.path.join(MULTI_LANG_MP3_PATH, channel)
+    orphaned_video_folders = []
+
+    if not os.path.exists(mp3_channel_path):
+        if DEBUG_MODE:
+            print(f"  频道 {channel} 的mp3目录不存在: {mp3_channel_path}")
+        return orphaned_video_folders
+
+    # 遍历所有video_name目录
+    for video_name_dir in os.listdir(mp3_channel_path):
+        video_name_path = os.path.join(mp3_channel_path, video_name_dir)
+        if (
+            os.path.isdir(video_name_path)
+            and not video_name_dir.startswith(".")
+            and not video_name_dir.startswith("._")
+        ):
+            # 检查这个video_name是否在中文txt文件基名集合中
+            if video_name_dir not in zh_txt_basenames:
+                # 如果不在，则这个video_name文件夹是孤立的
+                orphaned_video_folders.append(video_name_path)
+
+    return orphaned_video_folders
+
+
+def process_channel_mp3_cleanup(channel):
+    """
+    处理单个频道的mp3清理
+
+    Args:
+        channel: 频道名称
+
+    Returns:
+        tuple: (检查的video文件夹数, 删除的video文件夹数)
+    """
+    orphaned_video_folders = get_orphaned_mp3_files(channel)
+
+    if not orphaned_video_folders:
+        if DEBUG_MODE:
+            print(f"频道 {channel} 中没有找到孤立的video文件夹")
+        return 0, 0
+
+    print(
+        f"\n处理频道: {channel} (发现 {len(orphaned_video_folders)} 个孤立的video文件夹)"
+    )
+
+    deleted_count = 0
+
+    for video_folder in tqdm(
+        orphaned_video_folders, desc=f"清理 {channel} 孤立video文件夹"
+    ):
+        video_name = os.path.basename(video_folder)
+
+        if DEBUG_MODE:
+            print(f"  发现孤立video文件夹: {video_name}")
+
+        if delete_folder_safely(video_folder):
+            deleted_count += 1
+
+    if deleted_count > 0:
+        print(f"  ✅ 成功删除 {deleted_count} 个孤立的video文件夹")
+
+    return len(orphaned_video_folders), deleted_count
+
+
+def delete_folder_safely(folder_path):
+    """
+    安全删除文件夹及其所有内容，会先清理macOS产生的隐藏文件
+
+    Args:
+        folder_path: 要删除的文件夹路径
+
+    Returns:
+        bool: 删除是否成功
+    """
+    try:
+        if PREVIEW_MODE:
+            print(f"  [预览] 将删除文件夹: {folder_path}")
+            return True
+        else:
+            import shutil
+
+            # 先清理macOS产生的隐藏文件（._开头的文件）
+            def cleanup_macos_files(path):
+                """递归清理macOS产生的隐藏文件"""
+                try:
+                    for root, dirs, files in os.walk(path):
+                        for file in files:
+                            if file.startswith("._") or file == ".DS_Store":
+                                file_path = os.path.join(root, file)
+                                try:
+                                    os.remove(file_path)
+                                    if DEBUG_MODE:
+                                        print(f"    清理隐藏文件: {file_path}")
+                                except:
+                                    pass  # 忽略清理隐藏文件时的错误
+                except:
+                    pass  # 忽略遍历时的错误
+
+            # 清理隐藏文件
+            cleanup_macos_files(folder_path)
+
+            # 删除文件夹
+            shutil.rmtree(folder_path, ignore_errors=True)
+
+            if DEBUG_MODE:
+                print(f"  已删除文件夹: {folder_path}")
+            return True
+    except Exception as e:
+        print(f"  删除文件夹失败 {folder_path}: {e}")
+        return False
+
+
+def cleanup_orphaned_mp3_files():
+    """
+    清理所有频道中的孤立video文件夹
+
+    Returns:
+        tuple: (总检查的video文件夹数, 总删除的video文件夹数)
+    """
+    print(f"\n🎵 开始清理孤立的video文件夹...")
+    print(f"🔍 检查路径: {MULTI_LANG_MP3_PATH}")
+
+    # 检查mp3路径是否存在
+    if not os.path.exists(MULTI_LANG_MP3_PATH):
+        print(f"❌ 错误: mp3路径 '{MULTI_LANG_MP3_PATH}' 不存在")
+        return 0, 0
+
+    # 获取所有频道目录
+    channels = [
+        d
+        for d in os.listdir(MULTI_LANG_MP3_PATH)
+        if os.path.isdir(os.path.join(MULTI_LANG_MP3_PATH, d)) and not d.startswith(".")
+    ]
+
+    if not channels:
+        print(f"在 '{MULTI_LANG_MP3_PATH}' 中未找到任何频道目录")
+        return 0, 0
+
+    print(f"找到 {len(channels)} 个频道目录")
+
+    total_checked = 0
+    total_deleted = 0
+
+    # 处理每个频道
+    for channel in channels:
+        checked, deleted = process_channel_mp3_cleanup(channel)
+        total_checked += checked
+        total_deleted += deleted
+
+    return total_checked, total_deleted
+
+
 def main():
     """主函数"""
     global DEBUG_MODE, PREVIEW_MODE
 
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(
-        description="清理包含纯标点符号行的txt文件及其对应的多语种文件"
+        description="清理包含纯标点符号行的txt文件及其对应的多语种文件，以及清理孤立的mp3文件"
     )
 
     parser.add_argument(
@@ -294,6 +504,16 @@ def main():
         "--preview",
         action="store_true",
         help="预览模式，只显示将要删除的文件，不实际删除",
+    )
+    parser.add_argument(
+        "--mp3-only",
+        action="store_true",
+        help="只清理孤立video文件夹，不清理包含纯标点符号的txt文件及其对应的多语种文件",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="同时执行两种清理，先清理包含纯标点符号的txt文件及其对应的多语种文件，再清理孤立的video文件夹",
     )
 
     # 解析命令行参数
@@ -311,67 +531,188 @@ def main():
     print(f"🔍 检查路径: {ZH_SPLIT_TXT_PATH}")
     print(f"🗑️  多语种srt路径: {MULTI_LANG_SRT_PATH}")
     print(f"🗑️  多语种txt路径: {MULTI_LANG_TXT_PATH}")
+    print(f"🗑️  多语种mp3路径: {MULTI_LANG_MP3_PATH}")
 
-    # 检查输入路径是否存在
-    if not os.path.exists(ZH_SPLIT_TXT_PATH):
-        print(f"❌ 错误: 输入路径 '{ZH_SPLIT_TXT_PATH}' 不存在")
-        return
+    # 根据命令行参数决定执行哪种清理
+    if args.mp3_only:
+        # 只清理孤立的mp3文件
+        print(f"\n🎵 执行模式: 只清理孤立的video文件夹")
+        total_checked_mp3, total_deleted_mp3 = cleanup_orphaned_mp3_files()
 
-    # 获取所有频道目录
-    channels = [
-        d
-        for d in os.listdir(ZH_SPLIT_TXT_PATH)
-        if os.path.isdir(os.path.join(ZH_SPLIT_TXT_PATH, d)) and not d.startswith(".")
-    ]
+        # 显示mp3清理总结
+        print(f"\n{'='*60}")
+        print(f"🎯 mp3清理完成！")
+        print(f"📊 检查的video文件夹: {total_checked_mp3}")
+        print(f"🗑️  删除的video文件夹: {total_deleted_mp3}")
 
-    if not channels:
-        print(f"在 '{ZH_SPLIT_TXT_PATH}' 中未找到任何频道目录")
-        return
+        if PREVIEW_MODE:
+            print(f"💡 这是预览模式，没有实际删除文件")
+        elif total_deleted_mp3 > 0:
+            print(f"✅ 成功清理了 {total_deleted_mp3} 个孤立的video文件夹")
+        else:
+            print(f"✅ 没有发现孤立的video文件夹")
 
-    print(f"找到 {len(channels)} 个频道目录")
+    elif args.all:
+        # 执行两种清理
+        print(f"\n📋 执行模式: 同时执行两种清理")
 
-    # 统计信息
-    total_processed = 0
-    total_deleted_groups = 0
-    total_deleted_zh_txt = 0
-    total_deleted_srt = 0
-    total_deleted_multi_txt = 0
+        # 1. 先清理包含纯标点符号的txt文件及其对应的多语种文件
+        print(f"\n📝 第一步: 清理包含纯标点符号的txt文件及其对应的多语种文件")
 
-    # 处理每个频道
-    for channel in channels:
-        channel_path = os.path.join(ZH_SPLIT_TXT_PATH, channel)
-        processed, deleted_groups, deleted_zh_txt, deleted_srt, deleted_multi_txt = (
-            process_channel(channel_path)
+        # 检查输入路径是否存在
+        if not os.path.exists(ZH_SPLIT_TXT_PATH):
+            print(f"❌ 错误: 输入路径 '{ZH_SPLIT_TXT_PATH}' 不存在")
+            return
+
+        # 获取所有频道目录
+        channels = [
+            d
+            for d in os.listdir(ZH_SPLIT_TXT_PATH)
+            if os.path.isdir(os.path.join(ZH_SPLIT_TXT_PATH, d))
+            and not d.startswith(".")
+        ]
+
+        if not channels:
+            print(f"在 '{ZH_SPLIT_TXT_PATH}' 中未找到任何频道目录")
+        else:
+            print(f"找到 {len(channels)} 个频道目录")
+
+            # 统计信息
+            total_processed = 0
+            total_deleted_groups = 0
+            total_deleted_zh_txt = 0
+            total_deleted_srt = 0
+            total_deleted_multi_txt = 0
+
+            # 处理每个频道
+            for channel in channels:
+                channel_path = os.path.join(ZH_SPLIT_TXT_PATH, channel)
+                (
+                    processed,
+                    deleted_groups,
+                    deleted_zh_txt,
+                    deleted_srt,
+                    deleted_multi_txt,
+                ) = process_channel(channel_path)
+
+                total_processed += processed
+                total_deleted_groups += deleted_groups
+                total_deleted_zh_txt += deleted_zh_txt
+                total_deleted_srt += deleted_srt
+                total_deleted_multi_txt += deleted_multi_txt
+
+            # 计算总删除文件数
+            total_deleted_files = (
+                total_deleted_zh_txt + total_deleted_srt + total_deleted_multi_txt
+            )
+
+            # 显示第一步总结
+            print(f"\n📝 第一步完成！")
+            print(f"📊 总计处理文件: {total_processed}")
+            print(f"🗑️  删除的文件组: {total_deleted_groups}")
+            print(f"🗑️  删除的总文件数: {total_deleted_files}")
+            print(f"   ├─ zh_subtitle_split_txt: {total_deleted_zh_txt} 个")
+            print(f"   ├─ multi_lang_srt: {total_deleted_srt} 个")
+            print(f"   └─ multi_lang_txt: {total_deleted_multi_txt} 个")
+
+        # 2. 再清理孤立的mp3文件
+        print(f"\n🎵 第二步: 清理孤立的video文件夹")
+        total_checked_mp3, total_deleted_mp3 = cleanup_orphaned_mp3_files()
+
+        # 显示最终总结
+        print(f"\n{'='*60}")
+        print(f"🎯 全部清理完成！")
+        print(f"📝 纯标点符号文件清理:")
+        if "total_processed" in locals():
+            print(f"   ├─ 处理文件: {total_processed}")
+            print(f"   ├─ 删除文件组: {total_deleted_groups}")
+            print(f"   └─ 删除总文件数: {total_deleted_files}")
+        else:
+            print(f"   └─ 跳过（输入路径不存在）")
+        print(f"🎵 孤立video文件夹清理:")
+        print(f"   ├─ 检查文件夹: {total_checked_mp3}")
+        print(f"   └─ 删除文件夹: {total_deleted_mp3}")
+
+        if PREVIEW_MODE:
+            print(f"💡 这是预览模式，没有实际删除文件")
+        else:
+            total_all_deleted = (
+                total_deleted_files if "total_deleted_files" in locals() else 0
+            ) + total_deleted_mp3
+            if total_all_deleted > 0:
+                print(f"✅ 总共成功清理了 {total_all_deleted} 个文件")
+            else:
+                print(f"✅ 没有发现需要清理的文件")
+
+    else:
+        # 默认行为：只清理包含纯标点符号的txt文件及其对应的多语种文件
+        print(f"\n📝 执行模式: 清理包含纯标点符号的txt文件及其对应的多语种文件")
+
+        # 检查输入路径是否存在
+        if not os.path.exists(ZH_SPLIT_TXT_PATH):
+            print(f"❌ 错误: 输入路径 '{ZH_SPLIT_TXT_PATH}' 不存在")
+            return
+
+        # 获取所有频道目录
+        channels = [
+            d
+            for d in os.listdir(ZH_SPLIT_TXT_PATH)
+            if os.path.isdir(os.path.join(ZH_SPLIT_TXT_PATH, d))
+            and not d.startswith(".")
+        ]
+
+        if not channels:
+            print(f"在 '{ZH_SPLIT_TXT_PATH}' 中未找到任何频道目录")
+            return
+
+        print(f"找到 {len(channels)} 个频道目录")
+
+        # 统计信息
+        total_processed = 0
+        total_deleted_groups = 0
+        total_deleted_zh_txt = 0
+        total_deleted_srt = 0
+        total_deleted_multi_txt = 0
+
+        # 处理每个频道
+        for channel in channels:
+            channel_path = os.path.join(ZH_SPLIT_TXT_PATH, channel)
+            (
+                processed,
+                deleted_groups,
+                deleted_zh_txt,
+                deleted_srt,
+                deleted_multi_txt,
+            ) = process_channel(channel_path)
+
+            total_processed += processed
+            total_deleted_groups += deleted_groups
+            total_deleted_zh_txt += deleted_zh_txt
+            total_deleted_srt += deleted_srt
+            total_deleted_multi_txt += deleted_multi_txt
+
+        # 计算总删除文件数
+        total_deleted_files = (
+            total_deleted_zh_txt + total_deleted_srt + total_deleted_multi_txt
         )
 
-        total_processed += processed
-        total_deleted_groups += deleted_groups
-        total_deleted_zh_txt += deleted_zh_txt
-        total_deleted_srt += deleted_srt
-        total_deleted_multi_txt += deleted_multi_txt
+        # 显示总结
+        print(f"\n{'='*60}")
+        print(f"🎯 处理完成！")
+        print(f"📊 总计处理文件: {total_processed}")
+        print(f"🗑️  删除的文件组: {total_deleted_groups}")
+        print(f"🗑️  删除的总文件数: {total_deleted_files}")
+        print(f"   ├─ zh_subtitle_split_txt: {total_deleted_zh_txt} 个")
+        print(f"   ├─ multi_lang_srt: {total_deleted_srt} 个")
+        print(f"   └─ multi_lang_txt: {total_deleted_multi_txt} 个")
 
-    # 计算总删除文件数
-    total_deleted_files = (
-        total_deleted_zh_txt + total_deleted_srt + total_deleted_multi_txt
-    )
-
-    # 显示总结
-    print(f"\n{'='*60}")
-    print(f"🎯 处理完成！")
-    print(f"📊 总计处理文件: {total_processed}")
-    print(f"🗑️  删除的文件组: {total_deleted_groups}")
-    print(f"🗑️  删除的总文件数: {total_deleted_files}")
-    print(f"   ├─ zh_subtitle_split_txt: {total_deleted_zh_txt} 个")
-    print(f"   ├─ multi_lang_srt: {total_deleted_srt} 个")
-    print(f"   └─ multi_lang_txt: {total_deleted_multi_txt} 个")
-
-    if PREVIEW_MODE:
-        print(f"💡 这是预览模式，没有实际删除文件")
-        print(f"💡 要实际执行删除，请运行: python {os.path.basename(__file__)}")
-    elif total_deleted_groups > 0:
-        print(f"✅ 成功清理了 {total_deleted_groups} 组包含纯标点行的文件")
-    else:
-        print(f"✅ 没有发现包含纯标点行的文件")
+        if PREVIEW_MODE:
+            print(f"💡 这是预览模式，没有实际删除文件")
+            print(f"💡 要实际执行删除，请运行: python {os.path.basename(__file__)}")
+        elif total_deleted_groups > 0:
+            print(f"✅ 成功清理了 {total_deleted_groups} 组包含纯标点行的文件")
+        else:
+            print(f"✅ 没有发现包含纯标点行的文件")
 
 
 if __name__ == "__main__":

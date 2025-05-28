@@ -28,6 +28,7 @@ import sys
 import argparse
 import platform
 import glob
+import unicodedata
 from tqdm import tqdm
 from openai import OpenAI
 import concurrent.futures
@@ -100,7 +101,7 @@ def clean_text(text):
 
 def is_all_punctuation(text):
     """
-    检查文本是否全部由标点符号组成（包括中英文标点符号）
+    检查文本是否全部由标点符号组成（包括所有Unicode标点符号）
 
     Args:
         text: 要检查的文本
@@ -114,16 +115,14 @@ def is_all_punctuation(text):
     # 移除所有空白字符
     text = text.strip()
 
-    # 定义中英文标点符号集合
-    punctuation_chars = set(
-        '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~。！？，、；：""'
-        "（）【】《》〈〉「」『』〔〕…—–‚„‹›«»‰′″‴※‼⁇⁈⁉⁏⁗"
-    )
-
     # 检查每个字符是否都是标点符号
     for char in text:
-        if char not in punctuation_chars and not char.isspace():
-            return False
+        if not char.isspace():
+            # 使用unicodedata检查字符类别
+            category = unicodedata.category(char)
+            # 标点符号的Unicode类别以'P'开头
+            if not category.startswith("P"):
+                return False
 
     return True
 
