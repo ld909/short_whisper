@@ -30,6 +30,7 @@ import concurrent.futures
 import sys
 from tqdm import tqdm
 import importlib.util
+import tempfile  # 添加这个导入
 
 
 def get_base_path():
@@ -346,10 +347,12 @@ def merge_mp3_files(input_dir, output_file, force=False):
     # 这确保语速保持一致并且不会有空白段
     print(f"使用完整解码重新编码方法合并 {len(mp3_files)} 个MP3文件...")
 
+    # 使用系统临时目录避免路径过长问题
+    temp_dir = None
     try:
-        # 创建一个临时文件夹用于中间文件
-        temp_dir = os.path.join(output_dir, "temp_merge")
-        os.makedirs(temp_dir, exist_ok=True)
+        # 创建一个临时文件夹用于中间文件，使用系统临时目录
+        temp_dir = tempfile.mkdtemp(prefix="merge_mp3_")
+        print(f"创建临时目录: {temp_dir}")
 
         # 首先将所有MP3转换为WAV，确保采样率和格式一致
         wav_files = []
@@ -543,15 +546,6 @@ def merge_mp3_files(input_dir, output_file, force=False):
             and verify_mp3_file(output_file)
         ):
             print(f"成功合并并保存到: {output_file}")
-
-            # 清理临时文件
-            try:
-                import shutil
-
-                shutil.rmtree(temp_dir)
-            except Exception as cleanup_e:
-                print(f"清理临时文件时出错: {cleanup_e}")
-
             return True
         else:
             print("错误: 无法创建有效的输出MP3文件")
@@ -560,6 +554,15 @@ def merge_mp3_files(input_dir, output_file, force=False):
     except Exception as e:
         print(f"合并过程中出错: {e}")
         return False
+    finally:
+        # 清理临时文件
+        if temp_dir and os.path.exists(temp_dir):
+            try:
+                import shutil
+                shutil.rmtree(temp_dir)
+                print(f"清理临时目录: {temp_dir}")
+            except Exception as cleanup_e:
+                print(f"清理临时文件时出错: {cleanup_e}")
 
 
 def process_language(channel, video_name, language, force=False):
