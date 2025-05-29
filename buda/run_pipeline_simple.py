@@ -87,10 +87,8 @@ def check_environment_variables():
         print("\n设置方法:")
         print("export UNI_API_KEY=你的密钥")
         print("export DASHSCOPE_API_KEY=你的密钥")
-
-        choice = input("\n是否继续执行？某些脚本可能会失败 (y/n): ")
-        if choice.lower() != "y":
-            return False
+        print("\n⚠️  警告: 部分环境变量未设置，某些脚本可能会失败")
+        print("💡 程序将自动继续执行...")
 
     return True
 
@@ -119,21 +117,19 @@ def check_dependencies():
             print(dep)
         print("\n安装方法:")
         print("pip install edge-tts")
+        print("💡 程序将自动安装缺失的依赖...")
 
-        choice = input("\n是否自动安装缺失的依赖？(y/n): ")
-        if choice.lower() == "y":
-            try:
-                print("正在安装 edge-tts...")
-                subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "edge-tts"], check=True
-                )
-                print("✅ 依赖安装完成")
-                return True
-            except subprocess.CalledProcessError as e:
-                print(f"❌ 依赖安装失败: {e}")
-                return False
-        else:
-            return False
+        try:
+            print("正在安装 edge-tts...")
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "edge-tts"], check=True
+            )
+            print("✅ 依赖安装完成")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"❌ 依赖安装失败: {e}")
+            print("⚠️  警告: 某些脚本可能会失败，程序将继续执行...")
+            return True  # 即使安装失败也继续执行
 
     return True
 
@@ -272,6 +268,7 @@ def main():
             ),
             ("generate_subtitles.py", "5. 得到不同语言对应 srt 字幕", []),
             ("merge_mp3.py", "6. 把 mp3 clips 合成为一个 mp3", []),
+            ("merge_mp3.py", "6.1 再跑一次，把 mp3 clips 合成为一个 mp3", []),
             ("merge_mp4_clips_by_audio_duration.py", "7. 生成无声且无字幕的 mp4", []),
             ("add_subtitles_to_mp4.py", "8. 给无声的 mp4 增加字幕", []),
             ("merge_mp4_mp3.py", "9. 给mp4添加音频", []),
