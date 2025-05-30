@@ -1,3 +1,67 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+科幻音频小说故事提示生成器 (Sci-Fi Audio Story Prompt Generator)
+
+功能描述:
+    这个脚本用于自动生成科幻爱情音频小说的故事提示（prompt），专门为AI创作90分钟以上的音频内容设计。
+    生成的故事遵循特定的创作模板：人类男主角与外星女主角的科幻爱情故事，包含完整的故事结构和详细的情节发展指导。
+
+主要特性:
+    - 基于config.json配置文件随机组合故事参数
+    - 支持批量生成多个不同的故事提示
+    - 自动生成完整的故事结构大纲（90分钟音频时长）
+    - 输出纯文本格式，适合直接用于音频引擎
+    - 支持自定义输出目录
+    - 自动编号避免文件覆盖
+
+故事模板结构:
+    1. 人类男主角 + 外星女主角的科幻爱情故事
+    2. 包含9个主要情节段落（从开场到尾声）
+    3. 预设时长90分钟，超过10000英文单词
+    4. 遵循"意外结合，跨越星际，为爱与新生而战"的核心理念
+
+使用方法:
+    基本用法:
+        python gen_prompt.py
+        # 生成1个故事提示，保存到默认目录
+
+    生成多个提示:
+        python gen_prompt.py -n 5
+        # 生成5个不同的故事提示
+
+    指定输出目录:
+        python gen_prompt.py -o /path/to/output
+        # 将文件保存到指定目录
+
+    组合使用:
+        python gen_prompt.py -n 3 -o /custom/path
+        # 生成3个提示并保存到自定义目录
+
+参数说明:
+    -n, --num       生成的提示数量（默认: 1）
+    -o, --output    输出目录路径（默认: 根据操作系统自动选择）
+    -h, --help      显示帮助信息
+
+依赖文件:
+    - config.json: 包含所有故事参数的配置文件（必需）
+
+输出格式:
+    - 文件名: 1.txt, 2.txt, 3.txt... （自动递增编号）
+    - 内容: 纯文本格式的英文故事提示
+    - 每个文件包含完整的故事生成指令和结构大纲
+
+注意事项:
+    1. 确保config.json文件存在且格式正确
+    2. 输出目录会自动创建（如果不存在）
+    3. 生成的内容为英文，针对音频小说优化
+    4. 每次运行都会生成不同的随机组合
+
+作者:
+创建时间:
+最后更新:
+"""
+
 import random
 import json
 import re
@@ -137,6 +201,8 @@ def generate_prompt():
         "Climax_Setting",
         "Resolution_Focus",
         "Opening_Hook_Style",
+        "male_human_protagonist_names",
+        "female_alien_protagonist_names",
     ]:
         selected_params[param_name] = get_parameter_value(config_data, param_name)
 
@@ -184,8 +250,8 @@ def generate_prompt():
 Generate a science fiction romance audio script in English, targeting a runtime of 1 hour or more. The story must follow the channel's core DNA: "Unexpected Union, Across the Stars, Fighting for Love and New Life". It should feature a strong narrative hook, a central romance driven by conflict and unexpected circumstances, significant character growth (especially for the alien female), unique sci-fi elements (including alien biology/culture), and high stakes. Ensure the narrative pace builds effectively over the extended duration. **The human protagonist must be Male, and the alien protagonist must be Female.**
 
 **Story Parameters:**
--   Human (Male) Protagonist: {selected_params["Human_Protagonist_Role_Archetype"]}, Key Trait(s): {selected_params["Human_Protagonist_Key_Trait"]}.
--   Alien (Female) Protagonist: {selected_params["Alien_Protagonist_Species_Name"]} ({selected_params["Alien_Protagonist_Unique_Biology"]} biological feature(s)), Cultural Quirk(s): {selected_params["Alien_Protagonist_Cultural_Quirk"]}.
+-   Human (Male) Protagonist: {selected_params["Human_Protagonist_Role_Archetype"]}, Key Trait(s): {selected_params["Human_Protagonist_Key_Trait"]}, Name: {selected_params["male_human_protagonist_names"]}.
+-   Alien (Female) Protagonist: {selected_params["Alien_Protagonist_Species_Name"]} ({selected_params["Alien_Protagonist_Unique_Biology"]} biological feature(s)), Cultural Quirk(s): {selected_params["Alien_Protagonist_Cultural_Quirk"]}, Name: {selected_params["female_alien_protagonist_names"]}.
 -   Initial Setup: {selected_params["Initial_Scenario"]} ({selected_params["Specific_Details_for_Initial_Scenario"] if selected_params["Specific_Details_for_Initial_Scenario"] else 'No specific sub-details for this scenario type'}). The alien female protagonist shows hints of {selected_params["Alien_Protagonist_Hidden_Depth"]} in this scenario.
 -   Relationship & Plot Turning Point: A major shift occurs via the {selected_params["Turning_Point_Mechanism"]} mechanism.
 -   Main Conflict: Confronting {selected_params["Main_Antagonist_Faction_Type"]}, whose goal is {selected_params["Core_Conflict_Goal"]}.
@@ -194,16 +260,16 @@ Generate a science fiction romance audio script in English, targeting a runtime 
 -   Resolution Focus: {selected_params["Resolution_Focus"]}.
 -   Opening Hook Style: {selected_params["Opening_Hook_Style"]}, includes elements such as: {', '.join(selected_params["Opening_Hook_Elements"])}.
 
-**Story Structure Outline (Guidance for AI over 1h+ duration):**
+**Story Structure Outline (Guidance for AI over 90 mins duration):**
 Introduction & Hook (Approx. 0-1 min): Create a compelling hook sentence based on the Opening Hook Style, incorporating some of the listed Opening Hook Elements, limited to 1-2 sentences. Immediately transition into vividly describing the setting and atmosphere of the Initial Scenario, introducing the human male protagonist and the alien female protagonist in their initial dynamic. Establish the initial conflict, misunderstanding, or tension. Hint at the alien female protagonist's unique nature or situation (Unique Biology, Cultural Quirk, or initial glimpses of Hidden Depth).
-Initial Encounter & Immediate Consequences (Approx. 1-10 mins): Detail the events of the Initial Scenario. Explore the initial interactions between the human male protagonist, highlighting his Key Trait(s), and the alien female's initial status/behavior. Introduce the immediate consequences of the encounter – this could be the first sign of pursuit by the Main Antagonist Faction Type, the confusion arising from a Cultural Event/Ritual, or the immediate challenge posed by a Crash Reason. The alien female protagonist might reveal a bit more about her situation or capability.
-Turning Point Event & Forced Proximity (Approx. 10-18 mins): Describe the Turning Point Mechanism event in detail. This event fundamentally changes their situation, forcing the protagonists into prolonged or intense proximity (e.g., escaping together, stranded, bound by a ritual, dealing with a biological change). The conflict with the Main Antagonist Faction Type intensifies, making cooperation essential for survival.
-Developing Trust and Unveiling Depths (Approx. 18-33 mins): This is a significant section for character and relationship development. Through multiple scenes of shared challenges, difficult choices, and moments of vulnerability during their forced cooperation/escape, the protagonists begin to break down initial barriers and prejudices. The alien female protagonist reveals more about her Hidden Depth, often tied to the Core Plot Element. The human male protagonist's Key Trait(s) become evident in how he handles these situations. Explore cultural differences (Cultural Quirk(s)) and unique biological aspects (Unique Biology feature(s)) in detail, integrating them into problem-solving and interaction. Romantic tension begins to build through shared glances, physical proximity, and deeper conversations.
-Escalating Stakes & Romantic Connection (Approx. 33-48 mins): The conflict with the Main Antagonist Faction Type reaches a critical point. The stakes surrounding the Core Plot Element become clearer and more dangerous. The emotional and romantic connection between the protagonists deepens significantly. This section should include one or more key romantic or intimate scenes that solidify their bond, potentially involving the unique aspects of the alien female's biology. They explicitly acknowledge their growing feelings or make a choice based on their connection.
-Rising Action Towards Climax (Approx. 48-58 mins): The protagonists make a strategic move or are cornered, leading them directly towards the Climax Setting. They prepare for the final confrontation, relying on their combined skills and trust. New information about the antagonist or the stakes might be revealed.
-Climax Sequence (Approx. 58-65 mins): The intense, multi-part climax takes place at the Climax Setting. The protagonists face the Main Antagonist Faction Type head-on. Detail the action, strategy, and how their unique abilities (Key Trait(s), Hidden Depth / Unique Biology feature(s)) combine effectively. This should be the peak of both the external conflict and their partnership.
-Immediate Aftermath & Resolution (Approx. 65-68 mins): The external crisis is resolved. Detail the immediate consequences of the climax. The protagonists deal with injuries, aftermath, and the immediate reactions from allies or the wider galaxy. Their relationship is explicitly confirmed or demonstrated in a powerful way in the wake of the danger. Their personal choice has broader implications related to the Resolution Focus.
-Epilogue & Future Outlook (Approx. 68-70 mins): A concluding section (potentially with a short time skip) showing the results of their actions and the Resolution Focus. Depict the protagonists building their new life together, how their relationship has impacted the wider galaxy (e.g., a new alliance, changing perceptions), and hinting at a hopeful future. End on a strong, romantic, or thematic note that reinforces the channel's core DNA. romantic, or thematic note that reinforces the channel's core DNA.
+Initial Encounter & Immediate Consequences (Approx. 1-13 mins): Detail the events of the Initial Scenario. Explore the initial interactions between the human male protagonist, highlighting his Key Trait(s), and the alien female's initial status/behavior. Introduce the immediate consequences of the encounter – this could be the first sign of pursuit by the Main Antagonist Faction Type, the confusion arising from a Cultural Event/Ritual, or the immediate challenge posed by a Crash Reason. The alien female protagonist might reveal a bit more about her situation or capability.
+Turning Point Event & Forced Proximity (Approx. 13-23 mins): Describe the Turning Point Mechanism event in detail. This event fundamentally changes their situation, forcing the protagonists into prolonged or intense proximity (e.g., escaping together, stranded, bound by a ritual, dealing with a biological change). The conflict with the Main Antagonist Faction Type intensifies, making cooperation essential for survival.
+Developing Trust and Unveiling Depths (Approx. 23-43 mins): This is a significant section for character and relationship development. Through multiple scenes of shared challenges, difficult choices, and moments of vulnerability during their forced cooperation/escape, the protagonists begin to break down initial barriers and prejudices. The alien female protagonist reveals more about her Hidden Depth, often tied to the Core Plot Element. The human male protagonist's Key Trait(s) become evident in how he handles these situations. Explore cultural differences (Cultural Quirk(s)) and unique biological aspects (Unique Biology feature(s)) in detail, integrating them into problem-solving and interaction. Romantic tension begins to build through shared glances, physical proximity, and deeper conversations.
+Escalating Stakes & Romantic Connection (Approx. 43-63 mins): The conflict with the Main Antagonist Faction Type reaches a critical point. The stakes surrounding the Core Plot Element become clearer and more dangerous. The emotional and romantic connection between the protagonists deepens significantly. This section should include one or more key romantic or intimate scenes that solidify their bond, potentially involving the unique aspects of the alien female's biology. They explicitly acknowledge their growing feelings or make a choice based on their connection.
+Rising Action Towards Climax (Approx. 63-75 mins): The protagonists make a strategic move or are cornered, leading them directly towards the Climax Setting. They prepare for the final confrontation, relying on their combined skills and trust. New information about the antagonist or the stakes might be revealed.
+Climax Sequence (Approx. 75-84 mins): The intense, multi-part climax takes place at the Climax Setting. The protagonists face the Main Antagonist Faction Type head-on. Detail the action, strategy, and how their unique abilities (Key Trait(s), Hidden Depth / Unique Biology feature(s)) combine effectively. This should be the peak of both the external conflict and their partnership.
+Immediate Aftermath & Resolution (Approx. 84-88 mins): The external crisis is resolved. Detail the immediate consequences of the climax. The protagonists deal with injuries, aftermath, and the immediate reactions from allies or the wider galaxy. Their relationship is explicitly confirmed or demonstrated in a powerful way in the wake of the danger. Their personal choice has broader implications related to the Resolution Focus.
+Epilogue & Future Outlook (Approx. 88-90 mins): A concluding section (potentially with a short time skip) showing the results of their actions and the Resolution Focus. Depict the protagonists building their new life together, how their relationship has impacted the wider galaxy (e.g., a new alliance, changing perceptions), and hinting at a hopeful future. End on a strong, romantic, or thematic note that reinforces the channel's core DNA. romantic, or thematic note that reinforces the channel's core DNA.
 
 **Output Format:** Story script in English, including major sections and detailed narrative descriptions following the guidance above.
 Return only a single, continuous block of plain text.
@@ -215,6 +281,7 @@ Any other miscellaneous items, formatting, or meta-comments.
 Ensure the entire output is just this uninterrupted plain text, optimized for clear audio rendering.
 The full text must be over ten thousand English words. Let me repeat: this is a requirement that absolutely must be met.
 Ensure content is non-conversational in format.
+**IMPORTANT:** Use the specified protagonist names throughout the story: the human male protagonist should be called {selected_params["male_human_protagonist_names"]} and the alien female protagonist should be called {selected_params["female_alien_protagonist_names"]}. Do not change or modify these names during the story generation.
 """
     return prompt
 

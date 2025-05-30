@@ -1,3 +1,54 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+AI Studio 故事生成自动化脚本
+
+功能说明：
+这是一个用于 Google AI Studio 的自动化故事生成脚本，主要功能包括：
+
+1. 📖 批量故事生成
+   - 支持批量生成多个科幻故事
+   - 自动生成随机故事参数（通过 gen_prompt 模块）
+   - 智能索引管理：优先填补缺失的故事索引，然后生成新索引
+
+2. 🌐 浏览器自动化
+   - 通过 AdsPower 浏览器实现多开隔离
+   - 使用 Playwright 进行精确的网页操作控制
+   - 支持多窗口并发生成（最多2个窗口同时工作）
+
+3. 🎯 智能热身机制
+   - 首次运行时自动进行AI热身，发送随机问题激活模型
+   - 后续生成跳过热身，直接进入正式内容生成
+
+4. 💾 自动保存管理
+   - 自动将生成的故事保存为编号的文本文件
+   - 支持断点续传：检测已存在的故事，只生成缺失的部分
+   - 文件保存路径：/Volumes/dhl/audio/scifi/full_story/language_code/
+
+5. 🔄 错误处理与重试
+   - 智能检测AI生成状态（通过监控停止按钮状态）
+   - 生成失败时自动清理资源并提示重新运行
+   - 完善的异常处理机制
+
+6. ⚙️ 命令行界面
+   - 支持指定生成数量：--count 或 -c 参数
+   - 支持指定浏览器ID：--ads-id 参数
+   - 默认生成2个故事，使用 kyencl7 浏览器配置
+
+使用方法：
+python ai_studio_bot.py --count 5 --ads-id your_browser_id
+
+依赖组件：
+- AdsPower：提供浏览器环境隔离
+- Playwright：网页自动化控制
+- gen_prompt：故事参数生成模块
+
+作者：AI Studio 自动化团队
+版本：v2.0
+更新：支持多窗口并发、智能热身、断点续传
+"""
+
 import requests
 import time
 import json
@@ -528,70 +579,12 @@ def process_window(
             page.wait_for_timeout(8000)
             print(f"窗口 {window_index}: 页面已完全加载")
         else:
-            # 后续故事：在当前页面创建新会话
-            print(f"窗口 {window_index}: 在当前页面创建新的聊天会话...")
-
-            # 寻找文本框 - 使用更精确的选择器
-            textarea_selectors = [
-                ".text-wrapper textarea",  # 根据提供的HTML结构
-                "ms-autosize-textarea textarea",  # 具体的组件选择器
-                'textarea[aria-label*="Type something"]',  # aria-label匹配
-                'textarea[class*="textarea"]',
-                'textarea[class*="gmat-body-medium"]',
-                ".text-input-wrapper textarea",
-                "div.text-wrapper textarea",
-                "textarea",
-            ]
-
-            textarea = None
-            for selector in textarea_selectors:
-                try:
-                    if page.locator(selector).count() > 0:
-                        textarea = page.locator(selector)
-                        print(
-                            f"窗口 {window_index}: 找到新会话文本框，使用选择器: {selector}"
-                        )
-                        break
-                except:
-                    continue
-
-            if textarea and textarea.count() > 0:
-                # 点击文本框并直接输入新会话命令
-                new_session_command = (
-                    "@https://aistudio.google.com/u/0/prompts/new_chat"
-                )
-
-                textarea.click()
-                page.wait_for_timeout(500)
-
-                # 确保文本框获得焦点
-                textarea.focus()
-                page.wait_for_timeout(500)
-
-                # 清空现有内容并直接输入新会话命令
-                textarea.fill("")  # 清空
-                page.wait_for_timeout(300)
-                textarea.type(new_session_command)  # 直接输入文字
-                page.wait_for_timeout(1000)
-                print(f"窗口 {window_index}: 已输入新会话命令")
-
-                # 按回车键创建新会话
-                page.keyboard.press("Enter")
-                print(f"窗口 {window_index}: 已发送新会话命令，等待页面刷新...")
-
-                # 等待新会话加载
-                page.wait_for_timeout(5000)
-
-                # 等待页面稳定
-                page.wait_for_load_state("networkidle")
-                page.wait_for_timeout(3000)
-                print(f"窗口 {window_index}: 新会话页面已完全加载")
-            else:
-                print(f"窗口 {window_index}: 未找到文本框，回退到页面导航方式")
-                page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
-                page.wait_for_load_state("networkidle")
-                page.wait_for_timeout(8000)
-                print(f"窗口 {window_index}: 页面导航完成，页面已完全加载")
+            # 后续故事：直接导航到新的聊天页面
+            print(f"窗口 {window_index}: 导航到新的聊天页面...")
+            page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
+            page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(8000)
+            print(f"窗口 {window_index}: 新页面已完全加载")
 
         # 下面是正式的故事生成流程（适用于热身后的第一个故事和后续故事）
         # 多种可能的文本框选择器 - 使用更精确的选择器
