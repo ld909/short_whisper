@@ -10,10 +10,12 @@
 3. 将处理后的高清图片保存到指定目录
 
 输入:
-- 原始封面图片: /Volumes/dhl/audio/scifi/cover_img_small/[故事索引].png
+- macOS: /Volumes/dhl/audio/scifi/cover_img_small/[故事索引].png
+- Linux: /media/dhl/audio/scifi/cover_img_small/[故事索引].png
 
 输出:
-- 超分后图片: /Volumes/dhl/audio/scifi/cover_img_large/[故事索引].png
+- macOS: /Volumes/dhl/audio/scifi/cover_img_large/[故事索引].png
+- Linux: /media/dhl/audio/scifi/cover_img_large/[故事索引].png
 
 使用方法:
 1. 基本使用: python upscale_cover_images.py
@@ -26,6 +28,8 @@
 - 脚本支持断点续传，中断后可从上次停止的位置继续处理
 - 支持超分倍数 2x 和 4x
 - 处理本地文件，使用阿里云图像增强的advance接口
+- 自动排除以点开头的meta文件（如.DS_Store等）
+- 根据操作系统自动选择合适的路径（macOS使用/Volumes，Linux使用/media）
 """
 
 import os
@@ -35,6 +39,7 @@ import argparse
 import glob
 import re
 import io
+import platform
 from tqdm import tqdm
 from typing import List
 
@@ -50,6 +55,24 @@ from alibabacloud_tea_util import models as util_models
 from alibabacloud_tea_util.client import Client as UtilClient
 import requests
 from PIL import Image
+
+
+def get_base_input_path():
+    """根据操作系统返回原始图片的适当路径"""
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        return "/Volumes/dhl/audio/scifi/cover_img_small"
+    else:  # 默认为Linux/Ubuntu
+        return "/media/dhl/audio/scifi/cover_img_small"
+
+
+def get_base_output_path():
+    """根据操作系统返回输出图片的适当路径"""
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        return "/Volumes/dhl/audio/scifi/cover_img_large"
+    else:  # 默认为Linux/Ubuntu
+        return "/media/dhl/audio/scifi/cover_img_large"
 
 
 def create_client() -> ImageEnhanClient:
@@ -167,7 +190,7 @@ def upscale_image(
 
 def get_existing_images():
     """获取原始封面图片列表"""
-    image_dir = "/Volumes/dhl/audio/scifi/cover_img_small"
+    image_dir = get_base_input_path()
 
     if not os.path.exists(image_dir):
         print(f"原始图片目录不存在: {image_dir}")
@@ -178,6 +201,9 @@ def get_existing_images():
 
     for file_path in image_files:
         basename = os.path.basename(file_path)
+        # 排除以点开头的meta文件（如.DS_Store等）
+        if basename.startswith('.'):
+            continue
         match = re.match(r"(\d+)\.png", basename)
         if match:
             story_index = int(match.group(1))
@@ -188,7 +214,7 @@ def get_existing_images():
 
 def get_existing_upscaled_images():
     """获取已处理的超分图片列表"""
-    output_dir = "/Volumes/dhl/audio/scifi/cover_img_large"
+    output_dir = get_base_output_path()
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
@@ -199,6 +225,9 @@ def get_existing_upscaled_images():
 
     for file_path in existing_files:
         basename = os.path.basename(file_path)
+        # 排除以点开头的meta文件（如.DS_Store等）
+        if basename.startswith('.'):
+            continue
         match = re.match(r"(\d+)\.png", basename)
         if match:
             existing_indices.add(int(match.group(1)))
@@ -208,7 +237,7 @@ def get_existing_upscaled_images():
 
 def save_upscaled_image(story_index: int, image_data: bytes):
     """保存超分后的图片到文件"""
-    output_dir = "/Volumes/dhl/audio/scifi/cover_img_large"
+    output_dir = get_base_output_path()
 
     # 检查并创建目录
     try:

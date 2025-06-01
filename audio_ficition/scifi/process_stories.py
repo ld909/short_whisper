@@ -6,6 +6,40 @@
 1. 将 - 符号替换为空格
 2. 将 – 符号（长破折号）替换为空格  
 3. 将多个连续空格替换为单个空格
+
+📥 输入信息:
+- 默认输入目录: /mnt/dhl/audio/scifi/full_story/language_code
+- 支持文件格式: .txt 文件
+- 文件编码: UTF-8
+- 文件命名规则: 数字.txt (例如: 1.txt, 2.txt, 3.txt...)
+
+📤 输出信息:
+- 默认输出目录: /mnt/dhl/audio/scifi/full_story_refine
+- 输出文件格式: .txt 文件
+- 输出文件编码: UTF-8
+- 文件名保持不变
+
+🔄 处理规则:
+1. 将所有 '-' 符号替换为空格
+2. 将所有 '–' 符号（长破折号）替换为空格
+3. 将多个连续空格压缩为单个空格
+4. 保持其他字符不变
+
+💡 使用示例:
+# 批量处理默认目录中的所有文件
+python process_stories.py
+
+# 指定自定义输入输出目录
+python process_stories.py --input-dir /path/to/input --output-dir /path/to/output
+
+# 处理单个文件
+python process_stories.py --file /path/to/story.txt
+
+# 预览模式（不实际处理，只显示会处理哪些文件）
+python process_stories.py --preview
+
+# 查看帮助信息
+python process_stories.py --help
 """
 
 import os
@@ -88,7 +122,17 @@ def get_story_files(input_dir):
     
     # 查找所有 .txt 文件
     pattern = os.path.join(input_dir, "*.txt")
-    story_files = glob.glob(pattern)
+    all_txt_files = glob.glob(pattern)
+    
+    # 过滤掉以点开头的隐藏文件（如Mac的.DS_Store等meta文件）
+    story_files = []
+    for file_path in all_txt_files:
+        filename = os.path.basename(file_path)
+        # 排除以点开头的文件
+        if not filename.startswith('.'):
+            story_files.append(file_path)
+        else:
+            print(f"🚫 跳过隐藏文件: {filename}")
     
     # 按文件名中的数字排序
     def extract_number(filepath):

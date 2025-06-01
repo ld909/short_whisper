@@ -16,11 +16,29 @@ import shutil
 import json
 from pathlib import Path
 
+# ============ 配置参数 ============
+# 输入目录：存放文本块的目录
+INPUT_DIR = "/mnt/dhl/audio/scifi/story_chunks"
+
+# 输出目录：生成的音频文件保存目录
+OUTPUT_DIR = "/media/dhl/audio/scifi/mp3_clips"
+
+# 参考音频文件：用于语音克隆的参考音频
+REF_AUDIO = "/home/dhl/Documents/short_whisper/audio_ficition/audio_ref/11_normalized_2.mp3"
+
+# 默认使用的模型
+DEFAULT_MODEL = "F5TTS_v1_Base"
+
+# 代理设置
+PROXY_HTTP = "http://127.0.0.1:7897"
+PROXY_HTTPS = "http://127.0.0.1:7897"
+# ===================================
+
 
 def set_clash_proxy():
     """设置代理环境变量，用于下载模型文件"""
-    os.environ["http_proxy"] = "http://127.0.0.1:7897"
-    os.environ["https_proxy"] = "http://127.0.0.1:7897"
+    os.environ["http_proxy"] = PROXY_HTTP
+    os.environ["https_proxy"] = PROXY_HTTPS
     # os.environ["all_proxy"] = "socks5://127.0.0.1:7891"
     print("🌐 成功设定clash环境proxy...")
 
@@ -36,6 +54,7 @@ def unset_clash_proxy():
 def get_chunk_files(input_dir):
     """
     获取所有文本块文件，按故事索引和块索引排序
+    排除Mac生成的以点开头的meta文件
     
     Args:
         input_dir (str): 输入目录路径
@@ -54,9 +73,27 @@ def get_chunk_files(input_dir):
         if os.path.isdir(story_dir):
             story_index = os.path.basename(story_dir)
             
-            # 获取该故事的所有块文件
+            # 排除以点开头的目录（如.DS_Store等）
+            if story_index.startswith('.'):
+                print(f"⏭️  跳过隐藏目录: {story_dir}")
+                continue
+            
+            # 获取该故事的所有txt文件
             chunk_pattern = os.path.join(story_dir, "*.txt")
             story_chunks = glob.glob(chunk_pattern)
+            
+            # 过滤掉以点开头的文件
+            filtered_chunks = []
+            for chunk_file in story_chunks:
+                filename = os.path.basename(chunk_file)
+                if filename.startswith('.'):
+                    print(f"⏭️  跳过隐藏文件: {chunk_file}")
+                    continue
+                # 确保文件确实是txt文件且不是临时文件
+                if filename.endswith('.txt') and not filename.startswith('._'):
+                    filtered_chunks.append(chunk_file)
+                else:
+                    print(f"⏭️  跳过非txt文件或临时文件: {chunk_file}")
             
             # 按块索引排序
             def extract_chunk_number(filepath):
@@ -66,10 +103,10 @@ def get_chunk_files(input_dir):
                 except:
                     return 0
             
-            story_chunks.sort(key=extract_chunk_number)
+            filtered_chunks.sort(key=extract_chunk_number)
             
             # 添加到总列表
-            for chunk_file in story_chunks:
+            for chunk_file in filtered_chunks:
                 chunk_files.append((story_index, chunk_file))
     
     # 按故事索引排序
@@ -483,23 +520,23 @@ def main():
     parser = argparse.ArgumentParser(description="音频合成器 - 使用 f5-tts 将文本块合成为音频（支持断点续传）")
     parser.add_argument(
         "--input-dir",
-        default="/mnt/dhl/audio/scifi/story_chunks",
-        help="输入目录路径 (默认: /mnt/dhl/audio/scifi/story_chunks)"
+        default=INPUT_DIR,
+        help=f"输入目录路径 (默认: {INPUT_DIR})"
     )
     parser.add_argument(
         "--output-dir",
-        default="/media/dhl/audio/scifi/mp3_clips",
-        help="输出目录路径 (默认: /media/dhl/audio/scifi/mp3_clips)"
+        default=OUTPUT_DIR,
+        help=f"输出目录路径 (默认: {OUTPUT_DIR})"
     )
     parser.add_argument(
         "--ref-audio",
-        default="/home/dhl/Documents/short_whisper/audio_ficition/audio_ref/11_normalized_2.mp3",
-        help="参考音频文件路径"
+        default=REF_AUDIO,
+        help=f"参考音频文件路径 (默认: {REF_AUDIO})"
     )
     parser.add_argument(
         "--model",
-        default="F5TTS_v1_Base",
-        help="使用的 f5-tts 模型 (默认: F5TTS_v1_Base)"
+        default=DEFAULT_MODEL,
+        help=f"使用的 f5-tts 模型 (默认: {DEFAULT_MODEL})"
     )
     parser.add_argument(
         "--story",

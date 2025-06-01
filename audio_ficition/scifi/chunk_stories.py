@@ -4,6 +4,25 @@
 故事分块脚本
 将 process_stories.py 处理后的故事文件分割成400词以上的块
 每个块保存为单独的文件，格式：/mnt/dhl/audio/scifi/story_chunks/story_index/chunk_index.txt
+
+输入输出路径说明：
+默认输入路径：/mnt/dhl/audio/scifi/full_story_refine
+    - 包含经过 process_stories.py 处理后的故事文件
+    - 文件格式：数字.txt (例如：1.txt, 2.txt, 3.txt...)
+    
+默认输出路径：/mnt/dhl/audio/scifi/story_chunks
+    - 输出目录结构：story_chunks/story_index/chunk_index.txt
+    - 例如：story_chunks/1/1.txt, story_chunks/1/2.txt...
+    - 每个故事有自己的子目录，按故事索引命名
+    - 每个子目录内的文件按块索引命名
+
+使用方法：
+    python chunk_stories.py                              # 使用默认路径处理所有文件
+    python chunk_stories.py --input-dir /path/to/input   # 指定输入目录
+    python chunk_stories.py --output-dir /path/to/output # 指定输出目录
+    python chunk_stories.py --file /path/to/file.txt     # 处理单个文件
+    python chunk_stories.py --min-words 500              # 设置最小单词数
+    python chunk_stories.py --preview                    # 预览模式
 """
 
 import os
@@ -131,6 +150,7 @@ def process_single_story(input_file, output_base_dir, min_words=400):
 def get_story_files(input_dir):
     """
     获取输入目录中的所有故事文件
+    排除以点开头的Mac系统meta文件
     
     Args:
         input_dir (str): 输入目录路径
@@ -144,7 +164,16 @@ def get_story_files(input_dir):
     
     # 查找所有 .txt 文件
     pattern = os.path.join(input_dir, "*.txt")
-    story_files = glob.glob(pattern)
+    all_txt_files = glob.glob(pattern)
+    
+    # 过滤掉以点开头的文件（Mac系统meta文件）
+    story_files = []
+    for filepath in all_txt_files:
+        basename = os.path.basename(filepath)
+        if not basename.startswith('.'):
+            story_files.append(filepath)
+        else:
+            print(f"🚫 跳过Meta文件: {basename}")
     
     # 按文件名中的数字排序
     def extract_number(filepath):
