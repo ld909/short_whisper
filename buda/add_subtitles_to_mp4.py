@@ -51,6 +51,29 @@ def get_base_path():
         return "/media/dhl/buda_videos_youtube"
 
 
+def get_fonts_dir():
+    """根据操作系统类型返回对应的字体目录"""
+    if platform.system() == "Darwin":  # macOS
+        return "/Users/donghaoliu/doc/short_whisper/fonts"
+    else:  # 默认为Linux/Ubuntu
+        # 尝试多个可能的字体路径
+        font_paths = [
+            "/home/dhl/doc/short_whisper/fonts",  # 用户目录
+            "/home/dhl/Documents/short_whisper/fonts",  # 文档目录
+            "/usr/share/fonts",  # 系统字体目录
+            "/usr/local/share/fonts",  # 本地字体目录
+        ]
+        
+        for path in font_paths:
+            if os.path.exists(path):
+                return path
+        
+        # 如果都不存在，返回默认路径并创建
+        default_path = "/home/dhl/Documents/short_whisper/fonts"
+        os.makedirs(default_path, exist_ok=True)
+        return default_path
+
+
 # 定义全局路径变量
 BASE_PATH = get_base_path()
 # 输入MP4目录（来自merge_mp4_clips_by_audio_duration.py的输出）
@@ -58,7 +81,7 @@ INPUT_MP4_PATH = os.path.join(BASE_PATH, "mp4_merge_silient")
 # 输入SRT目录（来自generate_subtitles.py的输出）
 INPUT_SRT_PATH = os.path.join(BASE_PATH, "multi_lang_srt")
 # 字体目录
-FONTS_DIR = "/Users/donghaoliu/doc/short_whisper/fonts"
+FONTS_DIR = get_fonts_dir()
 # 输出MP4目录
 OUTPUT_MP4_PATH = os.path.join(BASE_PATH, "mp4_multi_with_subtitles")
 
@@ -351,6 +374,45 @@ def add_subtitle_to_video(video_path, srt_path, output_path, language, use_gpu=F
                 )
             return False
 
+    except Exception as e:
+        logger.error(f"添加字幕时出错: {str(e)}")
+        return False
+
+
+def add_subtitle_to_video_simple(video_path, srt_path, output_path, language):
+    """为视频添加字幕的简化版本（专用于修复损坏文件）"""
+    try:
+        # 创建输出目录
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # 使用系统字体进行简单渲染
+        cmd = [
+            "ffmpeg",
+            "-i", video_path,
+            "-vf", f"subtitles={srt_path}:force_style='FontSize=16,FontWeight=500,PrimaryColour=&Hffffff,OutlineColour=&H000000,BorderStyle=1,Outline=1,MarginV=20'",
+            "-c:a", "copy",
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "23",
+            "-y",
+            output_path
+        ]
+        
+        logger.info(f"执行简化字幕添加命令: {' '.join(cmd)}")
+        
+        # 执行命令
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode == 0:
+            logger.info(f"成功为视频添加字幕: {os.path.basename(output_path)}")
+            return True
+        else:
+            logger.error(f"添加字幕失败: {result.stderr}")
+            return False
+            
+    except subprocess.TimeoutExpired:
+        logger.error(f"添加字幕超时: {video_path}")
+        return False
     except Exception as e:
         logger.error(f"添加字幕时出错: {str(e)}")
         return False
