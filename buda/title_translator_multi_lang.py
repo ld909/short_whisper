@@ -1,27 +1,37 @@
 """
-多语言视频标题翻译工具
+多语言视频标题处理工具
 
 功能说明:
-此脚本用于将视频标题中文内容（去除标签）批量翻译成多种语言（英语、日语、韩语、越南语）。
+此脚本用于处理视频标题的多语言版本。支持两种模式：
+1. 直接提取：如果目标语言有对应的原始视频文件，直接从文件名提取标题
+2. 翻译模式：如果目标语言没有原始视频，则从源语言（通常是中文）翻译标题
+
 脚本使用OpenAI API进行翻译，特别针对佛教内容优化，支持并发处理和断点续传。
 
 输入:
-- SRT文件名（从mp3toscripts_faster.py的输出路径）
+- MP4文件名（从merge_mp4_mp3.py的多语言视频路径）
+- 支持的输入语言目录：chinese、english、korean
 
 输出:
-- JSON文件，包含原始标题（去除标签）和四种语言的翻译
-- 输出路径: /home/dhl/Documents/video_materials/multi_lang_titles/[频道名称]/[视频名称].json
+- JSON文件，为每种语言分别保存到对应目录
+- 输出路径: [基础路径]/multi_lang_titles/[频道名称]/[语言代码]/[视频名称].json
+- 每个JSON文件只包含对应语种的标题
+
+处理逻辑:
+1. 如果目标语言在输入路径中有对应的原始视频文件，直接从该文件名获取标题
+2. 如果没有原始视频文件，则从源语言翻译到目标语言
+3. 所有标题都会去除#tag格式的标签
 
 使用方法:
-1. 基本使用: python title_translator_multi_lang.py [主题名称]
-2. 指定目标语言: python title_translator_multi_lang.py [主题名称] -l English Japanese
-3. 强制重新翻译: python title_translator_multi_lang.py [主题名称] -f
-4. 设置批处理大小: python title_translator_multi_lang.py [主题名称] -b 20
+1. 基本使用: python title_translator_multi_lang.py [频道名称]
+2. 指定目标语言: python title_translator_multi_lang.py [频道名称] -l English Korean
+3. 强制重新处理: python title_translator_multi_lang.py [频道名称] -f
+4. 设置批处理大小: python title_translator_multi_lang.py [频道名称] -b 20
 
 注意:
-- 需要设置环境变量UNI_API_KEY以提供OpenAI API密钥
-- 脚本支持断点续传，中断后可从上次停止的位置继续翻译
-- 输入路径与mp3toscripts_faster.py的输出路径保持一致
+- 需要设置环境变量UNI_API_KEY以提供OpenAI API密钥（仅在需要翻译时）
+- 脚本支持断点续传，中断后可从上次停止的位置继续处理
+- 输入路径与merge_mp4_mp3.py的多语言视频路径保持一致
 """
 
 import os
@@ -36,23 +46,34 @@ import concurrent.futures
 from tqdm import tqdm
 
 
-def get_srt_input_path():
-    """返回mp3toscripts_faster.py的输出路径作为输入路径"""
-    return "/home/dhl/Documents/video_materials/format_srt"
+def get_base_path():
+    """根据操作系统类型返回对应的基础路径"""
+    if platform.system() == "Darwin":  # Mac OS
+        return "/Volumes/dhl/buda_videos_youtube"
+    else:  # 默认为Linux/Ubuntu
+        return "/media/dhl/buda_videos_youtube"
+
+
+def get_mp4_input_path():
+    """返回多语言MP4文件的输入路径"""
+    return f"{get_base_path()}/mp4_with_audio"
 
 
 def get_output_base_path():
     """返回翻译结果的输出基础路径"""
-    return "/home/dhl/Documents/video_materials/multi_lang_titles"
+    return f"{get_base_path()}/multi_lang_titles"
 
 
 # 获取输入和输出路径
-SRT_INPUT_PATH = get_srt_input_path()
+MP4_INPUT_PATH = get_mp4_input_path()
 OUTPUT_BASE_PATH = get_output_base_path()
 
 # 定义支持的语言列表
-LANGUAGES = ["English", "Japanese", "Vietnamese", "Korean"]
+LANGUAGES = ["English", "Korean"]
 LANGUAGE_CODES = {"English": "en", "Japanese": "ja", "Vietnamese": "vi", "Korean": "ko"}
+
+# 语言代码到目录名的映射（用于从输入路径查找对应语言的原始视频）
+LANGUAGE_DIR_MAPPING = {"English": "english", "Korean": "korean", "Chinese": "chinese"}
 
 
 def setup_openai_client():
@@ -119,124 +140,154 @@ def translate_text(client, text, target_language="English", max_retries=3):
                 return text  # 如果所有尝试都失败，返回原文
 
 
-def translate_title_to_all_languages(client, title, languages=None):
-    """将标题翻译为所有指定语言"""
-    if languages is None:
-        languages = LANGUAGES
-
-    # 去除标签
-    cleaned_title = remove_tags(title)
-
-    # 初始化结果字典，包含原始清理后的标题
-    result = {"original": cleaned_title}
-
-    # 并发翻译到所有语言
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(languages)) as executor:
-        # 为每种语言创建翻译任务
-        future_to_lang = {
-            executor.submit(translate_text, client, cleaned_title, lang): lang
-            for lang in languages
-        }
-
-        for future in concurrent.futures.as_completed(future_to_lang):
-            lang = future_to_lang[future]
-            try:
-                translation = future.result()
-                result[LANGUAGE_CODES[lang]] = translation
-                print(f"完成 {lang} 翻译: {translation}")
-            except Exception as e:
-                print(f"翻译到 {lang} 时出错: {e}")
-                result[LANGUAGE_CODES[lang]] = cleaned_title  # 出错时使用原文
-
-    return result
-
-
-def process_channel_titles(
-    client, topic, channel, languages=None, force=False, batch_size=20
+def get_title_for_language(
+    client, video_name, channel, source_language, target_language
 ):
-    """处理单个频道的所有视频标题"""
+    """
+    获取指定语言的标题
+    - 如果目标语言有原始视频文件，直接从文件名获取
+    - 如果没有原始视频文件，则从源语言翻译
+    """
+    # 检查目标语言是否有对应的原始视频目录
+    target_dir = LANGUAGE_DIR_MAPPING.get(target_language)
+    if target_dir:
+        target_path = os.path.join(MP4_INPUT_PATH, channel, target_dir)
+        if os.path.exists(target_path):
+            # 查找对应的视频文件
+            target_video_file = os.path.join(target_path, f"{video_name}.mp4")
+            if os.path.exists(target_video_file):
+                # 直接从文件名获取标题
+                title = remove_tags(video_name)
+                print(f"从原始 {target_language} 视频获取标题: {title}")
+                return title
+
+    # 如果没有找到原始视频，则进行翻译
+    source_title = remove_tags(video_name)
+    print(f"从 {source_language} 翻译到 {target_language}: {source_title}")
+    return translate_text(client, source_title, target_language)
+
+
+def process_channel_language_files(
+    client, channel, language, languages=None, force=False, batch_size=20
+):
+    """处理单个频道和语言下的所有视频标题"""
     if languages is None:
         languages = LANGUAGES
 
-    # 定义输入和输出路径
-    srt_input_path = os.path.join(SRT_INPUT_PATH, topic, channel)
-    output_base_path = os.path.join(OUTPUT_BASE_PATH, channel)
+    # 定义输入路径
+    mp4_input_path = os.path.join(MP4_INPUT_PATH, channel, language)
 
     # 检查输入路径是否存在
-    if not os.path.exists(srt_input_path):
-        print(f"警告: 输入路径 '{srt_input_path}' 不存在，跳过频道 '{channel}'")
+    if not os.path.exists(mp4_input_path):
+        print(f"警告: 输入路径 '{mp4_input_path}' 不存在，跳过")
         return
 
-    # 确保输出目录存在
-    if not os.path.exists(output_base_path):
-        os.makedirs(output_base_path)
-        print(f"创建输出目录: {output_base_path}")
-
-    # 获取所有SRT文件，过滤掉点开头的文件
-    srt_files = [
+    # 获取所有MP4文件，过滤掉点开头的文件
+    mp4_files = [
         f
-        for f in os.listdir(srt_input_path)
-        if f.endswith(".srt") and not f.startswith(".")
+        for f in os.listdir(mp4_input_path)
+        if f.endswith(".mp4") and not f.startswith(".")
     ]
 
-    if not srt_files:
-        print(f"在频道 '{channel}' 中未找到任何SRT文件，跳过")
+    if not mp4_files:
+        print(f"在频道 '{channel}' 语言 '{language}' 中未找到任何MP4文件，跳过")
         return
 
-    print(f"\n处理频道: {channel}，找到 {len(srt_files)} 个SRT文件")
+    print(f"\n处理频道: {channel}，源语言: {language}，找到 {len(mp4_files)} 个MP4文件")
+
+    # 为每种目标语言创建输出目录
+    output_paths = {}
+    for target_lang in languages:
+        lang_code = LANGUAGE_CODES[target_lang]
+        output_path = os.path.join(OUTPUT_BASE_PATH, channel, lang_code)
+        if not os.path.exists(output_path):
+            os.makedirs(output_path, exist_ok=True)
+            print(f"创建输出目录: {output_path}")
+        output_paths[target_lang] = output_path
 
     # 收集需要处理的文件
     files_to_process = []
-    for srt_file in srt_files:
-        video_name = os.path.splitext(srt_file)[0]  # 去掉.srt扩展名
-        output_file = os.path.join(output_base_path, f"{video_name}.json")
+    for mp4_file in mp4_files:
+        video_name = os.path.splitext(mp4_file)[0]  # 去掉.mp4扩展名
 
-        # 检查是否需要处理此文件
-        if os.path.exists(output_file) and not force:
-            # 检查文件是否包含所有语言翻译
-            try:
-                with open(output_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    all_langs_present = all(
-                        LANGUAGE_CODES[lang] in data for lang in languages
-                    )
-                    if all_langs_present:
-                        print(f"跳过已处理的文件: {video_name}")
-                        continue
-            except (json.JSONDecodeError, FileNotFoundError):
-                # 文件损坏或不完整，需要重新处理
-                pass
+        # 检查是否需要处理此文件（检查所有目标语言的输出文件）
+        needs_processing = False
+        if force:
+            needs_processing = True
+        else:
+            for target_lang in languages:
+                output_file = os.path.join(
+                    output_paths[target_lang], f"{video_name}.json"
+                )
+                if not os.path.exists(output_file):
+                    needs_processing = True
+                    break
 
-        files_to_process.append((video_name, srt_file))
+        if needs_processing:
+            files_to_process.append((video_name, mp4_file))
+        else:
+            print(f"跳过已处理的文件: {video_name}")
 
     # 如果没有需要处理的文件，返回
     if not files_to_process:
-        print(f"频道 '{channel}' 中的所有文件都已处理完毕")
+        print(f"频道 '{channel}' 语言 '{language}' 中的所有文件都已处理完毕")
         return
 
     print(f"需要处理 {len(files_to_process)} 个文件")
 
     # 批量处理文件
-    with tqdm(total=len(files_to_process), desc="翻译进度") as pbar:
+    with tqdm(
+        total=len(files_to_process), desc=f"翻译进度 {channel}/{language}"
+    ) as pbar:
         for i in range(0, len(files_to_process), batch_size):
             batch = files_to_process[i : i + batch_size]
 
             def process_file(file_info):
-                video_name, srt_file = file_info
-                title = video_name  # 使用文件名作为标题
+                video_name, mp4_file = file_info
 
                 try:
-                    # 翻译标题到所有语言
-                    translations = translate_title_to_all_languages(
-                        client, title, languages
-                    )
+                    # 确定源语言
+                    source_language = "Chinese"  # 默认为中文
+                    if language.lower() == "english":
+                        source_language = "English"
+                    elif language.lower() == "korean":
+                        source_language = "Korean"
 
-                    # 保存到JSON文件
-                    output_file = os.path.join(output_base_path, f"{video_name}.json")
-                    with open(output_file, "w", encoding="utf-8") as f:
-                        json.dump(translations, f, ensure_ascii=False, indent=2)
+                    # 为每种目标语言获取标题并保存单独的JSON文件
+                    for target_lang in languages:
+                        try:
+                            # 获取目标语言的标题（可能是原始文件或翻译）
+                            title = get_title_for_language(
+                                client,
+                                video_name,
+                                channel,
+                                source_language,
+                                target_lang,
+                            )
 
-                    print(f"已保存翻译结果到: {output_file}")
+                            # 创建JSON数据（只包含对应语种的标题）
+                            json_data = {"title": title}
+
+                            # 保存到对应语言的目录
+                            output_file = os.path.join(
+                                output_paths[target_lang], f"{video_name}.json"
+                            )
+                            with open(output_file, "w", encoding="utf-8") as f:
+                                json.dump(json_data, f, ensure_ascii=False, indent=2)
+
+                            print(f"已保存 {target_lang} 标题到: {output_file}")
+
+                        except Exception as e:
+                            print(f"处理 {target_lang} 时出错: {e}")
+                            # 出错时保存原始文件名（去除标签）
+                            fallback_title = remove_tags(video_name)
+                            json_data = {"title": fallback_title}
+                            output_file = os.path.join(
+                                output_paths[target_lang], f"{video_name}.json"
+                            )
+                            with open(output_file, "w", encoding="utf-8") as f:
+                                json.dump(json_data, f, ensure_ascii=False, indent=2)
+
                     return True
                 except Exception as e:
                     print(f"处理 {video_name} 时出错: {e}")
@@ -256,33 +307,69 @@ def process_channel_titles(
             print(f"批次处理完成: {success_count}/{len(batch)} 成功")
 
 
-def process_all_channels(client, topic, languages=None, force=False, batch_size=20):
-    """处理指定主题下的所有频道"""
+def process_channel_all_languages(
+    client, channel, languages=None, force=False, batch_size=20
+):
+    """处理指定频道下的所有语言"""
+    if languages is None:
+        languages = LANGUAGES
+
+    # 检查频道路径是否存在
+    channel_path = os.path.join(MP4_INPUT_PATH, channel)
+    if not os.path.exists(channel_path):
+        print(f"错误: 频道路径 '{channel_path}' 不存在")
+        return
+
+    # 获取所有语言目录，过滤掉点开头的目录
+    language_dirs = [
+        d
+        for d in os.listdir(channel_path)
+        if os.path.isdir(os.path.join(channel_path, d)) and not d.startswith(".")
+    ]
+
+    if not language_dirs:
+        print(f"在频道 '{channel}' 中未找到任何语言目录")
+        return
+
+    print(
+        f"频道 '{channel}' 找到 {len(language_dirs)} 个语言目录: {', '.join(language_dirs)}"
+    )
+
+    # 处理每个语言
+    for lang_dir in language_dirs:
+        process_channel_language_files(
+            client, channel, lang_dir, languages, force, batch_size
+        )
+
+
+def process_all_channels(client, languages=None, force=False, batch_size=20):
+    """处理MP4_INPUT_PATH下的所有频道"""
     if languages is None:
         languages = LANGUAGES
 
     # 检查输入路径是否存在
-    topic_path = os.path.join(SRT_INPUT_PATH, topic)
-    if not os.path.exists(topic_path):
-        print(f"错误: 主题路径 '{topic_path}' 不存在")
+    if not os.path.exists(MP4_INPUT_PATH):
+        print(f"错误: 输入路径 '{MP4_INPUT_PATH}' 不存在")
         return
 
     # 获取所有频道目录，过滤掉点开头的目录
     channels = [
         d
-        for d in os.listdir(topic_path)
-        if os.path.isdir(os.path.join(topic_path, d)) and not d.startswith(".")
+        for d in os.listdir(MP4_INPUT_PATH)
+        if os.path.isdir(os.path.join(MP4_INPUT_PATH, d)) and not d.startswith(".")
     ]
 
     if not channels:
-        print(f"在 '{topic_path}' 中未找到任何频道目录")
+        print(f"在 '{MP4_INPUT_PATH}' 中未找到任何频道目录")
         return
 
-    print(f"找到 {len(channels)} 个频道目录")
+    print(f"找到 {len(channels)} 个频道目录: {', '.join(channels)}")
 
     # 处理每个频道
     for channel in channels:
-        process_channel_titles(client, topic, channel, languages, force, batch_size)
+        print(f"\n开始处理频道: {channel}")
+        process_channel_all_languages(client, channel, languages, force, batch_size)
+        print(f"频道 '{channel}' 处理完成")
 
 
 def main():
@@ -290,7 +377,11 @@ def main():
     parser = argparse.ArgumentParser(description="将视频标题翻译为多种语言并保存为JSON")
 
     # 添加命令行参数
-    parser.add_argument("topic", help="主题名称，对应视频的顶级目录名称")
+    parser.add_argument(
+        "channel",
+        nargs="?",
+        help="频道名称，对应视频的频道目录名称（可选，不提供则处理所有频道）",
+    )
     parser.add_argument(
         "-l",
         "--languages",
@@ -302,11 +393,17 @@ def main():
         "-f", "--force", action="store_true", help="强制重新翻译，忽略已有翻译"
     )
     parser.add_argument(
-        "-b", "--batch_size", type=int, default=5, help="并发处理的批量大小，默认为20"
+        "-b", "--batch_size", type=int, default=5, help="并发处理的批量大小，默认为5"
     )
 
     # 解析命令行参数
     args = parser.parse_args()
+
+    # 打印系统信息和基础路径
+    print(f"检测到系统: {platform.system()}")
+    print(f"使用基础路径: {get_base_path()}")
+    print(f"MP4输入路径: {MP4_INPUT_PATH}")
+    print(f"输出路径: {OUTPUT_BASE_PATH}")
 
     # 设置OpenAI客户端
     client = setup_openai_client()
@@ -319,10 +416,15 @@ def main():
     if set(valid_languages) != set(args.languages):
         print(f"警告: 某些语言不受支持，将只处理: {', '.join(valid_languages)}")
 
-    # 处理所有频道和标题
-    process_all_channels(
-        client, args.topic, valid_languages, args.force, args.batch_size
-    )
+    # 根据是否提供channel参数来处理
+    if args.channel:
+        print(f"处理指定频道: {args.channel}")
+        process_channel_all_languages(
+            client, args.channel, valid_languages, args.force, args.batch_size
+        )
+    else:
+        print("未指定频道，将处理所有频道")
+        process_all_channels(client, valid_languages, args.force, args.batch_size)
 
     print("所有标题翻译任务完成!")
 

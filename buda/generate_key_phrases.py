@@ -1,11 +1,10 @@
 """
-多语种视频标题关键词/短语生成工具
+多语种视频关键词/短语生成工具
 
 功能说明:
-此脚本用于从视频脚本内容中生成多语种的标题和重点关键词或短语。
+此脚本用于从视频脚本内容中生成多语种的重点关键词或短语。
 脚本使用UNI API，GPT-4.1-mini生成：
-1. 简短吸引人的视频标题
-2. 简短有力的关键词或短语，以吸引观众点击观看视频
+简短有力的关键词或短语，以吸引观众点击观看视频
 支持并发处理和断点续传功能。
 
 输入:
@@ -13,7 +12,6 @@
 - 已翻译的JSON文件 (来自title_translator_multi_lang.py的输出)
 
 输出:
-- 标题文件: [媒体路径]/multi_lang_title_shorten/[频道名称]/[语言代码]/[视频名称].txt
 - 关键词JSON文件，包含各语言的重点关键词/短语: [媒体路径]/key_words/[频道名称]/[语言代码]/[视频名称].json
 
 使用方法:
@@ -293,7 +291,7 @@ def process_title_file(
                 # 单独保存到每种语言的目录
                 with open(keywords_file, "w", encoding="utf-8") as f:
                     json.dump(
-                        {"key_phrases": key_phrases, "title": translated_title},
+                        {"key_phrases": key_phrases},
                         f,
                         ensure_ascii=False,
                         indent=2,
@@ -332,6 +330,112 @@ def process_title_file(
         return None
 
 
+def process_title_file_new_structure(
+    client, channel, video_name, languages=None, force=False
+):
+    """处理单个标题文件，为每种语言生成关键词/短语"""
+    if languages is None:
+        languages = LANGUAGES
+
+    try:
+        # 读取各语言的已翻译标题文件
+        translations = {}
+
+        for lang in languages:
+            lang_code = LANGUAGE_CODES[lang]
+            lang_title_file = os.path.join(
+                BASE_MEDIA_PATH,
+                "multi_lang_titles",
+                channel,
+                lang_code,
+                f"{video_name}.json",
+            )
+
+            if os.path.exists(lang_title_file):
+                try:
+                    with open(lang_title_file, "r", encoding="utf-8") as f:
+                        lang_data = json.load(f)
+                    # 提取标题字段
+                    if "title" in lang_data:
+                        translations[lang_code] = lang_data["title"]
+                    else:
+                        print(
+                            f"警告: {lang} 翻译文件中没有 'title' 字段: {lang_title_file}"
+                        )
+                        continue
+                except Exception as e:
+                    print(f"读取 {lang} 翻译文件时出错: {e}")
+                    continue
+            else:
+                print(f"警告: 未找到 {lang} 翻译文件: {lang_title_file}")
+                continue
+
+        if not translations:
+            print(f"警告: 未找到视频 {video_name} 的任何翻译文件")
+            return None
+
+        # 初始化结果字典
+        result = {}
+
+        # 为每种语言生成关键词/短语
+        for lang in languages:
+            lang_code = LANGUAGE_CODES[lang]
+
+            # 检查是否有此语言的翻译
+            if lang_code not in translations:
+                print(f"警告: 没有 {lang} 翻译，跳过")
+                continue
+
+            # 获取此语言的已翻译标题
+            translated_title = translations[lang_code]
+
+            # 为关键词/短语创建输出目录
+            keywords_dir = os.path.join(
+                BASE_MEDIA_PATH, "key_words", channel, lang_code
+            )
+            os.makedirs(keywords_dir, exist_ok=True)
+
+            # 定义输出文件路径
+            keywords_file = os.path.join(keywords_dir, f"{video_name}.json")
+
+            # 检查是否需要生成关键词/短语
+            keywords_generated = False
+            if os.path.exists(keywords_file) and not force:
+                try:
+                    with open(keywords_file, "r", encoding="utf-8") as f:
+                        existing_data = json.load(f)
+                    if existing_data:  # 如果文件存在且有内容，跳过
+                        print(f"跳过已处理的 {lang} 关键词/短语: {video_name}")
+                        keywords_generated = True
+                except (json.JSONDecodeError, FileNotFoundError):
+                    # 文件损坏或不完整，需要重新处理
+                    pass
+
+            # 生成关键词/短语（如果需要）
+            if not keywords_generated:
+                print(f"为 {video_name} 生成 {lang} 关键词/短语...")
+                key_phrases = generate_key_phrases(client, translated_title, lang)
+
+                # 保存关键词/短语结果
+                result[f"{lang_code}_keywords"] = key_phrases
+
+                # 单独保存到每种语言的目录
+                with open(keywords_file, "w", encoding="utf-8") as f:
+                    json.dump(
+                        {"key_phrases": key_phrases},
+                        f,
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                print(f"已保存 {lang} 关键词/短语到: {keywords_file}")
+
+        return result
+
+    except Exception as e:
+        print(f"处理 {video_name} 时出错: {e}")
+        return None
+
+
 def process_channel(client, channel, languages=None, force=False, batch_size=20):
     """处理单个频道的所有标题文件"""
     if languages is None:
@@ -346,16 +450,38 @@ def process_channel(client, channel, languages=None, force=False, batch_size=20)
         os.makedirs(input_path, exist_ok=True)
         return
 
-    # 获取所有JSON标题文件，过滤掉点开头的文件
-    title_files = [
-        f
-        for f in os.listdir(input_path)
-        if f.endswith(".json") and not f.startswith(".")
-    ]
+    # 收集所有可用的视频名称（从所有语言目录中）
+    all_video_names = set()
+    available_languages = []
 
-    if not title_files:
+    # 检查每种语言的目录
+    for lang in languages:
+        lang_code = LANGUAGE_CODES[lang]
+        lang_dir = os.path.join(input_path, lang_code)
+
+        if os.path.exists(lang_dir):
+            available_languages.append(lang)
+            # 获取该语言目录下的所有JSON文件
+            lang_files = [
+                f
+                for f in os.listdir(lang_dir)
+                if f.endswith(".json") and not f.startswith(".")
+            ]
+            # 提取视频名称（去掉.json扩展名）
+            for f in lang_files:
+                video_name = os.path.splitext(f)[0]
+                all_video_names.add(video_name)
+
+    if not available_languages:
+        print(f"在频道 '{channel}' 中未找到任何可用语言的翻译目录")
+        return
+
+    if not all_video_names:
         print(f"在频道 '{channel}' 中未找到任何已翻译的标题文件，跳过")
         return
+
+    print(f"找到的可用语言: {', '.join(available_languages)}")
+    print(f"找到 {len(all_video_names)} 个不同的视频")
 
     # 确保所有输出目录存在
     for lang in languages:
@@ -366,22 +492,11 @@ def process_channel(client, channel, languages=None, force=False, batch_size=20)
             os.makedirs(keywords_dir, exist_ok=True)
             print(f"已创建关键词目录: {keywords_dir}")
 
-        # 创建标题输出目录
-        title_dir = os.path.join(
-            BASE_MEDIA_PATH, "multi_lang_title_shorten", channel, lang_code
-        )
-        if not os.path.exists(title_dir):
-            os.makedirs(title_dir, exist_ok=True)
-            print(f"已创建标题目录: {title_dir}")
-
-    print(f"\n处理频道: {channel}，找到 {len(title_files)} 个已翻译标题文件")
+    print(f"\n处理频道: {channel}，找到 {len(all_video_names)} 个已翻译标题文件")
 
     # 收集需要处理的文件
     files_to_process = []
-    for title_file in title_files:
-        video_name = os.path.splitext(title_file)[0]  # 去掉.json扩展名
-        full_title_path = os.path.join(input_path, title_file)
-
+    for video_name in all_video_names:
         # 标记是否需要处理此文件
         need_processing = force  # 如果强制重新生成，则肯定需要处理
 
@@ -396,40 +511,30 @@ def process_channel(client, channel, languages=None, force=False, batch_size=20)
                     lang_code,
                     f"{video_name}.json",
                 )
-                title_file_output = os.path.join(
-                    BASE_MEDIA_PATH,
-                    "multi_lang_title_shorten",
-                    channel,
-                    lang_code,
-                    f"{video_name}.txt",
-                )
 
-                if not os.path.exists(keywords_file) or not os.path.exists(
-                    title_file_output
-                ):
+                if not os.path.exists(keywords_file):
                     need_processing = True
                     break
 
         if need_processing:
-            files_to_process.append((video_name, full_title_path))
+            files_to_process.append(video_name)
 
     # 如果没有需要处理的文件，返回
     if not files_to_process:
-        print(f"频道 '{channel}' 中的所有标题文件都已处理完毕")
+        print(f"频道 '{channel}' 中的所有关键词文件都已处理完毕")
         return
 
     print(f"需要处理 {len(files_to_process)} 个文件")
 
     # 批量处理文件
-    with tqdm(total=len(files_to_process), desc="生成标题和关键词/短语进度") as pbar:
+    with tqdm(total=len(files_to_process), desc="生成关键词/短语进度") as pbar:
         for i in range(0, len(files_to_process), batch_size):
             batch = files_to_process[i : i + batch_size]
 
             # 函数用于处理单个文件
-            def process_file(file_info):
-                video_name, title_file = file_info
-                return process_title_file(
-                    client, channel, video_name, title_file, languages, force
+            def process_file(video_name):
+                return process_title_file_new_structure(
+                    client, channel, video_name, languages, force
                 )
 
             # 并发处理批次
@@ -491,19 +596,9 @@ def ensure_base_directories():
     for channel in [d for d in os.listdir(titles_base_dir) if not d.startswith(".")]:
         channel_path = os.path.join(titles_base_dir, channel)
         if os.path.isdir(channel_path):
-            # 创建多语种生成标题目录结构
+            # 创建关键词目录结构
             for lang in LANGUAGES:
                 lang_code = LANGUAGE_CODES[lang]
-
-                # 创建生成标题目录
-                shorten_title_dir = os.path.join(
-                    BASE_MEDIA_PATH, "multi_lang_title_shorten", channel, lang_code
-                )
-                if not os.path.exists(shorten_title_dir):
-                    os.makedirs(shorten_title_dir, exist_ok=True)
-                    print(
-                        f"已创建{channel}频道的{lang}生成标题目录: {shorten_title_dir}"
-                    )
 
                 # 创建关键词目录
                 keywords_dir = os.path.join(
@@ -512,14 +607,6 @@ def ensure_base_directories():
                 if not os.path.exists(keywords_dir):
                     os.makedirs(keywords_dir, exist_ok=True)
                     print(f"已创建{channel}频道的{lang}关键词目录: {keywords_dir}")
-
-    # 创建多语种生成标题基础目录
-    generated_titles_base_dir = os.path.join(
-        BASE_MEDIA_PATH, "multi_lang_title_shorten"
-    )
-    if not os.path.exists(generated_titles_base_dir):
-        os.makedirs(generated_titles_base_dir, exist_ok=True)
-        print(f"已创建生成标题基础目录: {generated_titles_base_dir}")
 
     # 创建关键词基础目录
     keywords_base_dir = os.path.join(BASE_MEDIA_PATH, "key_words")
@@ -536,7 +623,6 @@ def ensure_base_directories():
     # 检查所有目录的写入权限
     all_dirs = [
         titles_base_dir,
-        generated_titles_base_dir,
         keywords_base_dir,
         scripts_base_dir,
     ]
@@ -552,7 +638,7 @@ def ensure_base_directories():
 def main():
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(
-        description="从视频脚本内容中生成多语种标题和关键词/短语"
+        description="从视频脚本内容中生成多语种关键词/短语"
     )
 
     # 添加命令行参数
@@ -567,7 +653,7 @@ def main():
         "-f",
         "--force",
         action="store_true",
-        help="强制重新生成标题和关键词/短语，忽略已有文件",
+        help="强制重新生成关键词/短语，忽略已有文件",
     )
     parser.add_argument(
         "-b", "--batch_size", type=int, default=5, help="并发处理的批量大小，默认为20"
@@ -593,7 +679,7 @@ def main():
     # 处理所有频道和标题
     process_all_channels(client, valid_languages, args.force, args.batch_size)
 
-    print("所有标题和关键词/短语生成任务完成!")
+    print("所有关键词/短语生成任务完成!")
 
 
 if __name__ == "__main__":

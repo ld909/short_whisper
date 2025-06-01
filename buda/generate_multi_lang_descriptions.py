@@ -35,7 +35,7 @@ import glob
 from tqdm import tqdm
 
 # 定义支持的语言列表
-LANGUAGES = ["English", "Japanese", "Vietnamese", "Korean"]
+LANGUAGES = ["English", "Korean"]
 LANGUAGE_CODES = {"English": "en", "Japanese": "ja", "Vietnamese": "vi", "Korean": "ko"}
 LANGUAGE_PROMPTS = {
     "English": "你是一个 youtube 描述文字生成专家，给定一个音频脚本，你能够给出 120 字以内的高度凝练的总结，总结风格让观众一看就上头，并且有希望关注频道的欲望，语言简短有力，不要写成一坨，可以分段落。总结需要用「英语」给出，不要出现别的语言哈，直接返回你的总结，不要夹带任何内容，可是适当使用 emoji做强调但不要过多。",

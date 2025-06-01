@@ -1,12 +1,12 @@
 """
-多语言视频封面生成工具
+多语言视频封面生成工具（专用于en和ko语言）
 
 功能说明:
-此脚本用于为视频批量生成多语言封面。从指定路径随机选择背景图片，
-并将多语言关键词/短语添加到封面上。支持根据不同语言自动选择合适的字体。
+此脚本用于为视频批量生成英语和韩语封面。从thumbnail_base目录中随机选择
+背景图片，并将多语言关键词/短语添加到封面上。
 
 输入:
-- 背景图片: [媒体路径]/thumbnail_base/
+- 背景图片: [媒体路径]/thumbnail_base/[图片文件]
 - 多语言关键词: [媒体路径]/key_words/[频道名称]/[语言代码]/[视频名称].json
 
 输出:
@@ -16,13 +16,12 @@
 1. 基本使用: python generate_multilingual_thumbnails.py
 2. 指定频道: python generate_multilingual_thumbnails.py -c 频道名称
 3. 指定视频: python generate_multilingual_thumbnails.py -v 视频名称
-4. 指定语言: python generate_multilingual_thumbnails.py -l English Japanese
-5. 调整文字大小: python generate_multilingual_thumbnails.py --font_size 50
-6. 设置字体颜色: python generate_multilingual_thumbnails.py --font_color white
-7. 设置文字描边: python generate_multilingual_thumbnails.py --stroke_width 2 --stroke_color black
-8. 设置字体粗细: python generate_multilingual_thumbnails.py --font_weight 700
-9. 关闭文字描边: python generate_multilingual_thumbnails.py --no_stroke
-10. 随机选择关键词高亮: python generate_multilingual_thumbnails.py --random_highlight
+4. 调整文字大小: python generate_multilingual_thumbnails.py --font_size 50
+5. 设置字体颜色: python generate_multilingual_thumbnails.py --font_color white
+6. 设置文字描边: python generate_multilingual_thumbnails.py --stroke_width 2 --stroke_color black
+7. 设置字体粗细: python generate_multilingual_thumbnails.py --font_weight 700
+8. 关闭文字描边: python generate_multilingual_thumbnails.py --no_stroke
+9. 随机选择关键词高亮: python generate_multilingual_thumbnails.py --random_highlight
 """
 
 import os
@@ -34,13 +33,10 @@ import glob
 import re
 from PIL import Image, ImageDraw, ImageFont, ImageColor
 
-# 支持的语言及其代码
+# 支持的语言及其代码（仅限英语和韩语）
 LANGUAGES = {
     "English": "en",
-    "Japanese": "ja",
-    "Vietnamese": "vi",
     "Korean": "ko",
-    "Chinese": "zh",
 }
 
 # 苹果风格的颜色
@@ -70,10 +66,7 @@ def get_font_path(language, font_weight=400):
     # 为不同语言指定默认字体
     language_font_dirs = {
         "English": "Noto_Sans_EN",
-        "Japanese": "Noto_Sans_JP",
-        "Vietnamese": "Noto_Sans_VI",
         "Korean": "Noto_Sans_KR",
-        "Chinese": "Noto_Sans_SC",  # 或者使用 Noto_Sans_TC 取决于简体/繁体需求
     }
 
     # 根据字体粗细选择合适的字体文件
@@ -129,20 +122,40 @@ def get_font_path(language, font_weight=400):
             raise FileNotFoundError(f"找不到任何可用的字体文件在 {base_font_dir}")
 
 
-def get_random_background_image(media_path):
-    """从指定路径随机选择一张背景图片"""
-    background_dir = os.path.join(media_path, "thumbnail_base")
-    if not os.path.exists(background_dir):
-        raise FileNotFoundError(f"背景图片目录不存在: {background_dir}")
+def get_video_background_image(media_path, channel, language_code, video_name):
+    """从thumbnail_base目录中随机选择背景图片"""
+    # 构建thumbnail_base目录路径
+    thumbnail_base_dir = os.path.join(media_path, "thumbnail_base")
 
+    if not os.path.exists(thumbnail_base_dir):
+        print(f"错误: thumbnail_base目录不存在 {thumbnail_base_dir}")
+        return None
+
+    # 获取所有图片文件，排除以点开头的文件（mac生成的隐藏文件）
+    image_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tiff", ".webp"]
     image_files = []
-    for ext in ["*.jpg", "*.jpeg", "*.png"]:
-        image_files.extend(glob.glob(os.path.join(background_dir, ext)))
+
+    for file in os.listdir(thumbnail_base_dir):
+        # 排除以点开头的文件
+        if file.startswith("."):
+            continue
+
+        # 检查文件扩展名
+        file_lower = file.lower()
+        if any(file_lower.endswith(ext) for ext in image_extensions):
+            full_path = os.path.join(thumbnail_base_dir, file)
+            if os.path.isfile(full_path):
+                image_files.append(full_path)
 
     if not image_files:
-        raise FileNotFoundError(f"在 {background_dir} 中找不到任何图片")
+        print(f"错误: thumbnail_base目录中没有找到可用的图片文件 {thumbnail_base_dir}")
+        return None
 
-    return random.choice(image_files)
+    # 随机选择一张图片
+    selected_image = random.choice(image_files)
+    print(f"选择背景图片: {os.path.basename(selected_image)}")
+
+    return selected_image
 
 
 def load_multilingual_titles(media_path, channel, video_name):
@@ -186,86 +199,16 @@ def load_multilingual_titles(media_path, channel, video_name):
 def highlight_keywords(
     text, font_color=APPLE_WHITE, highlight_color=APPLE_GREEN, random_highlight=False
 ):
-    """高亮关键词，将关键词设置为绿色
+    """处理文本，统一使用指定的字体颜色，不再使用高亮
 
     参数:
     - text: 要处理的文本
-    - font_color: 普通文字颜色
-    - highlight_color: 高亮文字颜色
-    - random_highlight: 是否随机选择关键词高亮
+    - font_color: 文字颜色（统一使用这个颜色）
+    - highlight_color: 高亮文字颜色（已废弃，不再使用）
+    - random_highlight: 是否随机选择关键词高亮（已废弃，不再使用）
     """
-    highlighted_text = []
-
-    if random_highlight:
-        # 根据不同语言特点拆分文本
-        if any(ord(c) > 127 for c in text):  # 检测是否包含非ASCII字符
-            # 对于中日韩等语言，按字符拆分
-            words = list(text)
-        else:
-            # 对于英语等拉丁语系，按空格拆分
-            words = text.split()
-
-        # 随机选择1-3个词高亮
-        num_to_highlight = min(len(words), random.randint(1, 3))
-        indices_to_highlight = sorted(
-            random.sample(range(len(words)), num_to_highlight)
-        )
-
-        # 构建高亮文本
-        for i, word in enumerate(words):
-            if i in indices_to_highlight:
-                highlighted_text.append((word, highlight_color))
-            else:
-                highlighted_text.append((word, font_color))
-
-        # 如果是按空格拆分的，需要在单词之间添加空格
-        if not any(ord(c) > 127 for c in text):
-            spaced_text = []
-            for i, (word, color) in enumerate(highlighted_text):
-                if i < len(highlighted_text) - 1:
-                    spaced_text.append((word + " ", color))
-                else:
-                    spaced_text.append((word, color))
-            highlighted_text = spaced_text
-
-        return highlighted_text
-
-    # 传统方式: 查找可能的关键词（大写单词、引号内的内容等）
-    # 对于所有语言，默认处理引号内的内容
-    quote_pattern = r'["\']([^"\']+)["\']'
-
-    # 尝试匹配引号内内容或全大写单词
-    uppercase_pattern = r"\b([A-Z][A-Z]+)\b"
-
-    # 将文本拆分为普通部分和高亮部分
-    last_end = 0
-
-    # 首先尝试匹配引号内的内容
-    for match in re.finditer(quote_pattern, text):
-        start, end = match.span()
-        if start > last_end:
-            highlighted_text.append((text[last_end:start], font_color))
-        highlighted_text.append((match.group(1), highlight_color))
-        last_end = end
-
-    # 如果没有发现引号匹配，尝试匹配全大写单词（适用于英文）
-    if not highlighted_text:
-        for match in re.finditer(uppercase_pattern, text):
-            start, end = match.span()
-            if start > last_end:
-                highlighted_text.append((text[last_end:start], font_color))
-            highlighted_text.append((match.group(0), highlight_color))
-            last_end = end
-
-    # 添加最后一段文本
-    if last_end < len(text):
-        highlighted_text.append((text[last_end:], font_color))
-
-    # 如果没有找到任何匹配，则返回原始文本
-    if not highlighted_text:
-        highlighted_text = [(text, font_color)]
-
-    return highlighted_text
+    # 统一使用font_color，不再进行任何高亮处理
+    return [(text, font_color)]
 
 
 def create_thumbnail(
@@ -435,7 +378,6 @@ def create_thumbnail(
 def generate_thumbnails(
     channel=None,
     video_name=None,
-    languages=None,
     font_size=65,
     font_color=APPLE_WHITE,
     stroke_width=2,
@@ -445,25 +387,26 @@ def generate_thumbnails(
     random_highlight=False,
     left_margin=30,
 ):
-    """生成多语言视频封面"""
+    """生成英语和韩语视频封面"""
     media_path = get_base_media_path()
 
-    # 如果没有指定语言，使用所有支持的语言
-    if not languages:
-        languages = list(LANGUAGES.keys())
+    # 固定使用英语和韩语
+    languages = ["English", "Korean"]
 
     # 频道目录列表
     if channel:
         channels = [channel]
     else:
-        key_words_dir = os.path.join(media_path, "key_words")
-        if not os.path.exists(key_words_dir):
-            print(f"错误: 关键词目录不存在: {key_words_dir}")
+        # 从mp4_with_audio目录获取频道列表
+        mp4_with_audio_dir = os.path.join(media_path, "mp4_with_audio")
+        if not os.path.exists(mp4_with_audio_dir):
+            print(f"错误: mp4_with_audio目录不存在: {mp4_with_audio_dir}")
             return
         channels = [
             d
-            for d in os.listdir(key_words_dir)
-            if os.path.isdir(os.path.join(key_words_dir, d)) and not d.startswith(".")
+            for d in os.listdir(mp4_with_audio_dir)
+            if os.path.isdir(os.path.join(mp4_with_audio_dir, d))
+            and not d.startswith(".")
         ]
 
     print(f"处理 {len(channels)} 个频道")
@@ -471,37 +414,48 @@ def generate_thumbnails(
     for current_channel in channels:
         print(f"\n处理频道: {current_channel}")
 
-        channel_dir = os.path.join(media_path, "key_words", current_channel)
-        if not os.path.exists(channel_dir):
-            print(f"跳过: 频道目录不存在 {channel_dir}")
+        # 检查mp4_with_audio目录下的频道目录
+        channel_mp4_dir = os.path.join(media_path, "mp4_with_audio", current_channel)
+        if not os.path.exists(channel_mp4_dir):
+            print(f"跳过: mp4_with_audio频道目录不存在 {channel_mp4_dir}")
+            continue
+
+        # 检查关键词目录
+        channel_keywords_dir = os.path.join(media_path, "key_words", current_channel)
+        if not os.path.exists(channel_keywords_dir):
+            print(f"跳过: 关键词频道目录不存在 {channel_keywords_dir}")
             continue
 
         # 获取支持的所有语言代码目录
         lang_dirs = []
         for lang in languages:
             lang_code = LANGUAGES.get(lang, lang.lower())
-            lang_dir = os.path.join(channel_dir, lang_code)
-            if os.path.exists(lang_dir):
-                lang_dirs.append((lang, lang_code, lang_dir))
+
+            # 检查mp4_with_audio和key_words目录都存在
+            mp4_lang_dir = os.path.join(channel_mp4_dir, lang_code)
+            keywords_lang_dir = os.path.join(channel_keywords_dir, lang_code)
+
+            if os.path.exists(mp4_lang_dir) and os.path.exists(keywords_lang_dir):
+                lang_dirs.append((lang, lang_code, mp4_lang_dir, keywords_lang_dir))
 
         if not lang_dirs:
-            print(f"跳过: 频道 {current_channel} 下没有找到任何语言目录")
+            print(f"跳过: 频道 {current_channel} 下没有找到任何支持的语言目录")
             continue
 
-        # 从第一个语言目录获取所有视频名称
-        first_lang_dir = lang_dirs[0][2]
+        # 从第一个语言的mp4目录获取所有视频名称
+        first_lang_mp4_dir = lang_dirs[0][2]
 
         # 视频文件列表
         if video_name:
-            video_files = [f"{video_name}.json"]
+            video_files = [f"{video_name}.mp4"]
         else:
             video_files = [
                 f
-                for f in os.listdir(first_lang_dir)
-                if f.endswith(".json") and not f.startswith(".")
+                for f in os.listdir(first_lang_mp4_dir)
+                if f.endswith(".mp4") and not f.startswith(".")
             ]
 
-        print(f"找到 {len(video_files)} 个关键词文件")
+        print(f"找到 {len(video_files)} 个视频文件")
 
         for video_file in video_files:
             video_name_no_ext = os.path.splitext(video_file)[0]
@@ -524,12 +478,29 @@ def generate_thumbnails(
                     print(f"跳过: 找不到 {language} 关键词")
                     continue
 
+                # 检查mp4文件是否存在
+                mp4_file = os.path.join(
+                    media_path,
+                    "mp4_with_audio",
+                    current_channel,
+                    lang_code,
+                    f"{video_name_no_ext}.mp4",
+                )
+                if not os.path.exists(mp4_file):
+                    print(f"跳过: 找不到 {language} 视频文件 {mp4_file}")
+                    continue
+
                 key_phrase = key_phrases[language]
 
-                # 随机选择背景图片
+                # 从thumbnail_base目录中选择背景图片
                 try:
-                    bg_image = get_random_background_image(media_path)
-                except FileNotFoundError as e:
+                    bg_image = get_video_background_image(
+                        media_path, current_channel, lang_code, video_name_no_ext
+                    )
+                    if bg_image is None:
+                        print(f"跳过: 无法获取 {language} 背景图片")
+                        continue
+                except Exception as e:
                     print(f"错误: {e}")
                     continue
 
@@ -546,7 +517,7 @@ def generate_thumbnails(
                 print(f"  - 输出路径: {output_path}")
 
                 # 创建缩略图
-                create_thumbnail(
+                success = create_thumbnail(
                     bg_image,
                     key_phrase,
                     output_path,
@@ -563,10 +534,9 @@ def generate_thumbnails(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="生成多语言视频封面")
+    parser = argparse.ArgumentParser(description="生成英语和韩语视频封面")
     parser.add_argument("-c", "--channel", help="指定要处理的频道")
     parser.add_argument("-v", "--video", help="指定要处理的视频名称（不含扩展名）")
-    parser.add_argument("-l", "--languages", nargs="+", help="指定要生成的语言列表")
     parser.add_argument("--font_size", type=int, default=60, help="字体大小")
     parser.add_argument("--font_color", default=APPLE_WHITE, help="字体颜色")
     parser.add_argument(
@@ -587,14 +557,6 @@ def main():
 
     args = parser.parse_args()
 
-    # 验证语言
-    if args.languages:
-        for lang in args.languages:
-            if lang not in LANGUAGES:
-                print(
-                    f"警告: 不支持的语言 {lang}，支持的语言有: {', '.join(LANGUAGES.keys())}"
-                )
-
     if args.debug:
         # 打印字体目录信息
         system = platform.system()
@@ -606,10 +568,7 @@ def main():
         print("\n字体目录信息:")
         for lang, font_dir in {
             "English": "Noto_Sans_EN",
-            "Japanese": "Noto_Sans_JP",
-            "Vietnamese": "Noto_Sans_VI",
             "Korean": "Noto_Sans_KR",
-            "Chinese": "Noto_Sans_SC",
         }.items():
             full_dir = os.path.join(base_font_dir, font_dir)
             if os.path.exists(full_dir):
@@ -631,7 +590,6 @@ def main():
     generate_thumbnails(
         channel=args.channel,
         video_name=args.video,
-        languages=args.languages,
         font_size=args.font_size,
         font_color=args.font_color,
         stroke_width=args.stroke_width,
