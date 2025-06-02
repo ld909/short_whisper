@@ -47,6 +47,7 @@ import os
 import sys
 import time
 import json
+import random
 import argparse
 import platform
 import urllib3
@@ -144,39 +145,57 @@ class AutoPublishSystem:
             return []
 
     def get_latest_publish_time(self):
-        """获取已发布视频的最远发布时间"""
+        """获取已发布视频的最远发布时间
+
+        逻辑说明：
+        - 如果全部视频都未发布，返回当前时间作为基准
+        - 如果已有视频发布，返回已发布视频中的最远发布时间
+        - 包含未来时间的记录（因为我们就是要设置未来的发布时间）
+        """
         try:
+            print("🔄 重新读取Excel获取最新发布时间...")
             df = pd.read_excel(TRACKER_FILE, sheet_name=self.language)
 
-            # 过滤已发布的视频
+            # 过滤已发布的视频（是否已经发布=1）
             published = df[df["是否已经发布"] == 1]
+            print(f"📊 已发布视频数量: {len(published)}")
 
+            # 如果全部都未发布，使用当前时间作为基准
             if len(published) == 0:
-                print("没有已发布的视频，使用当前时间作为基准")
+                print("全部视频都未发布，使用当前时间作为基准")
                 return datetime.now()
 
             # 获取发布时间列，排除空值
             publish_times = published["发布时间"].dropna()
+            print(f"📅 有效发布时间记录数量: {len(publish_times)}")
 
+            # 如果已发布视频中没有有效的发布时间记录，使用当前时间作为基准
             if len(publish_times) == 0:
-                print("没有有效的发布时间记录，使用当前时间作为基准")
+                print("已发布视频中没有有效的发布时间记录，使用当前时间作为基准")
                 return datetime.now()
 
-            # 转换为datetime并找到最远的时间
-            max_time = pd.to_datetime(publish_times).max()
-            print(f"最远发布时间: {max_time}")
+            # 转换为datetime
+            publish_times_dt = pd.to_datetime(publish_times)
+
+            # 直接找到最远的时间（包含未来时间）
+            max_time = publish_times_dt.max()
+            print(f"✅ 已发布视频的最远发布时间: {max_time}")
 
             return max_time
 
         except Exception as e:
             print(f"获取发布时间时出错: {e}")
+            print("出错时使用当前时间作为基准")
             return datetime.now()
 
     def calculate_next_publish_time(self):
         """计算下一个发布时间（最远时间+6小时）"""
+        print("⏰ 开始计算下一个发布时间...")
         latest_time = self.get_latest_publish_time()
         next_time = latest_time + timedelta(hours=6)
-        print(f"下一个发布时间: {next_time}")
+        print(f"🎯 基准时间: {latest_time}")
+        print(f"➕ 添加6小时后: {next_time}")
+        print(f"✅ 下一个发布时间: {next_time}")
         return next_time
 
     def get_video_content(self, video_name, channel_name):
@@ -192,8 +211,18 @@ class AutoPublishSystem:
         desc_path = os.path.join(
             DESC_DIR, channel_name, self.language, f"{base_name}.txt"
         )
+        # 添加封面路径
+        thumbnail_path = os.path.join(
+            BASE_PATH, "thumbnail", channel_name, self.language, f"{base_name}.png"
+        )
 
-        content = {"mp4_path": mp4_path, "title": "", "description": "", "valid": True}
+        content = {
+            "mp4_path": mp4_path,
+            "title": "",
+            "description": "",
+            "thumbnail_path": thumbnail_path,
+            "valid": True,
+        }
 
         # 检查MP4文件
         if not os.path.exists(mp4_path):
@@ -223,6 +252,13 @@ class AutoPublishSystem:
         else:
             print(f"警告: 描述文件不存在: {desc_path}")
             content["description"] = "精彩内容，敬请观看！"  # 默认描述
+
+        # 检查封面文件
+        if not os.path.exists(thumbnail_path):
+            print(f"警告: 封面文件不存在: {thumbnail_path}")
+            content["thumbnail_path"] = None
+        else:
+            print(f"找到封面文件: {thumbnail_path}")
 
         return content
 
@@ -256,13 +292,61 @@ class AutoPublishSystem:
 
         return ws_endpoint, remote_debugging_url
 
-    def upload_video(self, video_content, dry_run=False):
+    def format_publish_time(self, publish_time):
+        """格式化发布时间为YouTube需要的格式
+
+        Returns:
+            tuple: (date_str, time_str)
+            date_str: 如 "Dec 2, 2025"
+            time_str: 如 "12:00 AM" 或 "10:15 PM"
+        """
+        # 月份映射
+        month_names = [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+        ]
+
+        # 格式化日期: "Dec 2, 2025"
+        date_str = f"{month_names[publish_time.month - 1]} {publish_time.day}, {publish_time.year}"
+
+        # 格式化时间: "12:00 AM" 或 "10:15 PM"
+        hour = publish_time.hour
+        minute = publish_time.minute
+
+        if hour == 0:
+            time_str = f"12:{minute:02d} AM"
+        elif hour < 12:
+            time_str = f"{hour}:{minute:02d} AM"
+        elif hour == 12:
+            time_str = f"12:{minute:02d} PM"
+        else:
+            time_str = f"{hour - 12}:{minute:02d} PM"
+
+        return date_str, time_str
+
+    def upload_video(
+        self, video_content, dry_run=False, publish_time=None, is_first_video=False
+    ):
         """上传视频到YouTube"""
         if dry_run:
             print(f"[试运行] 将要上传视频:")
             print(f"  文件: {video_content['mp4_path']}")
             print(f"  标题: {video_content['title']}")
             print(f"  描述: {video_content['description'][:100]}...")
+            if video_content.get("thumbnail_path"):
+                print(f"  封面: {video_content['thumbnail_path']}")
+            else:
+                print(f"  封面: 无")
             return True
 
         if not video_content["valid"]:
@@ -286,10 +370,21 @@ class AutoPublishSystem:
                 else:
                     context = browser.contexts[0]
 
-                if not context.pages:
-                    page = context.new_page()
-                else:
-                    page = context.pages[0]
+                # 只在第一个视频时关闭其他tab
+                if is_first_video:
+                    print("初次运行，正在关闭其他tab...")
+                    all_pages = context.pages
+                    for page in all_pages:
+                        try:
+                            page.close()
+                            print(f"已关闭tab: {page.url}")
+                        except Exception as e:
+                            print(f"关闭tab时出错: {e}")
+
+                # 为每个视频打开新的tab
+                print("正在打开新的tab...")
+                page = context.new_page()
+                print("已创建新的tab")
 
                 # 导航到YouTube Studio
                 print("正在导航到YouTube Studio...")
@@ -350,6 +445,11 @@ class AutoPublishSystem:
                 # 等待上传处理
                 page.wait_for_load_state("networkidle")
 
+                # 添加随机延迟，模拟人工操作
+                delay = random.uniform(1.0, 1.5)
+                print(f"等待 {delay:.2f} 秒后开始输入标题...")
+                page.wait_for_timeout(int(delay * 1000))
+
                 # 输入标题
                 title_selector = 'div[id="textbox"][aria-label="Add a title that describes your video (type @ to mention a channel)"]'
                 print("等待标题输入框...")
@@ -360,6 +460,11 @@ class AutoPublishSystem:
                 title_input.press("Control+a")
                 title_input.fill(video_content["title"])
                 print(f"已输入标题: {video_content['title']}")
+
+                # 添加随机延迟，模拟人工操作
+                delay = random.uniform(1.0, 1.5)
+                print(f"等待 {delay:.2f} 秒后开始输入描述...")
+                page.wait_for_timeout(int(delay * 1000))
 
                 # 输入描述
                 desc_selector = 'div[id="textbox"][aria-label="Tell viewers about your video (type @ to mention a channel)"]'
@@ -372,28 +477,182 @@ class AutoPublishSystem:
                 desc_input.fill(video_content["description"])
                 print("已输入描述")
 
+                # 添加随机延迟，模拟人工操作
+                delay = random.uniform(1.0, 1.5)
+                print(f"等待 {delay:.2f} 秒后开始上传封面...")
+                page.wait_for_timeout(int(delay * 1000))
+
+                # 上传封面
+                if video_content.get("thumbnail_path") and os.path.exists(
+                    video_content["thumbnail_path"]
+                ):
+                    print(f"正在上传封面: {video_content['thumbnail_path']}")
+                    try:
+                        # 等待封面上传输入框出现
+                        page.wait_for_selector(
+                            'input#file-loader[type="file"]', state="attached"
+                        )
+                        thumbnail_input = page.locator('input#file-loader[type="file"]')
+                        thumbnail_input.set_input_files(video_content["thumbnail_path"])
+                        print("封面已上传")
+
+                        # 等待封面上传完成
+                        page.wait_for_timeout(3000)  # 等待3秒确保上传完成
+                    except Exception as thumbnail_error:
+                        print(f"上传封面时出错: {thumbnail_error}")
+                        print("继续处理，不影响视频发布")
+                else:
+                    print("跳过封面上传（封面文件不存在）")
+
+                # 添加随机延迟，模拟人工操作
+                delay = random.uniform(1.0, 1.5)
+                print(f"等待 {delay:.2f} 秒后继续下一步...")
+                page.wait_for_timeout(int(delay * 1000))
+
                 # 点击Next按钮3次
                 print("正在点击Next按钮...")
                 next_button = page.locator('button:has-text("Next")')
                 for i in range(3):
                     next_button.click()
                     print(f"已点击Next按钮 ({i+1}/3)")
+                    # 在每次点击Next按钮之间也添加随机延迟
+                    delay = random.uniform(1.0, 1.5)
+                    page.wait_for_timeout(int(delay * 1000))
+
+                # 选择Public选项
+                print("正在选择Public选项...")
+                public_radio = page.locator('tp-yt-paper-radio-button[name="PUBLIC"]')
+                public_radio.click()
+                print("已选择Public选项")
+
+                # 展开发布计划选项
+                print("正在展开发布计划选项...")
+                second_container = page.locator("div#second-container")
+                second_container.click()
+                print("已展开发布计划选项")
+
+                # 设置发布时间
+                if publish_time:
+                    print(f"正在设置发布时间: {publish_time}")
+                    date_str, time_str = self.format_publish_time(publish_time)
+                    print(f"格式化后 - 日期: {date_str}, 时间: {time_str}")
+
+                    # 点击日期选择器
+                    print("正在点击日期选择器...")
+                    date_dropdown = page.locator(
+                        'div[role="button"].container.style-scope.ytcp-dropdown-trigger'
+                    )
+                    date_dropdown.click()
                     page.wait_for_timeout(1000)
 
-                print("视频上传和配置完成")
+                    # 使用第二个输入框（日期输入框）设置日期
+                    print(f"正在设置日期: {date_str}")
+                    date_input = page.get_by_label("Enter date").get_by_label("")
+                    date_input.click()
+                    page.keyboard.press("Control+a")  # 全选
+                    date_input.fill(date_str)
 
-                # 断开连接
-                browser.close()
-                return True
+                    # 点击两次回车确认日期
+                    page.keyboard.press("Enter")
+                    page.wait_for_timeout(500)
+                    page.keyboard.press("Enter")
+                    page.wait_for_timeout(1000)
+                    print("日期设置完成")
+
+                    # 使用第一个输入框（时间输入框）设置时间
+                    print(f"正在设置时间: {time_str}")
+                    time_input = page.locator("#input-1").get_by_label("")
+                    time_input.click()
+                    page.keyboard.press("Control+a")  # 全选
+                    time_input.fill(time_str)
+
+                    # 时间设置完成后连续按两次回车
+                    page.keyboard.press("Enter")
+                    page.wait_for_timeout(500)
+                    page.keyboard.press("Enter")
+                    page.wait_for_timeout(1000)
+                    print("时间设置完成")
+
+                    # 添加随机延迟，模拟人工操作
+                    delay = random.uniform(1.0, 1.5)
+                    print(f"等待 {delay:.2f} 秒后点击Schedule按钮...")
+                    page.wait_for_timeout(int(delay * 1000))
+
+                    # 点击Schedule按钮 - 使用多种选择器尝试
+                    print("正在点击Schedule按钮...")
+                    try:
+                        # 首先等待按钮元素出现
+                        print("等待Schedule按钮出现...")
+                        page.wait_for_selector(
+                            "#done-button", state="visible", timeout=10000
+                        )
+
+                        # 尝试多种选择器
+                        selectors = [
+                            "#done-button",  # 简单ID选择器
+                            "ytcp-button#done-button",  # 带标签的ID选择器
+                            'button[aria-label="Schedule"]',  # 内部button元素
+                            '[aria-label="Schedule"]',  # aria-label选择器
+                            'ytcp-button#done-button[role="button"]',  # 完整选择器
+                        ]
+
+                        clicked = False
+                        for selector in selectors:
+                            try:
+                                print(f"尝试选择器: {selector}")
+                                schedule_button = page.locator(selector)
+
+                                # 检查元素是否存在
+                                if schedule_button.count() > 0:
+                                    print(f"找到元素，准备点击...")
+
+                                    # 等待元素可点击
+                                    schedule_button.wait_for(
+                                        state="visible", timeout=5000
+                                    )
+
+                                    # 尝试点击
+                                    schedule_button.click()
+                                    print(
+                                        f"✅ 使用选择器 '{selector}' 成功点击Schedule按钮"
+                                    )
+                                    clicked = True
+                                    break
+                                else:
+                                    print(f"选择器 '{selector}' 未找到元素")
+                            except Exception as e:
+                                print(f"选择器 '{selector}' 点击失败: {e}")
+                                continue
+
+                        if not clicked:
+                            print("⚠️ 所有选择器都失败，尝试使用文本内容点击...")
+                            # 最后尝试：使用文本内容点击
+                            text_button = page.locator("text=Schedule")
+                            if text_button.count() > 0:
+                                text_button.click()
+                                print("✅ 使用文本内容成功点击Schedule按钮")
+                                clicked = True
+                            else:
+                                print("❌ 无法找到Schedule按钮")
+                                return False
+
+                    except Exception as e:
+                        print(f"点击Schedule按钮时出错: {e}")
+                        return False
+
+                    # 等待发布完成
+                    print("等待发布操作完成...")
+                    page.wait_for_timeout(5000)  # 等待5秒确保发布完成
+
+                    print("视频发布配置完成")
+
+                    # 不关闭浏览器和tab，保持打开状态
+                    print("保持浏览器和tab打开状态")
+                    return True
 
         except Exception as e:
             print(f"上传视频时出错: {e}")
             return False
-        finally:
-            # 关闭AdsPower浏览器
-            if self.http:
-                print("正在关闭AdsPower浏览器...")
-                self.http.request("GET", self.close_url)
 
     def update_publish_status(self, video_name, publish_time):
         """更新Excel中的发布状态"""
@@ -600,21 +859,31 @@ class AutoPublishSystem:
                 print(f"跳过视频 {video_name}（内容无效）")
                 continue
 
-            # 计算发布时间
+            # 每个视频都重新计算发布时间（确保获取最新的Excel数据）
             publish_time = self.calculate_next_publish_time()
 
             print(f"计划发布时间: {publish_time}")
             print(f"标题: {video_content['title']}")
             print(f"描述长度: {len(video_content['description'])} 字符")
+            if video_content.get("thumbnail_path"):
+                print(f"封面文件: {video_content['thumbnail_path']}")
+            else:
+                print(f"封面文件: 无")
 
-            # 上传视频
-            success = self.upload_video(video_content, dry_run)
+            # 上传视频，标记是否为第一个视频
+            is_first_video = i == 1
+            success = self.upload_video(
+                video_content, dry_run, publish_time, is_first_video
+            )
 
             if success:
                 if not dry_run:
                     # 更新Excel状态
                     self.update_publish_status(video_name, publish_time)
-                    print(f"✅ 视频 {video_name} 发布成功")
+                    print(f"✅ 视频 {video_name} 发布成功，Excel已更新")
+                    print(
+                        f"📝 发布时间已写入Excel: {publish_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
                 else:
                     print(f"✅ [试运行] 视频 {video_name} 处理完成")
             else:
@@ -627,6 +896,10 @@ class AutoPublishSystem:
 
         print(f"\n=== 发布完成 ===")
 
+        # 保持浏览器打开，不自动关闭
+        print("🌟 所有视频发布完成！浏览器将保持打开状态，方便您检查发布结果。")
+        print("💡 如需关闭浏览器，请手动关闭AdsPower中的浏览器实例。")
+
 
 def main():
     parser = argparse.ArgumentParser(description="YouTube视频自动发布系统")
@@ -638,7 +911,11 @@ def main():
         help="发布语言 (默认: en)",
     )
     parser.add_argument(
-        "-n", "--max-count", type=int, default=1, help="最大发布数量 (默认: 1)"
+        "-n",
+        "--max-count",
+        type=int,
+        default=None,
+        help="最大发布数量 (默认: 发布所有)",
     )
     parser.add_argument(
         "-d", "--dry-run", action="store_true", help="试运行模式，不实际发布"
@@ -661,9 +938,12 @@ def main():
         language=args.language, ads_id=args.ads_id, studio_url=args.studio_url
     )
 
+    # 如果没有指定max_count，则发布所有视频
+    max_count = args.max_count if args.max_count is not None else 999999
+
     # 运行发布系统
     try:
-        system.run(max_count=args.max_count, dry_run=args.dry_run)
+        system.run(max_count=max_count, dry_run=args.dry_run)
     except KeyboardInterrupt:
         print("\n用户中断操作")
     except Exception as e:

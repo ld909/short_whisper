@@ -279,7 +279,11 @@ def main():
             ),
             ("shorten_titles_multi_lang.py", "10.2. 生成简化多语种标题", []),
             ("generate_key_phrases.py", "11. 生成多语种的封面关键词和简化标题", []),
-            ("generate_multilingual_thumbnails.py", "12. 生成多语种封面", []),
+            (
+                "generate_multilingual_thumbnails.py",
+                "12. 生成多语种封面",
+                ["--font_size", "80", "--no_stroke"],
+            ),
             ("generate_multi_lang_descriptions.py", "13. 生成多语种视频描述", []),
         ]
     )
