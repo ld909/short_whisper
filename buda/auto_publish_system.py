@@ -150,16 +150,68 @@ class AutoPublishSystem:
         """
         try:
             print("🔄 重新读取Excel获取最新发布时间...")
-            df = pd.read_excel(TRACKER_FILE, sheet_name=self.language)
+            print(f"📄 Excel文件路径: {TRACKER_FILE}")
+            print(f"🌏 当前语言模式: {self.language}")
+
+            # 检查Excel文件是否存在
+            if not os.path.exists(TRACKER_FILE):
+                raise FileNotFoundError(f"Excel文件不存在: {TRACKER_FILE}")
+
+            # 检查Excel文件中是否有对应的语言sheet
+            try:
+                # 先读取所有sheet名称
+                excel_file = pd.ExcelFile(TRACKER_FILE)
+                available_sheets = excel_file.sheet_names
+                print(f"📋 Excel中可用的工作表: {available_sheets}")
+
+                if self.language not in available_sheets:
+                    raise ValueError(
+                        f"Excel文件中没有找到语言工作表 '{self.language}'。可用工作表: {available_sheets}"
+                    )
+
+                # 读取指定语言的工作表
+                df = pd.read_excel(TRACKER_FILE, sheet_name=self.language)
+                print(f"✅ 成功读取工作表 '{self.language}'，共 {len(df)} 行数据")
+
+            except Exception as sheet_error:
+                print(f"❌ 读取工作表时出错: {sheet_error}")
+                raise sheet_error
+
+            # 检查必要的列是否存在
+            required_columns = ["是否已经发布", "发布时间"]
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                print(f"❌ Excel中缺少必要的列: {missing_columns}")
+                print(f"📋 当前Excel的列名: {list(df.columns)}")
+                raise ValueError(f"Excel中缺少必要的列: {missing_columns}")
+
+            print(f"✅ Excel列检查通过")
 
             # 过滤已发布的视频（是否已经发布=1）
-            published = df[df["是否已经发布"] == 1]
+            print(f"🔍 开始过滤已发布的视频...")
+            print(f"📊 '是否已经发布'列的数据类型: {df['是否已经发布'].dtype}")
+            print(f"📊 '是否已经发布'列的唯一值: {df['是否已经发布'].unique()}")
+
+            # 更宽泛的过滤条件，处理不同的数据类型
+            published = df[
+                (df["是否已经发布"] == 1)
+                | (df["是否已经发布"] == "1")
+                | (df["是否已经发布"] == True)
+                | (df["是否已经发布"].astype(str).str.strip() == "1")
+            ]
             print(f"📊 已发布视频数量: {len(published)}")
 
             # 如果全部都未发布，使用当前时间作为基准
             if len(published) == 0:
-                print("全部视频都未发布，使用当前时间作为基准")
+                print("📝 全部视频都未发布，使用当前时间作为基准")
                 return datetime.now()
+
+            # 显示已发布视频的发布时间列信息
+            print(f"🔍 检查发布时间列...")
+            print(f"📊 '发布时间'列的数据类型: {df['发布时间'].dtype}")
+            print(
+                f"📊 已发布视频中'发布时间'列的样本数据: {published['发布时间'].head()}"
+            )
 
             # 获取发布时间列，排除空值
             publish_times = published["发布时间"].dropna()
@@ -167,21 +219,53 @@ class AutoPublishSystem:
 
             # 如果已发布视频中没有有效的发布时间记录，使用当前时间作为基准
             if len(publish_times) == 0:
-                print("已发布视频中没有有效的发布时间记录，使用当前时间作为基准")
+                print("📝 已发布视频中没有有效的发布时间记录，使用当前时间作为基准")
                 return datetime.now()
 
+            # 显示发布时间的详细信息
+            print(f"📅 发布时间样本数据:")
+            for i, time_val in enumerate(publish_times.head()):
+                print(f"   {i+1}: {time_val} (类型: {type(time_val)})")
+
             # 转换为datetime
-            publish_times_dt = pd.to_datetime(publish_times)
+            try:
+                publish_times_dt = pd.to_datetime(publish_times)
+                print(f"✅ 成功转换为datetime格式")
+                print(
+                    f"📅 转换后的时间范围: {publish_times_dt.min()} 到 {publish_times_dt.max()}"
+                )
+            except Exception as dt_error:
+                print(f"❌ 转换为datetime时出错: {dt_error}")
+                print(f"🔄 尝试使用不同的转换方法...")
+
+                # 尝试不同的日期格式
+                try:
+                    publish_times_dt = pd.to_datetime(
+                        publish_times, format="%Y-%m-%d %H:%M:%S"
+                    )
+                    print(f"✅ 使用标准格式转换成功")
+                except:
+                    try:
+                        publish_times_dt = pd.to_datetime(
+                            publish_times, infer_datetime_format=True
+                        )
+                        print(f"✅ 使用自动推断格式转换成功")
+                    except Exception as final_dt_error:
+                        print(f"❌ 所有日期转换方法都失败: {final_dt_error}")
+                        raise final_dt_error
 
             # 直接找到最远的时间（包含未来时间）
             max_time = publish_times_dt.max()
             print(f"✅ 已发布视频的最远发布时间: {max_time}")
+            print(f"📅 最远时间类型: {type(max_time)}")
 
             return max_time
 
         except Exception as e:
-            print(f"获取发布时间时出错: {e}")
-            print("出错时使用当前时间作为基准")
+            print(f"❌ 获取发布时间时出错: {e}")
+            print(f"🔍 错误类型: {type(e).__name__}")
+            print(f"📊 错误详细信息: {str(e)}")
+            print("📝 出错时使用当前时间作为基准")
             return datetime.now()
 
     def calculate_next_publish_time(self):
