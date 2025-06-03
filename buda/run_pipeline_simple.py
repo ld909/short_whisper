@@ -282,7 +282,7 @@ def main():
             (
                 "generate_multilingual_thumbnails.py",
                 "12. 生成多语种封面",
-                ["--font_size", "80", "--no_stroke"],
+                ["--font_size", "80", "--no_stroke", "--left_margin", "80"],
             ),
             ("generate_multi_lang_descriptions.py", "13. 生成多语种视频描述", []),
         ]
