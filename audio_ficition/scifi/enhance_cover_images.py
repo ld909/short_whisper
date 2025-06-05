@@ -1,32 +1,31 @@
 """
-科幻故事封面图片超分辨率处理工具
+科幻故事封面图片色彩增强工具
 
 功能说明:
-此脚本使用阿里云图像增强服务对封面图片进行超分辨率处理，提升图片质量和分辨率。
+此脚本使用阿里云图像增强服务对封面图片进行色彩增强处理，提升图片的色彩质感和观感。
 
 主要功能:
-1. 读取封面图片文件（来自 enhance_cover_images.py 的输出）
-2. 调用阿里云图像增强服务进行超分辨率处理
-3. 将处理后的高清图片保存到指定目录
+1. 读取封面图片文件（来自 generate_cover_images.py 的输出）
+2. 调用阿里云图像增强服务进行色彩增强处理
+3. 将处理后的增强图片保存到指定目录
 
 输入:
+- macOS: /Volumes/dhl/audio/scifi/cover_img_small/[故事索引].png
+- Linux: /media/dhl/audio/scifi/cover_img_small/[故事索引].png
+
+输出:
 - macOS: /Volumes/dhl/audio/scifi/cover_enhanced/[故事索引].png
 - Linux: /media/dhl/audio/scifi/cover_enhanced/[故事索引].png
 
-输出:
-- macOS: /Volumes/dhl/audio/scifi/cover_img_large/[故事索引].png
-- Linux: /media/dhl/audio/scifi/cover_img_large/[故事索引].png
-
 使用方法:
-1. 基本使用: python upscale_cover_images.py
-2. 强制重新处理: python upscale_cover_images.py -f
-3. 指定故事索引范围: python upscale_cover_images.py --start 1 --end 10
-4. 指定超分倍数: python upscale_cover_images.py --scale 4
+1. 基本使用: python enhance_cover_images.py
+2. 强制重新处理: python enhance_cover_images.py -f
+3. 指定故事索引范围: python enhance_cover_images.py --start 1 --end 10
 
 注意:
 - 需要设置环境变量 ALIBABA_CLOUD_ACCESS_KEY_ID 和 ALIBABA_CLOUD_ACCESS_KEY_SECRET
 - 脚本支持断点续传，中断后可从上次停止的位置继续处理
-- 支持超分倍数 2x 和 4x
+- 使用 Rec709 调色模式，适合一般条件拍摄的图像
 - 处理本地文件，使用阿里云图像增强的advance接口
 - 自动排除以点开头的meta文件（如.DS_Store等）
 - 根据操作系统自动选择合适的路径（macOS使用/Volumes，Linux使用/media）
@@ -49,7 +48,7 @@ from alibabacloud_credentials.models import Config as CredentialConfig
 from alibabacloud_tea_openapi import models as open_api_models
 from alibabacloud_imageenhan20190930 import models as imageenhan_20190930_models
 from alibabacloud_imageenhan20190930.models import (
-    MakeSuperResolutionImageAdvanceRequest,
+    EnhanceImageColorAdvanceRequest,
 )
 from alibabacloud_tea_util import models as util_models
 from alibabacloud_tea_util.client import Client as UtilClient
@@ -61,18 +60,18 @@ def get_base_input_path():
     """根据操作系统返回原始图片的适当路径"""
     system = platform.system()
     if system == "Darwin":  # macOS
-        return "/Volumes/dhl/audio/scifi/cover_enhanced"
+        return "/Volumes/dhl/audio/scifi/cover_img_small"
     else:  # 默认为Linux/Ubuntu
-        return "/media/dhl/audio/scifi/cover_enhanced"
+        return "/media/dhl/audio/scifi/cover_img_small"
 
 
 def get_base_output_path():
     """根据操作系统返回输出图片的适当路径"""
     system = platform.system()
     if system == "Darwin":  # macOS
-        return "/Volumes/dhl/audio/scifi/cover_img_large"
+        return "/Volumes/dhl/audio/scifi/cover_enhanced"
     else:  # 默认为Linux/Ubuntu
-        return "/media/dhl/audio/scifi/cover_img_large"
+        return "/media/dhl/audio/scifi/cover_enhanced"
 
 
 def create_client() -> ImageEnhanClient:
@@ -110,21 +109,19 @@ def create_client() -> ImageEnhanClient:
         sys.exit(1)
 
 
-def upscale_image(
+def enhance_image_color(
     client: ImageEnhanClient,
     image_path: str,
     story_index: int,
-    upscale_factor: int = 2,
     max_retries: int = 3,
 ):
     """
-    使用阿里云图像增强服务进行超分辨率处理
+    使用阿里云图像增强服务进行色彩增强处理
 
     Args:
         client: 阿里云图像增强客户端
         image_path: 本地图片文件路径
         story_index: 故事索引
-        upscale_factor: 超分倍数（2 或 4）
         max_retries: 最大重试次数
 
     Returns:
@@ -139,46 +136,46 @@ def upscale_image(
     for attempt in range(max_retries):
         try:
             print(
-                f"正在处理故事 {story_index} 的图片超分 (尝试 {attempt+1}/{max_retries})..."
+                f"正在处理故事 {story_index} 的图片色彩增强 (尝试 {attempt+1}/{max_retries})..."
             )
             print(f"处理本地文件: {image_path}")
 
             # 打开本地图片文件
             with open(image_path, "rb") as img_file:
-                # 创建超分请求（使用本地文件）
-                request = MakeSuperResolutionImageAdvanceRequest(
-                    url_object=img_file,
-                    mode="base",  # 使用base模式而不是enhancement
-                    upscale_factor=upscale_factor,
+                # 创建色彩增强请求（使用本地文件）
+                request = EnhanceImageColorAdvanceRequest(
+                    image_urlobject=img_file,  # 修正参数名为 image_urlobject
+                    mode="Rec709",  # 使用Rec709调色模式
+                    output_format="png",  # 输出格式为PNG
                 )
 
                 # 运行时选项
                 runtime = util_models.RuntimeOptions()
 
                 # 调用API (使用advance方法处理本地文件)
-                response = client.make_super_resolution_image_advance(request, runtime)
+                response = client.enhance_image_color_advance(request, runtime)
 
                 if (
                     response
                     and response.body
                     and response.body.data
-                    and response.body.data.url
+                    and response.body.data.image_url
                 ):
                     # 获取处理后的图片URL
-                    result_url = response.body.data.url
+                    result_url = response.body.data.image_url
 
-                    print(f"正在下载超分后的图片...")
+                    print(f"正在下载色彩增强后的图片...")
                     img_response = requests.get(result_url, timeout=30)
                     img_response.raise_for_status()
 
-                    print(f"✅ 已成功处理故事 {story_index} 的图片超分")
+                    print(f"✅ 已成功处理故事 {story_index} 的图片色彩增强")
                     return img_response.content
                 else:
                     print(f"❌ API返回数据格式异常或未包含图片URL")
                     return None
 
         except Exception as e:
-            print(f"图片超分处理出错 (尝试 {attempt+1}/{max_retries}): {e}")
+            print(f"图片色彩增强处理出错 (尝试 {attempt+1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
                 retry_delay = (attempt + 1) * 5
                 print(f"等待{retry_delay}秒后重试...")
@@ -212,8 +209,8 @@ def get_existing_images():
     return images
 
 
-def get_existing_upscaled_images():
-    """获取已处理的超分图片列表"""
+def get_existing_enhanced_images():
+    """获取已处理的增强图片列表"""
     output_dir = get_base_output_path()
 
     if not os.path.exists(output_dir):
@@ -235,8 +232,8 @@ def get_existing_upscaled_images():
     return existing_indices
 
 
-def save_upscaled_image(story_index: int, image_data: bytes):
-    """保存超分后的图片到文件"""
+def save_enhanced_image(story_index: int, image_data: bytes):
+    """保存色彩增强后的图片到文件"""
     output_dir = get_base_output_path()
 
     # 检查并创建目录
@@ -262,7 +259,7 @@ def save_upscaled_image(story_index: int, image_data: bytes):
         # 验证文件是否成功写入
         if os.path.exists(file_path):
             file_size = os.path.getsize(file_path)
-            print(f"📁 已保存超分图片到: {file_path} (大小: {file_size} 字节)")
+            print(f"📁 已保存色彩增强图片到: {file_path} (大小: {file_size} 字节)")
             return True
         else:
             print(f"❌ 文件保存后未找到: {file_path}")
@@ -278,20 +275,19 @@ def process_images(
     force: bool = False,
     start_index: int = None,
     end_index: int = None,
-    upscale_factor: int = 2,
 ):
-    """处理图片，进行超分辨率处理"""
+    """处理图片，进行色彩增强处理"""
 
     # 获取所有已存在的原始图片
     original_images = get_existing_images()
 
     if not original_images:
-        print("未找到任何色彩增强的封面图片文件")
-        print("请先运行 enhance_cover_images.py 生成色彩增强图片")
+        print("未找到任何原始封面图片文件")
+        print("请先运行 generate_cover_images.py 生成封面图片")
         return
 
-    # 获取已存在的超分图片
-    existing_upscaled = get_existing_upscaled_images()
+    # 获取已存在的增强图片
+    existing_enhanced = get_existing_enhanced_images()
 
     # 过滤需要处理的图片
     images_to_process = {}
@@ -304,18 +300,18 @@ def process_images(
             continue
 
         # 检查是否需要重新处理
-        if force or story_index not in existing_upscaled:
+        if force or story_index not in existing_enhanced:
             images_to_process[story_index] = image_path
 
     if not images_to_process:
-        print("所有指定范围内的故事都已有超分图片")
+        print("所有指定范围内的故事都已有色彩增强图片")
         return
 
-    print(f"\n=== 📊 图片超分处理分析 ===")
+    print(f"\n=== 📊 图片色彩增强处理分析 ===")
     print(f"总原始图片数量: {len(original_images)}")
-    print(f"已有超分图片: {len(existing_upscaled)}")
+    print(f"已有增强图片: {len(existing_enhanced)}")
     print(f"需要处理的图片: {len(images_to_process)}")
-    print(f"超分倍数: {upscale_factor}x")
+    print(f"调色模式: Rec709 (适合一般条件拍摄的图像)")
     print(f"处理的故事索引: {sorted(images_to_process.keys())}")
 
     # 统计变量
@@ -323,29 +319,27 @@ def process_images(
     failure_count = 0
 
     # 处理每个图片
-    with tqdm(total=len(images_to_process), desc="图片超分处理进度") as pbar:
+    with tqdm(total=len(images_to_process), desc="图片色彩增强处理进度") as pbar:
         for story_index in sorted(images_to_process.keys()):
             image_path = images_to_process[story_index]
 
             print(f"\n=== 处理故事 {story_index} ===")
             print(f"原始图片路径: {image_path}")
 
-            # 进行超分处理
-            upscaled_data = upscale_image(
-                client, image_path, story_index, upscale_factor
-            )
+            # 进行色彩增强处理
+            enhanced_data = enhance_image_color(client, image_path, story_index)
 
-            if upscaled_data:
-                # 保存超分后的图片
-                if save_upscaled_image(story_index, upscaled_data):
+            if enhanced_data:
+                # 保存增强后的图片
+                if save_enhanced_image(story_index, enhanced_data):
                     success_count += 1
-                    print(f"✅ 故事 {story_index} 图片超分处理成功")
+                    print(f"✅ 故事 {story_index} 图片色彩增强处理成功")
                 else:
                     failure_count += 1
                     print(f"❌ 故事 {story_index} 图片保存失败")
             else:
                 failure_count += 1
-                print(f"❌ 故事 {story_index} 图片超分处理失败")
+                print(f"❌ 故事 {story_index} 图片色彩增强处理失败")
 
             pbar.update(1)
 
@@ -362,7 +356,7 @@ def process_images(
 def main():
     """主函数"""
     # 创建命令行参数解析器
-    parser = argparse.ArgumentParser(description="对科幻故事封面图片进行超分辨率处理")
+    parser = argparse.ArgumentParser(description="对科幻故事封面图片进行色彩增强处理")
 
     # 添加命令行参数
     parser.add_argument(
@@ -381,13 +375,6 @@ def main():
         type=int,
         help="指定结束处理的故事索引",
     )
-    parser.add_argument(
-        "--scale",
-        type=int,
-        choices=[2, 4],
-        default=2,
-        help="超分倍数，支持2x或4x (默认: 2)",
-    )
 
     # 解析命令行参数
     args = parser.parse_args()
@@ -401,17 +388,17 @@ def main():
             print("❌ 错误：索引必须大于 0")
             return
 
-    print("🔍 科幻故事封面图片超分辨率处理器")
+    print("🎨 科幻故事封面图片色彩增强器")
     print("=" * 50)
 
     # 创建阿里云客户端
     client = create_client()
     print("✅ 阿里云图像增强客户端初始化成功")
 
-    # 处理图片超分
-    process_images(client, args.force, args.start, args.end, args.scale)
+    # 处理图片色彩增强
+    process_images(client, args.force, args.start, args.end)
 
-    print("\n🎉 图片超分处理任务完成!")
+    print("\n🎉 图片色彩增强处理任务完成!")
 
 
 if __name__ == "__main__":

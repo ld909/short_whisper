@@ -43,15 +43,15 @@ from tqdm import tqdm
 def get_base_paths():
     """根据操作系统获取基础路径"""
     system = platform.system().lower()
-    
+
     if system == "darwin":  # Mac
         base_path = "/Volumes/dhl/audio/scifi"
     else:  # Linux/Ubuntu
         base_path = "/mnt/dhl/audio/scifi"
-    
+
     return {
         "description_dir": os.path.join(base_path, "description"),
-        "titles_dir": os.path.join(base_path, "titles")
+        "titles_dir": os.path.join(base_path, "titles"),
     }
 
 
@@ -105,8 +105,8 @@ def generate_story_title(client, description_content, story_index, max_retries=3
                     continue
 
             # 移除可能的引号
-            result = result.strip('"\'')
-            
+            result = result.strip("\"'")
+
             print(f"成功生成故事 {story_index} 的标题，长度: {len(result)} 字符")
             return result
 
@@ -158,6 +158,9 @@ def get_existing_descriptions(description_dir):
 
     for file_path in desc_files:
         basename = os.path.basename(file_path)
+        # 排除以点开头的meta文件（如.DS_Store等）
+        if basename.startswith("."):
+            continue
         match = re.match(r"(\d+)\.txt", basename)
         if match:
             existing_numbers.append(int(match.group(1)))
@@ -176,6 +179,9 @@ def get_existing_titles(titles_dir):
 
     for file_path in title_files:
         basename = os.path.basename(file_path)
+        # 排除以点开头的meta文件（如.DS_Store等）
+        if basename.startswith("."):
+            continue
         match = re.match(r"(\d+)\.txt", basename)
         if match:
             existing_numbers.append(int(match.group(1)))
@@ -183,9 +189,7 @@ def get_existing_titles(titles_dir):
     return sorted(existing_numbers)
 
 
-def process_story_title(
-    client, story_index, description_dir, titles_dir, force=False
-):
+def process_story_title(client, story_index, description_dir, titles_dir, force=False):
     """处理单个故事的标题生成"""
     try:
         # 检查是否已存在标题文件
@@ -399,4 +403,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()

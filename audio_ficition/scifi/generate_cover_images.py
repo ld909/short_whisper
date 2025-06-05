@@ -2,11 +2,11 @@
 科幻故事封面图片生成工具
 
 功能说明:
-此脚本使用 AiHubMix 调用 Google Gemini 的 Imagen-3 模型，根据封面提示词生成故事封面图片。
+此脚本使用 Leonardo AI API 根据封面提示词生成故事封面图片。
 
 主要功能:
 1. 读取封面提示词文件（来自 generate_cover_prompts.py 的输出）
-2. 调用 Google Gemini Imagen-3 模型生成图片
+2. 调用 Leonardo AI 模型生成图片
 3. 将生成的图片保存到指定目录
 
 输入:
@@ -16,12 +16,13 @@
 - 封面图片文件: /Volumes/dhl/audio/scifi/cover_img_small/[故事索引].png
 
 使用方法:
-1. 基本使用: python generate_cover_images.py
+1. 基本使用: python generate_cover_images.py (生成所有提示词的图片)
 2. 强制重新生成: python generate_cover_images.py -f
 3. 指定故事索引范围: python generate_cover_images.py --start 1 --end 10
+4. 指定生成数量: python generate_cover_images.py --count 5 (生成前5个需要的图片)
 
 注意:
-- 需要设置环境变量 AIHUBMIX_API_KEY 以提供 AiHubMix 密钥
+- 使用 Leonardo AI API 生成图片
 - 脚本支持断点续传，中断后可从上次停止的位置继续处理
 - 生成的图片为 PNG 格式
 """
@@ -33,40 +34,55 @@ import argparse
 import base64
 import glob
 import re
+import requests
+import json
+import random
 from tqdm import tqdm
-from google import genai
-from google.genai import types
 from PIL import Image
 from io import BytesIO
 
 
-def setup_genai_client():
-    """设置 Google GenAI 客户端（用于通过 AiHubMix 调用 Google Gemini）"""
-    api_key = os.environ.get("AIHUBMIX_API_KEY")
+def setup_leonardo_client():
+    """设置 Leonardo AI 客户端配置"""
+    # 使用提供的 API key
+    api_key = "3944f0ae-68f6-4b82-8f02-a4c840373f17"
 
     if not api_key:
-        print("错误: 未找到 AiHubMix 密钥")
-        print("请设置环境变量 AIHUBMIX_API_KEY")
-        print("例如: export AIHUBMIX_API_KEY='your-api-key'")
+        print("错误: 未找到 Leonardo AI 密钥")
         sys.exit(1)
 
-    try:
-        # 使用 AiHubMix 的 base_url
-        client = genai.Client(
-            api_key=api_key,
-            http_options={"base_url": "https://aihubmix.com/gemini"},
-        )
-        return client
-    except Exception as e:
-        print(f"初始化 GenAI 客户端时出错: {e}")
-        sys.exit(1)
+    # Leonardo AI API 配置
+    config = {
+        "api_key": api_key,
+        "base_url": "https://cloud.leonardo.ai/api/rest/v1",
+        "model_id": "05ce0082-2d80-4a2d-8653-4d1c85e2418e",
+        "headers": {
+            "accept": "application/json",
+            "authorization": f"Bearer {api_key}",
+            "content-type": "application/json",
+        },
+        "num_images": 1,
+        "enhancePrompt": True,
+    }
+
+    print("✅ Leonardo AI 客户端配置完成")
+    return config
 
 
-def generate_image_with_imagen3(client, prompt, story_index, max_retries=3):
-    """使用 Google Gemini Imagen-3 模型生成图片"""
+def generate_image_with_leonardo(config, prompt, story_index, max_retries=3):
+    """使用 Leonardo AI 模型生成图片"""
     if not prompt.strip():
         print(f"警告: 故事 {story_index} 的提示词为空，无法生成图片")
         return None
+
+    # 检查并截断过长的提示词
+    max_prompt_length = 1490
+    if len(prompt) > max_prompt_length:
+        original_length = len(prompt)
+        prompt = prompt[:max_prompt_length]
+        print(
+            f"⚠️ 提示词过长 ({original_length} 字符)，已截断为 {max_prompt_length} 字符"
+        )
 
     for attempt in range(max_retries):
         try:
@@ -74,24 +90,124 @@ def generate_image_with_imagen3(client, prompt, story_index, max_retries=3):
                 f"正在为故事 {story_index} 生成图片 (尝试 {attempt+1}/{max_retries})..."
             )
 
-            # 调用 Google Gemini Imagen-3 模型
-            response = client.models.generate_images(
-                model="imagen-4.0-generate-preview-05-20",
-                prompt=prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    aspect_ratio="16:9",
-                ),
+            # 随机选择预设风格
+            preset_styles = ["CREATIVE", "DYNAMIC", "CINEMATIC", "HDR"]
+            selected_style = random.choice(preset_styles)
+            print(f"📸 选择预设风格: {selected_style}")
+
+            # 准备请求数据
+            generation_data = {
+                "height": 720,
+                "width": 1280,
+                "prompt": prompt,
+                "modelId": config["model_id"],
+                "num_images": 1,
+                "presetStyle": selected_style,
+            }
+
+            # 发送生成请求
+            generation_url = f"{config['base_url']}/generations"
+            response = requests.post(
+                generation_url,
+                headers=config["headers"],
+                data=json.dumps(generation_data),
             )
 
-            # 获取生成的图片数据
-            if response.generated_images and len(response.generated_images) > 0:
-                image_bytes = response.generated_images[0].image.image_bytes
-                print(f"✅ 已成功生成故事 {story_index} 的封面图片")
-                return image_bytes
-            else:
-                print(f"❌ 未收到图片数据")
-                return None
+            if response.status_code != 200:
+                print(f"❌ 生成请求失败: {response.status_code} - {response.text}")
+                continue
+
+            generation_response = response.json()
+            generation_id = generation_response.get("sdGenerationJob", {}).get(
+                "generationId"
+            )
+
+            if not generation_id:
+                print(f"❌ 未收到生成ID")
+                continue
+
+            print(f"📝 获得生成ID: {generation_id}，等待12秒...")
+            time.sleep(12)
+
+            # 尝试获取生成的图片（带重试机制）
+            get_url = f"{config['base_url']}/generations/{generation_id}"
+
+            # 第一次尝试获取图片
+            get_response = requests.get(get_url, headers=config["headers"])
+
+            if get_response.status_code != 200:
+                print(
+                    f"❌ 获取图片失败: {get_response.status_code} - {get_response.text}"
+                )
+                continue
+
+            get_data = get_response.json()
+
+            # 检查是否获得了有效的数据
+            if get_data is None:
+                print(f"⚠️ 第一次获取返回None，等待6秒后重试...")
+                time.sleep(6)
+
+                # 第二次尝试获取图片（使用同样的ID）
+                get_response = requests.get(get_url, headers=config["headers"])
+
+                if get_response.status_code != 200:
+                    print(
+                        f"❌ 第二次获取图片失败: {get_response.status_code} - {get_response.text}"
+                    )
+                    continue
+
+                get_data = get_response.json()
+
+                if get_data is None:
+                    print(f"❌ 第二次获取仍然返回None，重新生成...")
+                    continue
+
+            generations = get_data.get("generations_by_pk", {}).get(
+                "generated_images", []
+            )
+
+            if not generations:
+                print(f"⚠️ 未找到生成的图片，等待6秒后重试...")
+                time.sleep(6)
+
+                # 第二次尝试获取图片（使用同样的ID）
+                get_response = requests.get(get_url, headers=config["headers"])
+
+                if get_response.status_code != 200:
+                    print(
+                        f"❌ 第二次获取图片失败: {get_response.status_code} - {get_response.text}"
+                    )
+                    continue
+
+                get_data = get_response.json()
+
+                if get_data is None:
+                    print(f"❌ 第二次获取仍然返回None，重新生成...")
+                    continue
+
+                generations = get_data.get("generations_by_pk", {}).get(
+                    "generated_images", []
+                )
+
+                if not generations:
+                    print(f"❌ 第二次获取仍未找到生成的图片，重新生成...")
+                    continue
+
+            # 获取第一张图片的URL
+            image_url = generations[0].get("url")
+            if not image_url:
+                print(f"❌ 未找到图片URL")
+                continue
+
+            # 下载图片
+            img_response = requests.get(image_url)
+            if img_response.status_code != 200:
+                print(f"❌ 下载图片失败: {img_response.status_code}")
+                continue
+
+            print(f"✅ 已成功生成故事 {story_index} 的封面图片")
+            return img_response.content
 
         except Exception as e:
             print(f"生成图片出错 (尝试 {attempt+1}/{max_retries}): {e}")
@@ -144,6 +260,9 @@ def get_existing_images():
 
     for file_path in existing_files:
         basename = os.path.basename(file_path)
+        # 排除以点开头的meta文件（如.DS_Store等）
+        if basename.startswith("."):
+            continue
         match = re.match(r"(\d+)\.png", basename)
         if match:
             existing_indices.add(int(match.group(1)))
@@ -189,7 +308,7 @@ def save_image(story_index, image_bytes):
         return False
 
 
-def process_prompts(client, force=False, start_index=None, end_index=None):
+def process_prompts(config, force=False, start_index=None, end_index=None, count=None):
     """处理所有提示词，生成封面图片"""
     # 获取所有已存在的提示词
     prompts = get_existing_prompts()
@@ -204,16 +323,31 @@ def process_prompts(client, force=False, start_index=None, end_index=None):
     # 过滤需要处理的提示词
     prompts_to_process = {}
 
-    for story_index, content in prompts.items():
-        # 应用索引范围过滤
-        if start_index is not None and story_index < start_index:
-            continue
-        if end_index is not None and story_index > end_index:
-            continue
+    # 如果指定了数量参数，按索引顺序处理
+    if count is not None:
+        # 获取所有需要生成的故事索引（按顺序排列）
+        candidate_indices = []
+        for story_index in sorted(prompts.keys()):
+            # 检查是否需要重新生成
+            if force or story_index not in existing_images:
+                candidate_indices.append(story_index)
 
-        # 检查是否需要重新生成
-        if force or story_index not in existing_images:
-            prompts_to_process[story_index] = content
+        # 取前 count 个
+        selected_indices = candidate_indices[:count]
+        for story_index in selected_indices:
+            prompts_to_process[story_index] = prompts[story_index]
+    else:
+        # 原有的范围过滤逻辑
+        for story_index, content in prompts.items():
+            # 应用索引范围过滤
+            if start_index is not None and story_index < start_index:
+                continue
+            if end_index is not None and story_index > end_index:
+                continue
+
+            # 检查是否需要重新生成
+            if force or story_index not in existing_images:
+                prompts_to_process[story_index] = content
 
     if not prompts_to_process:
         print("所有指定范围内的故事都已有封面图片")
@@ -223,6 +357,10 @@ def process_prompts(client, force=False, start_index=None, end_index=None):
     print(f"总提示词数量: {len(prompts)}")
     print(f"已有封面图片: {len(existing_images)}")
     print(f"需要处理的提示词: {len(prompts_to_process)}")
+    if count is not None:
+        print(f"指定生成数量: {count}")
+        if len(prompts_to_process) < count:
+            print(f"⚠️ 实际可生成数量: {len(prompts_to_process)} (少于指定数量)")
     print(f"处理的故事索引: {sorted(prompts_to_process.keys())}")
 
     # 统计变量
@@ -242,7 +380,7 @@ def process_prompts(client, force=False, start_index=None, end_index=None):
             )
 
             # 生成封面图片
-            image_bytes = generate_image_with_imagen3(client, prompt, story_index)
+            image_bytes = generate_image_with_leonardo(config, prompt, story_index)
 
             if image_bytes:
                 # 保存图片
@@ -290,6 +428,11 @@ def main():
         type=int,
         help="指定结束处理的故事索引",
     )
+    parser.add_argument(
+        "--count",
+        type=int,
+        help="指定生成图片的数量（按故事索引顺序生成）",
+    )
 
     # 解析命令行参数
     args = parser.parse_args()
@@ -303,15 +446,23 @@ def main():
             print("❌ 错误：索引必须大于 0")
             return
 
+    if args.count is not None and args.count <= 0:
+        print("❌ 错误：生成数量必须大于 0")
+        return
+
+    # 检查参数冲突
+    if args.count is not None and (args.start is not None or args.end is not None):
+        print("❌ 错误：--count 参数不能与 --start 或 --end 参数同时使用")
+        return
+
     print("🖼️ 科幻故事封面图片生成器")
     print("=" * 50)
 
-    # 设置 GenAI 客户端
-    client = setup_genai_client()
-    print("✅ GenAI 客户端初始化成功")
+    # 设置 Leonardo AI 客户端
+    config = setup_leonardo_client()
 
     # 处理提示词，生成图片
-    process_prompts(client, args.force, args.start, args.end)
+    process_prompts(config, args.force, args.start, args.end, args.count)
 
     print("\n🎉 封面图片生成任务完成!")
 

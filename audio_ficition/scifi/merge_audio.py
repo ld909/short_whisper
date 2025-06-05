@@ -55,6 +55,9 @@ def get_story_files(chunk_dir, audio_dir):
         for story_dir in glob.glob(os.path.join(chunk_dir, "*")):
             if os.path.isdir(story_dir):
                 story_index = os.path.basename(story_dir)
+                # 排除以点开头的meta目录（如.DS_Store等）
+                if story_index.startswith("."):
+                    continue
                 txt_files = glob.glob(os.path.join(story_dir, "*.txt"))
 
                 if story_index not in story_info:
@@ -69,6 +72,9 @@ def get_story_files(chunk_dir, audio_dir):
         for story_dir in glob.glob(os.path.join(audio_dir, "*")):
             if os.path.isdir(story_dir):
                 story_index = os.path.basename(story_dir)
+                # 排除以点开头的meta目录（如.DS_Store等）
+                if story_index.startswith("."):
+                    continue
                 mp3_files = glob.glob(os.path.join(story_dir, "*.mp3"))
 
                 if story_index not in story_info:
