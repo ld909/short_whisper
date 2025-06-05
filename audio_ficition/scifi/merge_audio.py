@@ -291,6 +291,9 @@ def scan_existing_merged_files(output_dir):
     for story_dir in glob.glob(os.path.join(output_dir, "*")):
         if os.path.isdir(story_dir):
             story_index = os.path.basename(story_dir)
+            # 排除以点开头的目录（如.DS_Store等）
+            if story_index.startswith("."):
+                continue
             story_file = os.path.join(story_dir, "story.mp3")
 
             if is_valid_merged_audio(story_file):

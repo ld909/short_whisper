@@ -141,6 +141,9 @@ def get_existing_stories():
 
     for file_path in story_files:
         basename = os.path.basename(file_path)
+        # 排除以点开头的文件（如.DS_Store等）
+        if basename.startswith("."):
+            continue
         match = re.match(r"(\d+)\.txt", basename)
         if match:
             story_index = int(match.group(1))
@@ -168,6 +171,9 @@ def get_existing_cover_prompts():
 
     for file_path in existing_files:
         basename = os.path.basename(file_path)
+        # 排除以点开头的文件（如.DS_Store等）
+        if basename.startswith("."):
+            continue
         match = re.match(r"(\d+)\.txt", basename)
         if match:
             existing_indices.add(int(match.group(1)))

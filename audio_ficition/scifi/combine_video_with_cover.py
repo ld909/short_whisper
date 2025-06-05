@@ -1434,6 +1434,9 @@ def get_story_files(paths: Dict) -> Dict:
         for story_dir in glob.glob(os.path.join(audio_dir, "*")):
             if os.path.isdir(story_dir):
                 story_index = os.path.basename(story_dir)
+                # 排除以点开头的目录（如.DS_Store等）
+                if story_index.startswith("."):
+                    continue
                 audio_file = os.path.join(story_dir, "story.mp3")
 
                 if os.path.exists(audio_file):

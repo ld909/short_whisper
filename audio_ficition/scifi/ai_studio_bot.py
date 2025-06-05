@@ -119,6 +119,9 @@ def get_existing_stories(story_dir):
 
     for file_path in existing_files:
         basename = os.path.basename(file_path)
+        # 排除以点开头的文件（如.DS_Store等）
+        if basename.startswith("."):
+            continue
         match = re.match(r"(\d+)\.txt", basename)
         if match:
             existing_numbers.append(int(match.group(1)))
@@ -200,7 +203,7 @@ def get_story_parameters_to_generate(num_needed=1):
 
 
 def wait_for_warmup_completion(page, window_index):
-    """等待热身问题的AI回答完成 - 如果stop按钮是false就认为完成"""
+    """等待热身问题的AI回答完成 - 停止按钮状态判断+错误检测"""
     print(f"窗口 {window_index}: 正在等待热身问题AI回答完成...")
 
     # 多种可能的停止按钮选择器
@@ -213,15 +216,41 @@ def wait_for_warmup_completion(page, window_index):
         'rect[class="stoppable-stop ng-tns-c51961493-15"]',
     ]
 
+    # 错误提示选择器
+    error_selectors = [
+        'div.model-error:has-text("An internal error has occurred")',  # 具体的错误元素
+        'div:has-text("An internal error has occurred")',  # 更通用的选择器
+        '[class*="model-error"]:has-text("internal error")',  # 包含internal error的元素
+        'div:has-text("internal error")',  # 最通用的错误检测
+    ]
+
     try:
         # 先等待3秒让AI开始运行
         print(f"窗口 {window_index}: 等待3秒让热身AI开始运行...")
         time.sleep(3)
 
-        # 直接检查停止按钮状态，如果不存在就认为完成
-        print(f"窗口 {window_index}: 检查热身AI停止按钮状态...")
+        # 检查停止按钮状态和错误提示
+        print(f"窗口 {window_index}: 检查热身AI停止按钮状态和错误提示...")
 
         while True:
+            # 首先检查是否有错误提示
+            error_detected = False
+            for error_selector in error_selectors:
+                try:
+                    if page.locator(error_selector).count() > 0:
+                        print(
+                            f"窗口 {window_index}: ❌ 热身阶段检测到AI生成错误: {error_selector}"
+                        )
+                        error_detected = True
+                        break
+                except:
+                    continue
+
+            if error_detected:
+                raise Exception(
+                    f"窗口 {window_index}: 热身阶段AI生成出现internal error"
+                )
+
             # 检查停止按钮是否存在
             stop_buttons_exist = False
             for selector in stop_selectors:
@@ -248,7 +277,7 @@ def wait_for_warmup_completion(page, window_index):
 
 
 def wait_for_ai_completion(page, window_index):
-    """等待AI运行完成 - 只使用停止按钮状态判断"""
+    """等待AI运行完成 - 停止按钮状态判断+错误检测"""
     print(f"窗口 {window_index}: 正在等待AI运行完成...")
 
     # 等待一下让AI开始运行
@@ -264,12 +293,36 @@ def wait_for_ai_completion(page, window_index):
         'rect[class="stoppable-stop ng-tns-c51961493-15"]',  # 原有的具体选择器作为备用
     ]
 
+    # 错误提示选择器
+    error_selectors = [
+        'div.model-error:has-text("An internal error has occurred")',  # 具体的错误元素
+        'div:has-text("An internal error has occurred")',  # 更通用的选择器
+        '[class*="model-error"]:has-text("internal error")',  # 包含internal error的元素
+        'div:has-text("internal error")',  # 最通用的错误检测
+    ]
+
     try:
         # 第一步：等待AI开始运行（等待停止按钮出现）
         print(f"窗口 {window_index}: 等待AI开始运行...")
         found_stop_button = False
 
         for attempt in range(15):  # 等待最多30秒
+            # 首先检查是否有错误提示
+            for error_selector in error_selectors:
+                try:
+                    if page.locator(error_selector).count() > 0:
+                        print(
+                            f"窗口 {window_index}: ❌ 检测到AI生成错误: {error_selector}"
+                        )
+                        raise Exception(
+                            f"窗口 {window_index}: AI生成出现internal error"
+                        )
+                except Exception as e:
+                    if "AI生成出现internal error" in str(e):
+                        raise e  # 重新抛出我们的错误
+                    # 其他异常（如选择器语法错误）继续下一个
+                    continue
+
             for selector in stop_selectors:
                 try:
                     count = page.locator(selector).count()
@@ -293,13 +346,29 @@ def wait_for_ai_completion(page, window_index):
             print(f"窗口 {window_index}: ⚠️ 未检测到停止按钮，可能AI没有开始运行")
             raise Exception(f"窗口 {window_index}: 无法检测到AI运行状态")
 
-        # 第二步：等待停止按钮消失
-        print(f"窗口 {window_index}: 监控停止按钮状态...")
+        # 第二步：等待停止按钮消失，同时检测错误
+        print(f"窗口 {window_index}: 监控停止按钮状态和错误提示...")
         consecutive_no_stop_button = 0
         check_count = 0
 
         while True:
             check_count += 1
+
+            # 首先检查是否有错误提示
+            error_detected = False
+            for error_selector in error_selectors:
+                try:
+                    if page.locator(error_selector).count() > 0:
+                        print(
+                            f"窗口 {window_index}: ❌ 检测到AI生成错误: {error_selector}"
+                        )
+                        error_detected = True
+                        break
+                except:
+                    continue
+
+            if error_detected:
+                raise Exception(f"窗口 {window_index}: AI生成过程中出现internal error")
 
             # 检查所有停止按钮是否都消失了
             stop_buttons_exist = False

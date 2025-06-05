@@ -149,6 +149,9 @@ def get_existing_stories(story_dir):
 
     for file_path in story_files:
         basename = os.path.basename(file_path)
+        # 排除以点开头的文件（如.DS_Store等）
+        if basename.startswith("."):
+            continue
         match = re.match(r"(\d+)\.txt", basename)
         if match:
             existing_numbers.append(int(match.group(1)))
@@ -167,6 +170,9 @@ def get_existing_descriptions(description_dir):
 
     for file_path in desc_files:
         basename = os.path.basename(file_path)
+        # 排除以点开头的文件（如.DS_Store等）
+        if basename.startswith("."):
+            continue
         match = re.match(r"(\d+)\.txt", basename)
         if match:
             existing_numbers.append(int(match.group(1)))
