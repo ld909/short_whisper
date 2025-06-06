@@ -267,9 +267,12 @@ def main():
                 [],
             ),
             ("generate_subtitles.py", "5. 得到不同语言对应 srt 字幕", []),
-            ("merge_mp3.py", "6. 把 mp3 clips 合成为一个 mp3", []),
-            ("merge_mp3.py", "6.1 再跑一次，把 mp3 clips 合成为一个 mp3", []),
-            ("merge_mp4_clips_by_audio_duration.py", "7. 生成无声且无字幕的 mp4", []),
+            ("merge_mp3_optimized.py", "6. 把 mp3 clips 合成为一个 mp3", []),
+            (
+                "merge_mp4_clips_by_audio_duration_optimized.py",
+                "7. 生成无声且无字幕的 mp4",
+                [],
+            ),
             ("add_subtitles_to_mp4.py", "8. 给无声的 mp4 增加字幕", []),
             ("merge_mp4_mp3.py", "9. 给mp4添加音频", []),
             (

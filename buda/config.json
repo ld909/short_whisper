@@ -1,0 +1,24 @@
+{
+    "base_path": "/Volumes/dhl/buda_videos_youtube",
+    "clip_duration": 8.0,
+    "max_workers": 6,
+    "cache_enabled": true,
+    "log_level": "INFO",
+    "ffmpeg_options": {
+        "video_codec": "copy",
+        "audio_codec": "copy",
+        "extra_flags": [
+            "-avoid_negative_ts",
+            "make_zero"
+        ]
+    },
+    "quality_settings": {
+        "duration_tolerance": 0.1,
+        "min_file_size": 1024
+    },
+    "performance": {
+        "batch_size_auto": true,
+        "use_memory_optimization": true,
+        "cleanup_temp_files": true
+    }
+}
