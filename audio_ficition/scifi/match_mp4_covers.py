@@ -8,8 +8,8 @@ MP4视频与封面图片匹配工具
 
 主要功能:
 1. 检查系统是否为Ubuntu，非Ubuntu系统自动退出
-2. 提取MP4视频的第一帧
-3. 与封面图片进行像素级别的差异比较
+2. 并行提取所有MP4视频的第一帧进行预处理
+3. 并行地为多张封面图片与所有视频帧进行像素级别的差异比较
 4. 找到差异最小的MP4文件并复制到指定目录
 5. 支持断点续传，避免重复计算
 
@@ -40,10 +40,14 @@ import re
 import shutil
 import json
 import time
+import concurrent.futures
 from tqdm import tqdm
 import cv2
 import numpy as np
 from PIL import Image
+
+# 用于工作进程的全局变量，存放预处理的MP4帧
+g_mp4_frames = {}
 
 
 def check_ubuntu_system():
@@ -93,6 +97,33 @@ def extract_first_frame(video_path):
     except Exception as e:
         print(f"❌ 提取视频第一帧时出错 {video_path}: {e}")
         return None
+
+
+def preprocess_mp4_frames(mp4_files):
+    """并行预处理所有MP4文件，提取第一帧"""
+    print(f"🚀 并行预处理 {len(mp4_files)} 个MP4文件以提取第一帧...")
+    frames = {}
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        future_to_mp4 = {
+            executor.submit(extract_first_frame, mp4_file): mp4_file
+            for mp4_file in mp4_files
+        }
+        for future in tqdm(
+            concurrent.futures.as_completed(future_to_mp4),
+            total=len(mp4_files),
+            desc="提取帧",
+        ):
+            mp4_file = future_to_mp4[future]
+            try:
+                frame = future.result()
+                frames[mp4_file] = frame
+            except Exception as e:
+                print(f"❌ {mp4_file} 在提取帧时产生异常: {e}")
+                frames[mp4_file] = None
+
+    valid_frames_count = sum(1 for frame in frames.values() if frame is not None)
+    print(f"🖼️  成功预处理 {valid_frames_count}/{len(mp4_files)} 个MP4帧.")
+    return frames
 
 
 def load_cover_image(image_path):
@@ -242,42 +273,40 @@ def load_match_cache(cache_file):
     return {}
 
 
-def find_best_match(cover_image_path, mp4_files, cache_data, story_index):
-    """为单张封面图片找到最佳匹配的MP4文件"""
+def init_worker(frames_data):
+    """初始化工作进程，传递预处理的帧数据"""
+    global g_mp4_frames
+    g_mp4_frames = frames_data
+
+
+def find_best_match_worker(story_index, cover_image_path, cache_data):
+    """为单张封面图片找到最佳匹配的MP4文件 (在工作进程中运行)"""
     cover_image = load_cover_image(cover_image_path)
     if cover_image is None:
-        return None, float("inf")
+        return story_index, None, float("inf"), {}
 
     best_mp4 = None
     min_diff = float("inf")
+    local_cache_updates = {}
 
-    print(f"🔍 为故事 {story_index} 寻找最佳匹配MP4...")
-
-    for mp4_file in tqdm(mp4_files, desc=f"比较MP4文件", leave=False):
+    for mp4_file, first_frame in g_mp4_frames.items():
         mp4_basename = os.path.basename(mp4_file)
-
-        # 检查缓存
         cache_key = f"{story_index}_{mp4_basename}"
+
         if cache_key in cache_data:
             diff = cache_data[cache_key]
         else:
-            # 提取MP4第一帧
-            first_frame = extract_first_frame(mp4_file)
             if first_frame is None:
                 continue
 
-            # 计算像素差异
             diff = calculate_pixel_difference(cover_image, first_frame)
+            local_cache_updates[cache_key] = diff
 
-            # 保存到缓存
-            cache_data[cache_key] = diff
-
-        # 更新最佳匹配
         if diff < min_diff:
             min_diff = diff
             best_mp4 = mp4_file
 
-    return best_mp4, min_diff
+    return story_index, best_mp4, min_diff, local_cache_updates
 
 
 def copy_matched_mp4(source_mp4, story_index):
@@ -324,7 +353,7 @@ def process_matching(force=False, start_index=None, end_index=None):
     # 过滤需要处理的封面图片
     covers_to_process = {}
 
-    for story_index, cover_path in cover_images.items():
+    for story_index, cover_path in sorted(cover_images.items()):
         # 应用索引范围过滤
         if start_index is not None and story_index < start_index:
             continue
@@ -346,6 +375,12 @@ def process_matching(force=False, start_index=None, end_index=None):
     print(f"需要处理的封面: {len(covers_to_process)}")
     print(f"处理的故事索引: {sorted(covers_to_process.keys())}")
 
+    # 1. 并行预处理所有MP4文件，提取第一帧
+    mp4_frames = preprocess_mp4_frames(mp4_files)
+    if not mp4_frames:
+        print("❌ 预处理失败，未能提取任何MP4帧。")
+        return
+
     # 加载匹配缓存
     cache_file = "/tmp/mp4_cover_match_cache.json"
     cache_data = load_match_cache(cache_file)
@@ -353,56 +388,76 @@ def process_matching(force=False, start_index=None, end_index=None):
     # 统计变量
     success_count = 0
     failure_count = 0
+    results = {}
 
-    # 处理每张封面图片
-    with tqdm(total=len(covers_to_process), desc="匹配进度") as pbar:
-        for story_index in sorted(covers_to_process.keys()):
-            cover_path = covers_to_process[story_index]
+    # 2. 使用多进程并行处理匹配
+    with concurrent.futures.ProcessPoolExecutor(
+        initializer=init_worker, initargs=(mp4_frames,)
+    ) as executor:
+        futures = {
+            executor.submit(find_best_match_worker, idx, path, cache_data): idx
+            for idx, path in covers_to_process.items()
+        }
 
-            print(f"\n=== 处理故事 {story_index} ===")
+        for future in tqdm(
+            concurrent.futures.as_completed(futures),
+            total=len(covers_to_process),
+            desc="匹配封面",
+        ):
+            try:
+                story_idx, best_mp4, min_diff, local_cache = future.result()
+                results[story_idx] = (best_mp4, min_diff)
+                cache_data.update(local_cache)
+            except Exception as e:
+                story_idx = futures[future]
+                results[story_idx] = (None, float("inf"))
+                print(f"❌ 故事 {story_idx} 的匹配任务失败: {e}")
 
-            # 寻找最佳匹配的MP4
-            best_mp4, min_diff = find_best_match(
-                cover_path, mp4_files, cache_data, story_index
+    # 3. 按顺序处理和报告结果
+    print("\n=== 📝 处理匹配结果 ===")
+    for story_index in sorted(covers_to_process.keys()):
+        if story_index not in results:
+            print(f"🤷‍♂️ 故事 {story_index} 没有结果，可能在处理中被跳过。")
+            continue
+
+        best_mp4, min_diff = results[story_index]
+
+        print(f"\n--- 故事 {story_index} ---")
+        if best_mp4:
+            print(
+                f"🎯 找到最佳匹配: {os.path.basename(best_mp4)} (差异值: {min_diff:.2f})"
             )
 
-            if best_mp4:
+            # 检查差异值是否超过阈值
+            if min_diff > 20:
                 print(
-                    f"🎯 找到最佳匹配: {os.path.basename(best_mp4)} (差异值: {min_diff:.2f})"
+                    f"⚠️ 差异值 {min_diff:.2f} 大于阈值 20，认为MP4视频未正确生成，跳过复制"
                 )
-
-                # 检查差异值是否超过阈值
-                if min_diff > 20:
-                    print(
-                        f"⚠️ 差异值 {min_diff:.2f} 大于阈值 20，认为MP4视频未正确生成，跳过复制"
-                    )
-                    print(f"⏭️ 跳过故事 {story_index}")
-                else:
-                    # 复制MP4文件
-                    if copy_matched_mp4(best_mp4, story_index):
-                        success_count += 1
-                        print(f"✅ 故事 {story_index} 匹配成功")
-                    else:
-                        failure_count += 1
-                        print(f"❌ 故事 {story_index} 文件复制失败")
-            else:
+                print(f"⏭️  跳过故事 {story_index}")
                 failure_count += 1
-                print(f"❌ 故事 {story_index} 未找到匹配的MP4文件")
-
-            pbar.update(1)
-
-            # 每处理5个文件保存一次缓存
-            if (success_count + failure_count) % 5 == 0:
-                save_match_cache(cache_file, cache_data)
+            else:
+                # 复制MP4文件
+                if copy_matched_mp4(best_mp4, story_index):
+                    success_count += 1
+                    print(f"✅ 故事 {story_index} 匹配成功")
+                else:
+                    failure_count += 1
+                    print(f"❌ 故事 {story_index} 文件复制失败")
+        else:
+            failure_count += 1
+            print(f"❌ 故事 {story_index} 未找到匹配的MP4文件")
 
     # 保存最终缓存
     save_match_cache(cache_file, cache_data)
 
     # 输出最终统计
+    total_processed = len(covers_to_process)
     print(f"\n=== 📈 匹配完成统计 ===")
-    print(f"✅ 成功匹配: {success_count}/{len(covers_to_process)} 个封面图片")
-    print(f"❌ 匹配失败: {failure_count}/{len(covers_to_process)} 个封面图片")
-    print(f"📊 成功率: {success_count/len(covers_to_process)*100:.1f}%")
+    print(f"✅ 成功匹配: {success_count}/{total_processed} 个封面图片")
+    print(f"❌ 匹配失败: {failure_count}/{total_processed} 个封面图片")
+    if total_processed > 0:
+        success_rate = (success_count / total_processed) * 100
+        print(f"📊 成功率: {success_rate:.1f}%")
 
 
 def main():

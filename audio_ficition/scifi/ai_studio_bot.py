@@ -77,6 +77,18 @@ WARMUP_QUESTIONS = [
 ]
 
 
+def countdown_wait(seconds=20, window_index=None):
+    """显示倒计时等待"""
+    prefix = f"窗口 {window_index}: " if window_index else ""
+    print(f"{prefix}等待 {seconds} 秒后继续...")
+
+    for i in range(seconds, 0, -1):
+        print(f"\r{prefix}倒计时: {i:2d} 秒", end="", flush=True)
+        time.sleep(1)
+
+    print(f"\r{prefix}等待完成！{'':10}")  # 清除倒计时显示
+
+
 def get_adspower_info(ads_id):
     """连接AdsPower浏览器"""
     open_url = f"http://127.0.0.1:50325/api/v1/browser/start?user_id={ads_id}"
@@ -849,6 +861,8 @@ def process_window(
 
         if success:
             print(f"窗口 {window_index}: 故事 {story_data['index']} 处理完成")
+            # 生成完成后等待20秒
+            countdown_wait(20, window_index)
         else:
             print(f"窗口 {window_index}: 故事 {story_data['index']} 保存失败")
 
@@ -1029,10 +1043,10 @@ def main():
                                         f"窗口 {i+1}：故事 {story_data['index']} 生成失败！"
                                     )
 
-                                # 在处理下一个窗口前稍作等待
+                                # 在处理下一个窗口前稍作等待（已在process_window中有20秒等待）
                                 if i < len(current_batch) - 1:
-                                    print(f"等待 3 秒后处理下一个窗口...")
-                                    time.sleep(3)
+                                    print(f"等待 2 秒后处理下一个窗口...")
+                                    time.sleep(2)
 
                             except Exception as e:
                                 if "AI生成状态检测失败" in str(e):
@@ -1077,10 +1091,10 @@ def main():
                         f"总进度: {stories_processed}/{len(stories_to_generate)} 个故事"
                     )
 
-                    # 如果还有更多故事要处理，稍作等待
+                    # 如果还有更多故事要处理，稍作等待（每个故事已有20秒等待）
                     if stories_processed < len(stories_to_generate):
-                        print(f"等待 5 秒后处理下一批...")
-                        time.sleep(5)
+                        print(f"等待 3 秒后处理下一批...")
+                        time.sleep(3)
 
                 except Exception as e:
                     print(f"处理批次时发生未预期的错误: {e}")
