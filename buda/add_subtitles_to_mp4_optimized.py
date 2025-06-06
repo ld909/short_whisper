@@ -55,6 +55,7 @@ class ResourceManager:
         self.cpu_count = multiprocessing.cpu_count()
         self.memory_total = psutil.virtual_memory().total
         self.gpu_memory = self._get_gpu_memory()
+        self.has_gpu = self.gpu_memory is not None
 
     def _get_gpu_memory(self) -> Optional[int]:
         """获取GPU内存信息"""
@@ -78,6 +79,17 @@ class ResourceManager:
             return None
         except Exception:
             return None
+
+    def should_use_gpu(self) -> bool:
+        """判断是否应该使用GPU"""
+        if not self.has_gpu:
+            return False
+        
+        # 如果GPU内存大于2GB，推荐使用GPU
+        if self.gpu_memory and self.gpu_memory > 2000:
+            return True
+        
+        return False
 
     def get_optimal_workers(self, use_gpu: bool = False) -> int:
         """根据系统资源计算最优工作进程数"""
@@ -745,7 +757,8 @@ def main():
     parser.add_argument(
         "-s", "--single", type=str, help="只处理指定的单个视频，格式: 频道名/视频名"
     )
-    parser.add_argument("--gpu", action="store_true", help="使用GPU加速ffmpeg处理")
+    parser.add_argument("--gpu", action="store_true", help="强制使用GPU加速ffmpeg处理")
+    parser.add_argument("--no-gpu", action="store_true", help="强制不使用GPU，即使检测到可用GPU")
     parser.add_argument(
         "-w", "--workers", type=int, help="并行工作进程数 (默认根据系统资源自动计算)"
     )
@@ -768,6 +781,29 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # 初始化资源管理器
+    resource_manager = ResourceManager()
+    
+    # 自动检测GPU并决定是否使用
+    use_gpu = False
+    if args.no_gpu:
+        use_gpu = False
+        logger.info("根据用户要求，禁用GPU加速")
+    elif args.gpu:
+        use_gpu = True
+        logger.info("根据用户要求，强制启用GPU加速")
+    else:
+        # 自动检测
+        if resource_manager.should_use_gpu():
+            use_gpu = True
+            logger.info(f"检测到GPU内存: {resource_manager.gpu_memory}MB，自动启用GPU加速")
+        else:
+            use_gpu = False
+            if resource_manager.has_gpu:
+                logger.info(f"检测到GPU但内存较小: {resource_manager.gpu_memory}MB，使用CPU处理")
+            else:
+                logger.info("未检测到可用GPU，使用CPU处理")
 
     # 设置调试模式
     if args.debug:
@@ -821,7 +857,7 @@ def main():
             )
 
             result = add_subtitle_to_video_parallel(
-                video_path, srt_path, output_path, language, args.gpu, args.timeout
+                video_path, srt_path, output_path, language, use_gpu, args.timeout
             )
 
             if result.success:
@@ -842,11 +878,11 @@ def main():
             # process_all_videos(valid_languages, args.force, args.gpu)
         else:
             logger.info("使用并行处理模式")
-            if args.gpu:
+            if use_gpu:
                 logger.info("已启用GPU加速")
 
             process_videos_parallel(
-                valid_languages, args.force, args.gpu, args.workers, args.timeout
+                valid_languages, args.force, use_gpu, args.workers, args.timeout
             )
 
 
