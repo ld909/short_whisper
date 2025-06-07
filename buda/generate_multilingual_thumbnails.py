@@ -5,6 +5,10 @@
 此脚本用于为视频批量生成英语和韩语封面。从thumbnail_base目录中随机选择
 背景图片，并将多语言关键词/短语添加到封面上。
 
+主要特点:
+- 以key_words目录作为唯一的依赖源头，不再依赖mp4_with_audio目录
+- 只要有关键词文件，就会生成对应的封面，即使没有视频文件
+
 输入:
 - 背景图片: [媒体路径]/thumbnail_base/[图片文件]
 - 多语言关键词: [媒体路径]/key_words/[频道名称]/[语言代码]/[视频名称].json
@@ -378,14 +382,14 @@ def create_thumbnail(
 def generate_thumbnails(
     channel=None,
     video_name=None,
-    font_size=65,
+    font_size=80,
     font_color=APPLE_WHITE,
     stroke_width=2,
     stroke_color=APPLE_BLACK,
     font_weight=400,
-    no_stroke=False,
+    no_stroke=True,
     random_highlight=False,
-    left_margin=30,
+    left_margin=80,
 ):
     """生成英语和韩语视频封面"""
     media_path = get_base_media_path()
@@ -414,11 +418,10 @@ def generate_thumbnails(
     for current_channel in channels:
         print(f"\n处理频道: {current_channel}")
 
-        # 检查mp4_with_audio目录下的频道目录
+        # 检查mp4_with_audio目录下的频道目录（可选）
         channel_mp4_dir = os.path.join(media_path, "mp4_with_audio", current_channel)
         if not os.path.exists(channel_mp4_dir):
-            print(f"跳过: mp4_with_audio频道目录不存在 {channel_mp4_dir}")
-            continue
+            print(f"注意: mp4_with_audio频道目录不存在 {channel_mp4_dir}，但继续处理")
 
         # 检查关键词目录
         channel_keywords_dir = os.path.join(media_path, "key_words", current_channel)
@@ -426,36 +429,38 @@ def generate_thumbnails(
             print(f"跳过: 关键词频道目录不存在 {channel_keywords_dir}")
             continue
 
-        # 获取支持的所有语言代码目录
+        # 获取支持的所有语言代码目录（仅检查key_words目录）
         lang_dirs = []
         for lang in languages:
             lang_code = LANGUAGES.get(lang, lang.lower())
 
-            # 检查mp4_with_audio和key_words目录都存在
+            # 仅检查key_words目录存在（mp4_with_audio目录可选）
             mp4_lang_dir = os.path.join(channel_mp4_dir, lang_code)
             keywords_lang_dir = os.path.join(channel_keywords_dir, lang_code)
 
-            if os.path.exists(mp4_lang_dir) and os.path.exists(keywords_lang_dir):
+            if os.path.exists(keywords_lang_dir):
                 lang_dirs.append((lang, lang_code, mp4_lang_dir, keywords_lang_dir))
+                if not os.path.exists(mp4_lang_dir):
+                    print(f"注意: {lang} 语言的mp4目录不存在 {mp4_lang_dir}，但继续处理")
 
         if not lang_dirs:
             print(f"跳过: 频道 {current_channel} 下没有找到任何支持的语言目录")
             continue
 
-        # 从第一个语言的mp4目录获取所有视频名称
-        first_lang_mp4_dir = lang_dirs[0][2]
+        # 从第一个语言的key_words目录获取所有视频名称（基于JSON文件）
+        first_lang_keywords_dir = lang_dirs[0][3]
 
-        # 视频文件列表
+        # 视频文件列表（基于key_words目录中的JSON文件）
         if video_name:
-            video_files = [f"{video_name}.mp4"]
+            video_files = [f"{video_name}.json"]
         else:
             video_files = [
                 f
-                for f in os.listdir(first_lang_mp4_dir)
-                if f.endswith(".mp4") and not f.startswith(".")
+                for f in os.listdir(first_lang_keywords_dir)
+                if f.endswith(".json") and not f.startswith(".")
             ]
 
-        print(f"找到 {len(video_files)} 个视频文件")
+        print(f"找到 {len(video_files)} 个关键词文件")
 
         for video_file in video_files:
             video_name_no_ext = os.path.splitext(video_file)[0]
@@ -478,7 +483,7 @@ def generate_thumbnails(
                     print(f"跳过: 找不到 {language} 关键词")
                     continue
 
-                # 检查mp4文件是否存在
+                # 检查mp4文件是否存在（仅作提示，不影响封面生成）
                 mp4_file = os.path.join(
                     media_path,
                     "mp4_with_audio",
@@ -487,8 +492,7 @@ def generate_thumbnails(
                     f"{video_name_no_ext}.mp4",
                 )
                 if not os.path.exists(mp4_file):
-                    print(f"跳过: 找不到 {language} 视频文件 {mp4_file}")
-                    continue
+                    print(f"注意: 找不到对应的 {language} 视频文件 {mp4_file}，但依然生成封面")
 
                 key_phrase = key_phrases[language]
 
@@ -510,6 +514,11 @@ def generate_thumbnails(
                 )
                 os.makedirs(output_dir, exist_ok=True)
                 output_path = os.path.join(output_dir, f"{video_name_no_ext}.png")
+
+                # 检查封面是否已存在
+                if os.path.exists(output_path):
+                    print(f"跳过 {language}: 封面已存在 {output_path}")
+                    continue
 
                 print(f"为 {language} 创建封面:")
                 print(f"  - 关键词: {key_phrase}")
@@ -537,7 +546,7 @@ def main():
     parser = argparse.ArgumentParser(description="生成英语和韩语视频封面")
     parser.add_argument("-c", "--channel", help="指定要处理的频道")
     parser.add_argument("-v", "--video", help="指定要处理的视频名称（不含扩展名）")
-    parser.add_argument("--font_size", type=int, default=60, help="字体大小")
+    parser.add_argument("--font_size", type=int, default=80, help="字体大小")
     parser.add_argument("--font_color", default=APPLE_WHITE, help="字体颜色")
     parser.add_argument(
         "--stroke_width", type=int, default=2, help="文字描边宽度（像素）"
@@ -546,12 +555,12 @@ def main():
     parser.add_argument(
         "--font_weight", type=int, default=400, help="字体粗细 (100-900)"
     )
-    parser.add_argument("--no_stroke", action="store_true", help="关闭文字描边")
+    parser.add_argument("--no_stroke", action="store_true", default=True, help="关闭文字描边")
     parser.add_argument(
         "--random_highlight", action="store_true", help="随机选择关键词高亮"
     )
     parser.add_argument(
-        "--left_margin", type=int, default=30, help="文字距离左边界的像素距离"
+        "--left_margin", type=int, default=80, help="文字距离左边界的像素距离"
     )
     parser.add_argument("--debug", action="store_true", help="打印调试信息")
 

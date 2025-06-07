@@ -269,12 +269,29 @@ class AutoPublishSystem:
             return datetime.now()
 
     def calculate_next_publish_time(self):
-        """计算下一个发布时间（最远时间+6小时）"""
+        """计算下一个发布时间
+        
+        逻辑：
+        - 如果最远发布时间 >= 当前时间：最远时间 + 6小时
+        - 如果最远发布时间 < 当前时间：当前时间 + 6小时（说明有一段时间没有发布了）
+        """
         print("⏰ 开始计算下一个发布时间...")
         latest_time = self.get_latest_publish_time()
-        next_time = latest_time + timedelta(hours=6)
+        current_time = datetime.now()
+        
         print(f"🎯 基准时间: {latest_time}")
-        print(f"➕ 添加6小时后: {next_time}")
+        print(f"🕐 当前时间: {current_time}")
+        
+        if latest_time < current_time:
+            print("📅 最远发布时间小于当前时间，说明有一段时间没有发布了")
+            print("🔄 使用当前时间作为基准")
+            base_time = current_time
+        else:
+            print("📅 最远发布时间大于等于当前时间，继续按计划发布")
+            base_time = latest_time
+        
+        next_time = base_time + timedelta(hours=6)
+        print(f"➕ 基准时间 + 6小时: {next_time}")
         print(f"✅ 下一个发布时间: {next_time}")
         return next_time
 

@@ -23,7 +23,7 @@
   --list-languages  列出指定频道的所有可用语言
   --force           强制重新生成已存在的文件
   --base-path       指定自定义的基础路径，覆盖默认路径
-  --gpu              Enable GPU acceleration for ffmpeg (uses -hwaccel auto)
+  --gpu              强制启用GPU加速 (默认Ubuntu系统自动启用，Mac系统不启用)
 
 示例:
   # 列出所有频道
@@ -66,6 +66,14 @@ def get_base_path():
         return "/Volumes/dhl/buda_videos_youtube"
     else:  # 默认为Linux/Ubuntu
         return "/media/dhl/buda_videos_youtube"
+
+
+def should_use_gpu():
+    """根据操作系统类型决定是否默认启用GPU加速"""
+    if platform.system() == "Darwin":  # Mac OS
+        return False  # Mac系统不使用GPU
+    else:  # Linux/Ubuntu系统
+        return True  # Ubuntu系统默认使用GPU
 
 
 # 基础路径
@@ -485,7 +493,7 @@ def parse_args():
     parser.add_argument(
         "--gpu",
         action="store_true",
-        help="Enable GPU acceleration for ffmpeg (uses -hwaccel auto)",
+        help="强制启用GPU加速 (默认Ubuntu系统自动启用，Mac系统不启用)",
     )
     return parser.parse_args()
 
@@ -527,11 +535,20 @@ def main():
     monitor_thread = threading.Thread(target=key_monitor, daemon=True)
     monitor_thread.start()
 
+    # 确定GPU使用策略
+    use_gpu = args.gpu if args.gpu else should_use_gpu()
+    
+    # 显示GPU使用状态
+    if use_gpu:
+        print(f"GPU加速: 启用 (系统: {platform.system()})")
+    else:
+        print(f"GPU加速: 禁用 (系统: {platform.system()})")
+
     # 处理指定频道或所有频道
     if args.channel:
         print(f"\n开始处理频道: {args.channel}")
         process_channel_language(
-            args.channel, args.language, args.file, args.force, use_gpu=args.gpu
+            args.channel, args.language, args.file, args.force, use_gpu=use_gpu
         )
     else:
         # 获取所有频道
@@ -549,7 +566,7 @@ def main():
 
             print(f"\n开始处理频道: {channel}")
             process_channel_language(
-                channel, args.language, args.file, args.force, use_gpu=args.gpu
+                channel, args.language, args.file, args.force, use_gpu=use_gpu
             )
 
     # 等待可能存在的视频处理完成
