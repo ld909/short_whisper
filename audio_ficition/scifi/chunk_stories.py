@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 故事分块脚本
-将 process_stories.py 处理后的故事文件分割成400词以上的块
+将 process_stories.py 处理后的故事文件分割成3000字符以内的块
 每个块保存为单独的文件，格式：/mnt/dhl/audio/scifi/story_chunks/story_index/chunk_index.txt
 
 输入输出路径说明：
@@ -21,7 +21,7 @@
     python chunk_stories.py --input-dir /path/to/input   # 指定输入目录
     python chunk_stories.py --output-dir /path/to/output # 指定输出目录
     python chunk_stories.py --file /path/to/file.txt     # 处理单个文件
-    python chunk_stories.py --min-words 500              # 设置最小单词数
+    python chunk_stories.py --max-chars 2500             # 设置最大字符数
     python chunk_stories.py --preview                    # 预览模式
 """
 
@@ -32,57 +32,62 @@ import re
 from pathlib import Path
 
 
-def count_words(text):
+def split_story_into_chunks(content, max_chars=3000):
     """
-    计算文本中的单词数量
-    
-    Args:
-        text (str): 输入文本
-        
-    Returns:
-        int: 单词数量
-    """
-    # 使用正则表达式分割单词，包括中文字符
-    words = re.findall(r'\b\w+\b|[\u4e00-\u9fff]', text)
-    return len(words)
-
-
-def split_story_into_chunks(content, min_words=400):
-    """
-    将故事内容分割成指定最小单词数的块
+    将故事内容分割成指定最大字符数的块，尽量让每个块长度相等
     
     Args:
         content (str): 故事内容
-        min_words (int): 每个块的最小单词数
+        max_chars (int): 每个块的最大字符数
         
     Returns:
         list: 分割后的文本块列表
     """
+    content = content.strip()
+    if not content:
+        return []
+    
+    total_chars = len(content)
+    
+    # 计算需要多少个块
+    estimated_chunks = max(1, (total_chars + max_chars - 1) // max_chars)
+    
+    # 计算理想的每个块大小（除了最后一个）
+    ideal_chunk_size = min(max_chars, total_chars // estimated_chunks)
+    
     chunks = []
     lines = content.split('\n')
     current_chunk = []
-    current_word_count = 0
+    current_char_count = 0
     
     for line in lines:
-        line_word_count = count_words(line)
+        line_with_newline = line + '\n' if line != lines[-1] else line
+        line_char_count = len(line_with_newline)
         
-        # 如果当前块加上这一行还没达到最小单词数，继续添加
-        if current_word_count + line_word_count < min_words:
-            current_chunk.append(line)
-            current_word_count += line_word_count
-        else:
-            # 达到最小单词数，添加这一行后结束当前块
-            current_chunk.append(line)
-            current_word_count += line_word_count
-            
+        # 检查是否应该开始新的块
+        should_start_new_chunk = False
+        
+        if current_char_count + line_char_count > max_chars:
+            # 超过最大限制，必须开始新块
+            should_start_new_chunk = True
+        elif len(chunks) < estimated_chunks - 1:
+            # 还没到最后一个块，检查是否接近理想大小
+            if current_char_count + line_char_count >= ideal_chunk_size:
+                should_start_new_chunk = True
+        
+        if should_start_new_chunk and current_chunk:
             # 保存当前块
             chunk_text = '\n'.join(current_chunk).strip()
-            if chunk_text:  # 确保块不为空
+            if chunk_text:
                 chunks.append(chunk_text)
             
             # 开始新的块
-            current_chunk = []
-            current_word_count = 0
+            current_chunk = [line]
+            current_char_count = len(line)
+        else:
+            # 继续当前块
+            current_chunk.append(line)
+            current_char_count += line_char_count
     
     # 处理最后一个块
     if current_chunk:
@@ -93,14 +98,14 @@ def split_story_into_chunks(content, min_words=400):
     return chunks
 
 
-def process_single_story(input_file, output_base_dir, min_words=400):
+def process_single_story(input_file, output_base_dir, max_chars=3000):
     """
     处理单个故事文件，分割成块并保存
     
     Args:
         input_file (str): 输入故事文件路径
         output_base_dir (str): 输出基础目录
-        min_words (int): 每个块的最小单词数
+        max_chars (int): 每个块的最大字符数
         
     Returns:
         tuple: (成功标志, 块数量)
@@ -123,22 +128,32 @@ def process_single_story(input_file, output_base_dir, min_words=400):
         os.makedirs(story_output_dir, exist_ok=True)
         
         # 分割故事
-        chunks = split_story_into_chunks(content, min_words)
+        chunks = split_story_into_chunks(content, max_chars)
         
         if not chunks:
             print(f"⚠️  无法分割文件: {filename}")
             return False, 0
         
-        # 保存每个块
+        # 保存每个块并显示每个块的信息
+        chunk_sizes = []
         for chunk_index, chunk_content in enumerate(chunks, 1):
             chunk_filename = f"{chunk_index}.txt"
             chunk_filepath = os.path.join(story_output_dir, chunk_filename)
             
+            # 去掉换行符，变成一大段话
+            chunk_content_no_newlines = chunk_content.replace('\n', ' ').strip()
+            
             with open(chunk_filepath, 'w', encoding='utf-8') as f:
-                f.write(chunk_content)
+                f.write(chunk_content_no_newlines)
+            
+            chunk_sizes.append(len(chunk_content_no_newlines))
         
-        word_count = count_words(content)
-        print(f"✅ {filename}: {len(chunks)} 个块 (总计 {word_count} 词)")
+        total_chars = len(content)
+        avg_chunk_size = sum(chunk_sizes) / len(chunk_sizes)
+        chunk_sizes_str = ', '.join([str(size) for size in chunk_sizes])
+        
+        print(f"✅ {filename}: {len(chunks)} 个块 (总计 {total_chars} 字符)")
+        print(f"   块大小: [{chunk_sizes_str}] 字符, 平均: {avg_chunk_size:.0f} 字符")
         
         return True, len(chunks)
         
@@ -191,7 +206,7 @@ def get_story_files(input_dir):
 
 def main():
     """主函数"""
-    parser = argparse.ArgumentParser(description="故事分块器 - 将故事分割成指定单词数的块")
+    parser = argparse.ArgumentParser(description="故事分块器 - 将故事分割成指定字符数的块")
     parser.add_argument(
         "--input-dir", 
         default="/mnt/dhl/audio/scifi/full_story_refine",
@@ -203,10 +218,10 @@ def main():
         help="输出目录路径 (默认: /mnt/dhl/audio/scifi/story_chunks)"
     )
     parser.add_argument(
-        "--min-words",
+        "--max-chars",
         type=int,
-        default=400,
-        help="每个块的最小单词数 (默认: 400)"
+        default=3000,
+        help="每个块的最大字符数 (默认: 3000)"
     )
     parser.add_argument(
         "--file",
@@ -222,12 +237,12 @@ def main():
     
     input_dir = args.input_dir
     output_dir = args.output_dir
-    min_words = args.min_words
+    max_chars = args.max_chars
     
     print(f"🎯 故事分块器")
     print(f"📁 输入目录: {input_dir}")
     print(f"📁 输出目录: {output_dir}")
-    print(f"📊 最小单词数: {min_words} 词/块")
+    print(f"📊 最大字符数: {max_chars} 字符/块")
     
     if args.file:
         # 处理单个文件
@@ -246,7 +261,7 @@ def main():
             return
         
         print(f"\n🔄 开始处理单个文件...")
-        success, chunk_count = process_single_story(input_file, output_dir, min_words)
+        success, chunk_count = process_single_story(input_file, output_dir, max_chars)
         
         if success:
             print(f"✅ 文件处理完成! 生成了 {chunk_count} 个块")
@@ -289,7 +304,7 @@ def main():
         
         print(f"\n处理第 {i}/{len(story_files)} 个文件: {filename}")
         
-        success, chunk_count = process_single_story(input_file, output_dir, min_words)
+        success, chunk_count = process_single_story(input_file, output_dir, max_chars)
         
         if success:
             successful_count += 1

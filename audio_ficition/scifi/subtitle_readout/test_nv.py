@@ -5,7 +5,7 @@ asr_model = nemo_asr.models.ASRModel.from_pretrained(model_name="nvidia/parakeet
 
 
 
-output = asr_model.transcribe(['./2086-149220-0033.wav'], timestamps=True)
+output = asr_model.transcribe(['./8.mp3'], timestamps=True)
 # by default, timestamps are enabled for char, word and segment level
 word_timestamps = output[0].timestamp['word'] # word level timestamps for first sample
 segment_timestamps = output[0].timestamp['segment'] # segment level timestamps

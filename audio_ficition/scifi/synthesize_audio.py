@@ -11,8 +11,6 @@ import glob
 import argparse
 import subprocess
 import time
-import tempfile
-import shutil
 import json
 from pathlib import Path
 
@@ -143,47 +141,13 @@ def read_text_content(file_path):
         return None
 
 
-def clean_text_for_tts(text_content):
-    """
-    清理文本内容，避免CLI参数冲突
 
-    Args:
-        text_content (str): 原始文本内容
-
-    Returns:
-        str: 清理后的文本内容
-    """
-    if not text_content:
-        return ""
-
-    # 移除或替换可能导致CLI参数问题的字符
-    cleaned_text = text_content
-
-    # 替换双引号为中文引号，避免CLI参数冲突
-    cleaned_text = cleaned_text.replace('"', '"').replace('"', '"')
-
-    # 替换单引号为中文引号
-    cleaned_text = cleaned_text.replace("'", "'").replace("'", "'")
-
-    # 移除可能的控制字符
-    cleaned_text = "".join(
-        char for char in cleaned_text if ord(char) >= 32 or char in "\n\r\t"
-    )
-
-    # 确保文本不为空
-    cleaned_text = cleaned_text.strip()
-    if not cleaned_text:
-        return "无内容"
-
-    return cleaned_text
-
-
-def synthesize_audio(text_content, ref_audio, output_file, model="F5TTS_v1_Base"):
+def synthesize_audio(source_file, ref_audio, output_file, model="F5TTS_v1_Base"):
     """
     使用 f5-tts CLI 合成音频
 
     Args:
-        text_content (str): 要合成的文本内容
+        source_file (str): 源文本文件路径
         ref_audio (str): 参考音频文件路径
         output_file (str): 输出音频文件路径
         model (str): 使用的模型名称
@@ -191,26 +155,12 @@ def synthesize_audio(text_content, ref_audio, output_file, model="F5TTS_v1_Base"
     Returns:
         bool: 合成是否成功
     """
-    temp_text_file = None
     try:
         # 确保输出目录存在
         output_dir = os.path.dirname(output_file)
         os.makedirs(output_dir, exist_ok=True)
 
-        # 清理文本内容
-        cleaned_text = clean_text_for_tts(text_content)
-
-        # 创建临时文本文件来避免CLI参数中的特殊字符问题
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", suffix=".txt", delete=False
-        ) as temp_file:
-            temp_file.write(cleaned_text)
-            temp_text_file = temp_file.name
-
-        print(f"📝 文本长度: {len(text_content)} -> {len(cleaned_text)} 字符")
-        print(f"📄 临时文本文件: {temp_text_file}")
-
-        # 构建 f5-tts 命令，使用临时文件
+        # 直接使用源文件，构建 f5-tts 命令
         cmd = [
             "f5-tts_infer-cli",
             "--model",
@@ -220,7 +170,7 @@ def synthesize_audio(text_content, ref_audio, output_file, model="F5TTS_v1_Base"
             "--ref_text",
             "",  # 总是空的，但必须提供
             "--gen_file",
-            temp_text_file,  # 使用文件而不是直接传递文本
+            source_file,  # 直接使用源文件
             "--remove_silence",
             "--output_dir",
             output_dir,
@@ -229,10 +179,11 @@ def synthesize_audio(text_content, ref_audio, output_file, model="F5TTS_v1_Base"
         ]
 
         print(f"🔄 执行命令: {' '.join(cmd)}")
+        print(f"📄 使用源文件: {source_file}")
 
         # 执行命令
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=300  # 5分钟超时
+            cmd, capture_output=True, text=True, timeout=1800  # 30分钟超时
         )
 
         if result.returncode == 0:
@@ -243,12 +194,16 @@ def synthesize_audio(text_content, ref_audio, output_file, model="F5TTS_v1_Base"
             print(f"   stdout: {result.stdout}")
             print(f"   stderr: {result.stderr}")
 
-            # 如果 --gen_file 参数不支持，回退到 --gen_text 方式
+            # 如果 --gen_file 参数不支持，回退到读取文件内容使用 --gen_text 方式
             if "--gen_file" in result.stderr or "gen_file" in result.stderr:
                 print(f"⚠️  --gen_file 参数不支持，回退到 --gen_text 方式")
-                return synthesize_audio_fallback(
-                    cleaned_text, ref_audio, output_file, model
-                )
+                text_content = read_text_content(source_file)
+                if text_content:
+                    return synthesize_audio_fallback(
+                        text_content, ref_audio, output_file, model
+                    )
+                else:
+                    return False
 
             return False
 
@@ -258,24 +213,16 @@ def synthesize_audio(text_content, ref_audio, output_file, model="F5TTS_v1_Base"
     except Exception as e:
         print(f"❌ 音频合成出错: {e}")
         return False
-    finally:
-        # 清理临时文件
-        if temp_text_file and os.path.exists(temp_text_file):
-            try:
-                os.unlink(temp_text_file)
-                print(f"🗑️  已删除临时文件: {temp_text_file}")
-            except Exception as e:
-                print(f"⚠️  删除临时文件失败: {e}")
 
 
 def synthesize_audio_fallback(
     text_content, ref_audio, output_file, model="F5TTS_v1_Base"
 ):
     """
-    回退方案：直接使用 --gen_text 参数，但对文本进行更严格的转义
+    回退方案：直接使用 --gen_text 参数
 
     Args:
-        text_content (str): 要合成的文本内容（已清理）
+        text_content (str): 要合成的文本内容
         ref_audio (str): 参考音频文件路径
         output_file (str): 输出音频文件路径
         model (str): 使用的模型名称
@@ -286,14 +233,12 @@ def synthesize_audio_fallback(
     try:
         output_dir = os.path.dirname(output_file)
 
-        # 进一步转义文本，确保在命令行中安全
-        escaped_text = (
-            text_content.replace("\\", "\\\\").replace("\n", " ").replace("\r", " ")
-        )
+        # 简单处理换行符，避免命令行参数问题
+        clean_text = text_content.replace("\n", " ").replace("\r", " ").strip()
 
         # 限制文本长度，避免命令行参数过长
-        if len(escaped_text) > 1000:
-            escaped_text = escaped_text[:1000] + "..."
+        if len(clean_text) > 1000:
+            clean_text = clean_text[:1000] + "..."
             print(f"⚠️  文本过长，已截断到1000字符")
 
         # 构建 f5-tts 命令
@@ -306,7 +251,7 @@ def synthesize_audio_fallback(
             "--ref_text",
             "",
             "--gen_text",
-            escaped_text,
+            clean_text,
             "--remove_silence",
             "--output_dir",
             output_dir,
@@ -314,10 +259,10 @@ def synthesize_audio_fallback(
             os.path.basename(output_file),
         ]
 
-        print(f"🔄 回退方案执行命令")
+        print(f"🔄 回退方案执行命令（使用 --gen_text）")
 
         # 执行命令
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)  # 30分钟超时
 
         if result.returncode == 0:
             print(f"✅ 音频合成成功（回退方案）: {output_file}")
@@ -508,9 +453,9 @@ def process_chunk(
     Returns:
         bool: 处理是否成功
     """
-    # 读取文本内容
-    text_content = read_text_content(chunk_file)
-    if not text_content:
+    # 检查源文件是否存在
+    if not os.path.exists(chunk_file):
+        print(f"❌ 源文件不存在: {chunk_file}")
         return False
 
     # 获取块索引
@@ -526,13 +471,17 @@ def process_chunk(
         print(f"⏭️  文件已存在且有效，跳过: {output_file} ({file_size} 字节)")
         return True
 
-    print(f"📝 处理文本块: 故事 {story_index}, 块 {chunk_index}")
-    print(f"   输入: {chunk_file}")
-    print(f"   输出: {output_file}")
-    print(f"   文本长度: {len(text_content)} 字符")
+    # 获取文件大小用于显示
+    try:
+        file_size = os.path.getsize(chunk_file)
+        print(f"📝 处理文本块: 故事 {story_index}, 块 {chunk_index}")
+        print(f"   输入: {chunk_file} ({file_size} 字节)")
+        print(f"   输出: {output_file}")
+    except Exception as e:
+        print(f"⚠️  无法获取文件大小: {e}")
 
-    # 合成音频
-    success = synthesize_audio(text_content, ref_audio, output_file, model)
+    # 直接使用源文件合成音频
+    success = synthesize_audio(chunk_file, ref_audio, output_file, model)
 
     if success:
         # 检查输出文件是否真的生成了且有效
