@@ -2,14 +2,19 @@
 # -*- coding: utf-8 -*-
 
 """
-AI Studio 故事生成自动化脚本
+AI Studio 多主题故事生成自动化脚本
 
 功能说明：
-这是一个用于 Google AI Studio 的自动化故事生成脚本，主要功能包括：
+这是一个用于 Google AI Studio 的自动化故事生成脚本，支持多种主题类型：
+
+📚 支持的主题类型：
+- scifi: 科幻故事（使用gen_prompt模块）
+- fantasy: 奇幻故事（使用fantasy配置文件）
+- 可扩展：love、detective、mystery等
 
 1. 📖 批量故事生成
-   - 支持批量生成多个科幻故事
-   - 自动生成随机故事参数（通过 gen_prompt 模块）
+   - 支持批量生成多个指定主题的故事
+   - 根据主题自动选择对应的参数生成器
    - 智能索引管理：优先填补缺失的故事索引，然后生成新索引
 
 2. 🌐 浏览器自动化
@@ -24,7 +29,7 @@ AI Studio 故事生成自动化脚本
 4. 💾 自动保存管理
    - 自动将生成的故事保存为编号的文本文件
    - 支持断点续传：检测已存在的故事，只生成缺失的部分
-   - 文件保存路径：/Volumes/dhl/audio/scifi/full_story/language_code/
+   - 文件保存路径格式：/Volumes/dhl/audio/{theme}/full_story/*.txt
 
 5. 🔄 错误处理与重试
    - 智能检测AI生成状态（通过监控停止按钮状态）
@@ -34,19 +39,22 @@ AI Studio 故事生成自动化脚本
 6. ⚙️ 命令行界面
    - 支持指定生成数量：--count 或 -c 参数
    - 支持指定浏览器ID：--ads-id 参数
+   - 支持指定主题：--theme 或 -t 参数（必需）
    - 默认生成2个故事，使用 kyencl7 浏览器配置
 
 使用方法：
-python ai_studio_bot.py --count 5 --ads-id your_browser_id
+python ai_studio_bot.py --theme scifi --count 5 --ads-id your_browser_id
+python ai_studio_bot.py --theme fantasy --count 3
 
 依赖组件：
 - AdsPower：提供浏览器环境隔离
 - Playwright：网页自动化控制
-- gen_prompt：故事参数生成模块
+- gen_prompt：科幻故事参数生成模块
+- fantasy配置：奇幻故事参数生成模块
 
 作者：AI Studio 自动化团队
-版本：v2.0
-更新：支持多窗口并发、智能热身、断点续传
+版本：v3.0
+更新：支持多主题、可扩展架构、主题特定的参数生成
 """
 
 import requests
@@ -60,7 +68,61 @@ import re
 import argparse
 import random
 from playwright.sync_api import sync_playwright
-from gen_prompt import generate_prompt, remove_markdown
+
+# 主题相关的导入
+# 添加scifi模块导入路径
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "scifi"))
+try:
+    from gen_prompt import generate_prompt, remove_markdown
+
+    SCIFI_AVAILABLE = True
+except ImportError:
+    print("警告: gen_prompt 模块未找到，scifi主题将不可用")
+    SCIFI_AVAILABLE = False
+
+# 添加fantasy模块导入路径
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "fantasy"))
+try:
+    from fantasy_script_generator import (
+        generate_story_parameters,
+        load_config,
+        remove_markdown_formatting,
+    )
+
+    FANTASY_AVAILABLE = True
+except ImportError:
+    print("警告: fantasy_script_generator 模块未找到，fantasy主题将不可用")
+    FANTASY_AVAILABLE = False
+
+# 支持的主题配置
+SUPPORTED_THEMES = {
+    "scifi": {
+        "name": "科幻",
+        "available": SCIFI_AVAILABLE,
+        "description": "科幻故事生成，包含未来科技、太空探索、时间旅行等元素",
+    },
+    "fantasy": {
+        "name": "奇幻",
+        "available": FANTASY_AVAILABLE,
+        "description": "奇幻故事生成，包含魔法、龙、精灵等奇幻元素",
+    },
+    # 为未来扩展预留
+    "love": {
+        "name": "爱情",
+        "available": False,
+        "description": "爱情故事生成（即将支持）",
+    },
+    "detective": {
+        "name": "侦探",
+        "available": False,
+        "description": "侦探推理故事生成（即将支持）",
+    },
+    "mystery": {
+        "name": "悬疑",
+        "available": False,
+        "description": "悬疑惊悚故事生成（即将支持）",
+    },
+}
 
 # 添加随机问题列表用于热身
 WARMUP_QUESTIONS = [
@@ -75,6 +137,82 @@ WARMUP_QUESTIONS = [
     "什么是人工智能？",
     "你会说中文吗？",
 ]
+
+
+def get_theme_story_path_prefix(theme):
+    """获取主题对应的故事文件目录路径"""
+    return f"/Volumes/dhl/audio/{theme}/full_story"
+
+
+def generate_story_prompt_by_theme(theme):
+    """根据主题生成故事参数"""
+    if theme == "scifi":
+        if not SCIFI_AVAILABLE:
+            raise ImportError("scifi主题不可用：gen_prompt模块未找到")
+        story_prompt = generate_prompt()
+        return remove_markdown(story_prompt)
+
+    elif theme == "fantasy":
+        if not FANTASY_AVAILABLE:
+            raise ImportError("fantasy主题不可用：fantasy_script_generator模块未找到")
+
+        # 加载fantasy配置并生成参数
+        try:
+            # 构建配置文件路径
+            fantasy_dir = os.path.join(os.path.dirname(__file__), "..", "fantasy")
+            config_path = os.path.join(fantasy_dir, "config.json")
+
+            # 加载配置
+            config = load_config(config_path)
+
+            # 生成参数
+            params = generate_story_parameters(config)
+
+            # 创建并填充模板
+            from fantasy_script_generator import (
+                create_prompt_template,
+                fill_prompt_template,
+            )
+
+            template = create_prompt_template()
+            filled_prompt = fill_prompt_template(template, params)
+
+            # 移除markdown格式
+            return remove_markdown_formatting(filled_prompt)
+
+        except FileNotFoundError:
+            raise FileNotFoundError(f"fantasy配置文件未找到: {config_path}")
+        except Exception as e:
+            raise Exception(f"生成fantasy故事参数失败: {e}")
+
+    else:
+        raise ValueError(
+            f"不支持的主题: {theme}。支持的主题: {list(SUPPORTED_THEMES.keys())}"
+        )
+
+
+def validate_theme(theme):
+    """验证主题是否支持"""
+    if theme not in SUPPORTED_THEMES:
+        available_themes = [k for k, v in SUPPORTED_THEMES.items() if v["available"]]
+        raise ValueError(f"不支持的主题: {theme}。\n可用主题: {available_themes}")
+
+    if not SUPPORTED_THEMES[theme]["available"]:
+        raise ValueError(
+            f"主题 '{theme}' 暂不可用: {SUPPORTED_THEMES[theme]['description']}"
+        )
+
+    return True
+
+
+def list_available_themes():
+    """列出所有可用的主题"""
+    print("\n=== 📚 可用主题列表 ===")
+    for theme_id, theme_info in SUPPORTED_THEMES.items():
+        status = "✅ 可用" if theme_info["available"] else "❌ 不可用"
+        print(f"  {theme_id}: {theme_info['name']} - {status}")
+        print(f"    描述: {theme_info['description']}")
+    print()
 
 
 def countdown_wait(seconds=20, window_index=None):
@@ -120,46 +258,55 @@ def get_adspower_info(ads_id):
     return ws_endpoint, remote_debugging_url, http
 
 
-def get_existing_stories(story_dir):
-    """获取已经生成的故事索引列表"""
-    if not os.path.exists(story_dir):
-        os.makedirs(story_dir, exist_ok=True)
-        return []
+def get_existing_stories(story_dir_path):
+    """获取已存在的故事索引"""
+    # 搜索目录下的数字命名txt文件
+    story_files = glob.glob(f"{story_dir_path}/*.txt")
+    print(f"DEBUG: Searching for stories with pattern: {story_dir_path}/*.txt")
+    print(f"DEBUG: Found story files: {story_files}")
 
-    existing_files = glob.glob(os.path.join(story_dir, "*.txt"))
-    existing_numbers = []
-
-    for file_path in existing_files:
-        basename = os.path.basename(file_path)
-        # 排除以点开头的文件（如.DS_Store等）
-        if basename.startswith("."):
-            continue
-        match = re.match(r"(\d+)\.txt", basename)
+    existing_indices = []
+    for f in story_files:
+        # 从文件名中提取数字索引
+        filename = os.path.basename(f)
+        match = re.search(r"^(\d+)\.txt$", filename)
         if match:
-            existing_numbers.append(int(match.group(1)))
+            existing_indices.append(int(match.group(1)))
 
-    return sorted(existing_numbers)
+    if existing_indices:
+        print(
+            f"找到 {len(existing_indices)} 个已存在的故事，索引为: {sorted(existing_indices)}"
+        )
+    else:
+        print("未找到任何已存在的故事。")
+
+    return set(existing_indices)
 
 
-def get_story_parameters_to_generate(num_needed=1):
-    """生成需要的故事参数，优先填补缺失的索引"""
-    story_dir = "/Volumes/dhl/audio/scifi/full_story/language_code"
-    existing_stories = get_existing_stories(story_dir)
+def get_story_parameters_to_generate(theme, num_needed=1):
+    """
+    获取需要生成的故事的参数列表。
 
-    print(f"\n=== 📊 故事索引分析 ===")
-    print(f"已存在的故事索引: {existing_stories}")
+    该函数会首先检查已存在的故事，并根据需要生成新的故事参数。
+    """
+    story_dir_path = get_theme_story_path_prefix(theme)
+    existing_indices = get_existing_stories(story_dir_path)
+
+    print(f"\n=== 📊 {SUPPORTED_THEMES[theme]['name']}主题故事索引分析 ===")
+    print(f"故事保存目录: {story_dir_path}")
+    print(f"已存在的故事索引: {existing_indices}")
     print(f"需要生成的故事数量: {num_needed}")
 
     stories_to_generate = []
 
-    if existing_stories:
-        max_existing = max(existing_stories)
+    if existing_indices:
+        max_existing = max(existing_indices)
         print(f"当前最大索引: {max_existing}")
 
         # 找出缺失的索引（从1到最大值之间的空缺）
         missing_indices = []
         for i in range(1, max_existing + 1):
-            if i not in existing_stories:
+            if i not in existing_indices:
                 missing_indices.append(i)
 
         missing_indices.sort()  # 确保从小到大排序
@@ -198,19 +345,23 @@ def get_story_parameters_to_generate(num_needed=1):
     else:
         # 如果没有任何故事，从1开始
         indices_to_use = list(range(1, num_needed + 1))
-        print(f"🎯 第一次生成故事，从索引 1 开始")
+        print(f"🎯 第一次生成{SUPPORTED_THEMES[theme]['name']}故事，从索引 1 开始")
         print(f"📋 生成索引列表: {indices_to_use}")
 
     # 生成故事参数
-    print(f"\n=== 🎨 开始生成故事参数 ===")
+    print(f"\n=== 🎨 开始生成{SUPPORTED_THEMES[theme]['name']}故事参数 ===")
     for story_index in sorted(indices_to_use):  # 确保按索引顺序处理
-        story_prompt = generate_prompt()
-        clean_prompt = remove_markdown(story_prompt)
+        try:
+            story_prompt = generate_story_prompt_by_theme(theme)
+            stories_to_generate.append({"index": story_index, "prompt": story_prompt})
+            print(f"✅ 准备生成{SUPPORTED_THEMES[theme]['name']}故事 {story_index}")
+        except Exception as e:
+            print(f"❌ 生成故事 {story_index} 参数失败: {e}")
+            # 继续处理其他故事，不中断整个流程
 
-        stories_to_generate.append({"index": story_index, "prompt": clean_prompt})
-        print(f"✅ 准备生成故事 {story_index}")
-
-    print(f"=== 📝 故事参数生成完成，共 {len(stories_to_generate)} 个 ===\n")
+    print(
+        f"=== 📝 {SUPPORTED_THEMES[theme]['name']}故事参数生成完成，共 {len(stories_to_generate)} 个 ===\n"
+    )
     return stories_to_generate
 
 
@@ -435,7 +586,7 @@ def wait_for_ai_completion(page, window_index):
         raise e
 
 
-def save_generated_story(page, story_index, story_dir):
+def save_generated_story(page, story_index, story_dir_path, theme=""):
     """保存生成的故事内容"""
     try:
         # 等待内容生成完成
@@ -465,8 +616,9 @@ def save_generated_story(page, story_index, story_dir):
             try:
                 elements = page.locator(selector)
                 if elements.count() > 0:
+                    theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
                     print(
-                        f"故事 {story_index}: 找到 {elements.count()} 个元素使用选择器: {selector}"
+                        f"{theme_name}故事 {story_index}: 找到 {elements.count()} 个元素使用选择器: {selector}"
                     )
 
                     # 对于AI Studio特有的元素，优先选择最后一个元素
@@ -483,7 +635,7 @@ def save_generated_story(page, story_index, story_dir):
                             ):  # 过滤掉太短的内容
                                 content = element_text
                                 print(
-                                    f"故事 {story_index}: 从AI Studio元素 #{i+1}（最后一个）提取到内容，长度: {len(content)}"
+                                    f"{theme_name}故事 {story_index}: 从AI Studio元素 #{i+1}（最后一个）提取到内容，长度: {len(content)}"
                                 )
                                 break
 
@@ -498,57 +650,66 @@ def save_generated_story(page, story_index, story_dir):
                             ):  # 确保内容足够长
                                 content = element_content
                                 print(
-                                    f"故事 {story_index}: 从选择器 {selector} 的最后一个元素提取到内容，长度: {len(content)}"
+                                    f"{theme_name}故事 {story_index}: 从选择器 {selector} 的最后一个元素提取到内容，长度: {len(content)}"
                                 )
                                 break
                         if content:
                             break
 
             except Exception as e:
-                print(f"故事 {story_index}: 选择器 {selector} 提取失败: {e}")
+                theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
+                print(
+                    f"{theme_name}故事 {story_index}: 选择器 {selector} 提取失败: {e}"
+                )
                 continue
 
         if content.strip():
             # 清理内容 - 移除多余的换行和空白
             content = content.strip()
 
-            # 保存到文件
-            os.makedirs(story_dir, exist_ok=True)
-            file_path = os.path.join(story_dir, f"{story_index}.txt")
+            # 保存到文件，使用简单的数字命名
+            file_path = f"{story_dir_path}/{story_index}.txt"
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            print(f"故事 {story_index} 已保存到: {file_path}")
+
+            theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
+            print(f"{theme_name}故事 {story_index} 已保存到: {file_path}")
             print(f"内容长度: {len(content)} 字符")
             # 打印内容的前200个字符作为预览
             preview = content[:200] + "..." if len(content) > 200 else content
             print(f"内容预览: {preview}")
             return True
         else:
-            print(f"故事 {story_index}: 未找到生成的内容")
+            theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
+            print(f"{theme_name}故事 {story_index}: 未找到生成的内容")
             # 尝试打印页面的部分内容用于调试
             try:
                 page_content = page.content()
                 if "ms-prompt-chunk" in page_content:
                     print(
-                        f"故事 {story_index}: 页面中发现ms-prompt-chunk元素，但无法提取内容"
+                        f"{theme_name}故事 {story_index}: 页面中发现ms-prompt-chunk元素，但无法提取内容"
                     )
                 else:
-                    print(f"故事 {story_index}: 页面中未发现ms-prompt-chunk元素")
+                    print(
+                        f"{theme_name}故事 {story_index}: 页面中未发现ms-prompt-chunk元素"
+                    )
             except:
                 pass
             return False
 
     except Exception as e:
-        print(f"保存故事 {story_index} 时出错: {e}")
+        theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
+        print(f"保存{theme_name}故事 {story_index} 时出错: {e}")
         return False
 
 
 def process_window(
-    page, window_index, story_data, is_first_story=True, need_warmup=False
+    page, window_index, story_data, theme, is_first_story=True, need_warmup=False
 ):
     """处理单个窗口的故事生成"""
     try:
-        print(f"窗口 {window_index}: 开始处理故事 {story_data['index']}")
+        theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
+        print(f"窗口 {window_index}: 开始处理{theme_name}故事 {story_data['index']}")
         print(
             f"窗口 {window_index}: 窗口第一次={is_first_story}, 需要热身={need_warmup}"
         )
@@ -856,20 +1017,30 @@ def process_window(
             raise Exception(f"窗口 {window_index}: AI生成状态检测失败")
 
         # 保存生成的故事
-        story_dir = "/Volumes/dhl/audio/scifi/full_story/language_code"
-        success = save_generated_story(page, story_data["index"], story_dir)
+        success = save_generated_story(
+            page, story_data["index"], story_data["dir_path"], theme
+        )
 
         if success:
-            print(f"窗口 {window_index}: 故事 {story_data['index']} 处理完成")
+            theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
+            print(
+                f"窗口 {window_index}: {theme_name}故事 {story_data['index']} 处理完成"
+            )
             # 生成完成后等待20秒
             countdown_wait(20, window_index)
         else:
-            print(f"窗口 {window_index}: 故事 {story_data['index']} 保存失败")
+            theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
+            print(
+                f"窗口 {window_index}: {theme_name}故事 {story_data['index']} 保存失败"
+            )
 
         return success
 
     except Exception as e:
-        print(f"窗口 {window_index}: 处理故事 {story_data['index']} 时出错: {e}")
+        theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
+        print(
+            f"窗口 {window_index}: 处理{theme_name}故事 {story_data['index']} 时出错: {e}"
+        )
         import traceback
 
         traceback.print_exc()
@@ -879,15 +1050,53 @@ def process_window(
 def main():
     """主函数"""
     # 解析命令行参数
-    parser = argparse.ArgumentParser(description="AI Studio 故事生成器")
+    parser = argparse.ArgumentParser(
+        description="AI Studio 多主题故事生成自动化脚本",
+        formatter_class=argparse.RawTextHelpFormatter,
+        epilog="""
+支持的主题:
+  scifi    - 科幻故事
+  fantasy  - 奇幻故事
+  love     - 爱情故事 (即将支持)
+  detective- 侦探推理故事 (即将支持)
+  mystery  - 悬疑故事 (即将支持)
+
+使用示例:
+  python ai_studio_bot.py --theme scifi --count 5
+  python ai_studio_bot.py --theme fantasy --count 3 --ads-id your_browser_id
+        """,
+    )
     parser.add_argument(
         "--count", "-c", type=int, default=2, help="要生成的故事数量 (默认: 2)"
     )
     parser.add_argument(
         "--ads-id", default="kyencl7", help="AdsPower 浏览器ID (默认: kyencl7)"
     )
+    parser.add_argument(
+        "--theme", "-t", help="要生成故事的主题 (必需，除非使用--list-themes)"
+    )
+    parser.add_argument("--list-themes", action="store_true", help="列出所有支持的主题")
 
     args = parser.parse_args()
+
+    # 如果用户请求列出主题，显示后退出
+    if args.list_themes:
+        list_available_themes()
+        return
+
+    # 如果没有指定主题且没有使用--list-themes，则报错
+    if not args.theme:
+        print("❌ 错误：必须指定主题，使用 --theme 参数")
+        list_available_themes()
+        return
+
+    # 验证主题
+    try:
+        validate_theme(args.theme)
+    except ValueError as e:
+        print(f"❌ {e}")
+        list_available_themes()
+        return
 
     # 验证参数
     if args.count <= 0:
@@ -903,21 +1112,33 @@ def main():
 
     ads_id = args.ads_id
     story_count = args.count
+    theme = args.theme
+    theme_name = SUPPORTED_THEMES[theme]["name"]
 
-    print(f"🎯 准备生成 {story_count} 个故事")
+    print(f"🎯 准备生成 {story_count} 个 {theme_name}({theme}) 故事")
     print(f"📱 使用 AdsPower ID: {ads_id}")
 
     close_url = f"http://127.0.0.1:50325/api/v1/browser/stop?user_id={ads_id}"
 
     try:
+        story_dir_path = get_theme_story_path_prefix(theme)
+
+        # 确保故事目录存在
+        os.makedirs(story_dir_path, exist_ok=True)
+        print(f"故事将保存在: {story_dir_path}")
+
         # 获取需要生成的故事参数
-        stories_to_generate = get_story_parameters_to_generate(story_count)
+        stories_to_generate = get_story_parameters_to_generate(theme, story_count)
 
         if not stories_to_generate:
             print("没有需要生成的故事")
             return
 
         print(f"📝 实际需要生成 {len(stories_to_generate)} 个故事")
+
+        # 为每个故事参数添加目录路径，以提高后续处理效率
+        for story in stories_to_generate:
+            story["dir_path"] = story_dir_path
 
         # 获取WebDriver
         ws_endpoint, remote_debugging_url, http = get_adspower_info(ads_id)
@@ -1016,7 +1237,12 @@ def main():
                                 is_first = window_first_story[i]
                                 need_warmup = not global_warmup_done
                                 success = process_window(
-                                    window, i + 1, story_data, is_first, need_warmup
+                                    window,
+                                    i + 1,
+                                    story_data,
+                                    theme,
+                                    is_first,
+                                    need_warmup,
                                 )
 
                                 # 更新全局热身状态和窗口状态

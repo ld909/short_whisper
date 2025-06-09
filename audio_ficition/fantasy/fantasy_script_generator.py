@@ -1,3 +1,48 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+奇幻故事脚本参数生成器
+Fantasy Story Script Parameter Generator
+
+功能描述:
+    自动生成奇幻小说的故事参数，用于创建有声书脚本。
+    基于配置文件随机组合各种元素（角色、世界设定、魔法系统等），
+    生成完整的故事创作提示词模板。
+
+依赖文件:
+    - config.json: 配置文件，包含所有可选的故事元素
+      必须放在脚本同一目录下
+
+输入:
+    - config.json: 故事元素配置文件
+    - 命令行参数: 可选的生成数量
+
+输出:
+    - 固定目录: /Volumes/dhl/audio/fantasy/story_param/
+    - 文件格式: {索引号}.txt (如: 1.txt, 2.txt, 3.txt...)
+    - 内容: 完整的故事创作提示词，可直接用于AI生成故事
+
+使用方法:
+    1. 基本使用（生成1个故事参数）:
+       python fantasy_script_generator.py
+
+    2. 批量生成（生成N个故事参数）:
+       python fantasy_script_generator.py -n 5
+       python fantasy_script_generator.py --number 10
+
+    3. 查看帮助:
+       python fantasy_script_generator.py -h
+
+注意事项:
+    - 确保config.json文件存在且格式正确
+    - 输出目录会自动创建（如果不存在）
+    - 脚本会自动避免覆盖现有文件（从最大索引号+1开始）
+    - 每个生成的故事参数包含完整的世界设定、角色配置、情节结构等
+
+作者: 奇幻故事生成系统
+版本: 1.0
+"""
+
 import json
 import random
 import os
@@ -71,32 +116,17 @@ def generate_story_parameters(config):
     params["themes"] = select_random_element(config["thematic_cores_catalogue"])
 
     # Generate tone and pacing
-    tone_options = [
-        "Epic and Heroic",
-        "Dark and Gritty",
-        "Mystical and Adventurous",
-        "Hopeful and Inspiring",
-        "Mysterious and Dangerous",
-        "Romantic and Heroic",
-    ]
-    pacing_options = [
-        "Slow build to explosive climax",
-        "Fast-paced with continuous revelations",
-        "Steady progression with sudden twists",
-        "Tense suspense gradually escalating",
-    ]
-    params["overall_tone"] = select_random_element(tone_options)
-    params["pacing_strategy"] = select_random_element(pacing_options)
+    params["overall_tone"] = select_random_element(
+        config["additional_story_elements"]["tone_options"]
+    )
+    params["pacing_strategy"] = select_random_element(
+        config["additional_story_elements"]["pacing_options"]
+    )
 
     # Core concept hooks
-    hook_options = [
-        "A scholar discovers that the power mentioned in ancient prophecies is actually hidden in everyday objects",
-        "The protagonist accidentally inherits a cursed ability and must learn to control it",
-        "A seemingly ordinary craftsman discovers they are the last heir of an ancient bloodline",
-        "The protagonist discovers that the world's history has been deliberately altered, and the truth could change everything",
-        "An accidental magical event transports the protagonist to the forbidden lands of the world",
-    ]
-    params["core_concept_hook"] = select_random_element(hook_options)
+    params["core_concept_hook"] = select_random_element(
+        config["additional_story_elements"]["core_concept_hooks"]
+    )
 
     # === Character Names ===
     params["protagonist_name"] = select_random_name(config["protagonist_names"])
@@ -128,27 +158,15 @@ def generate_story_parameters(config):
     )
 
     # Protagonist skills and conflicts
-    skill_options = [
-        "Natural magical perception abilities, but unable to fully control them",
-        "Mastery of ancient texts and runic studies",
-        "Exceptional combat skills and tactical thinking",
-        "Ability to communicate with animals or natural elements",
-        "Possesses fragments of prophetic ability",
-    ]
-    params["protagonist_skill_magic"] = select_random_element(skill_options)
-
-    conflict_options = [
-        "Struggling between personal desires and collective responsibility",
-        "Must overcome inner fears to unleash true potential",
-        "Learning to trust others and break free from isolation habits",
-        "Choosing between revenge and forgiveness",
-        "Accepting their destiny while maintaining free will",
-    ]
-    params["protagonist_internal_conflict_arc"] = select_random_element(
-        conflict_options
+    params["protagonist_skill_magic"] = select_random_element(
+        config["additional_story_elements"]["protagonist_skills_and_magic"]
     )
-    params["protagonist_visual_keywords"] = (
-        "Weathered but determined eyes, simple yet practical attire, bearing mysterious symbols or scars"
+
+    params["protagonist_internal_conflict_arc"] = select_random_element(
+        config["additional_story_elements"]["protagonist_internal_conflicts"]
+    )
+    params["protagonist_visual_keywords"] = select_random_element(
+        config["additional_story_elements"]["protagonist_visual_keywords"]
     )
 
     # === Antagonist Elements ===
@@ -165,18 +183,11 @@ def generate_story_parameters(config):
         config["antagonist_elements"]["methods_of_conflict"]
     )
 
-    connection_options = [
-        "Was once the protagonist's mentor or ally",
-        "Shares the same bloodline or origin as the protagonist",
-        "Represents a dark version of what the protagonist could become",
-        "Embodies the external manifestation of the protagonist's inner fears",
-        "Possesses power that the protagonist desires but dares not pursue",
-    ]
     params["antagonist_protagonist_connection"] = select_random_element(
-        connection_options
+        config["additional_story_elements"]["antagonist_protagonist_connections"]
     )
-    params["antagonist_visual_keywords"] = (
-        "Majestic yet dangerous demeanor, ornate but evil decorations, radiating ominous energy"
+    params["antagonist_visual_keywords"] = select_random_element(
+        config["additional_story_elements"]["antagonist_visual_keywords"]
     )
 
     # === Supporting Characters ===
@@ -193,17 +204,17 @@ def generate_story_parameters(config):
     params["supporting_char1_species"] = select_random_element(
         config["protagonist_elements"]["species_options"]
     )
-    params["supporting_char1_skill"] = (
-        "Masters lost ancient magical knowledge and combat techniques"
+    params["supporting_char1_skill"] = select_random_element(
+        config["additional_story_elements"]["supporting_character_skills"]
     )
-    params["supporting_char1_relationship_to_protagonist"] = (
-        "Reluctant but ultimately loyal guide who sees the protagonist's potential"
+    params["supporting_char1_relationship_to_protagonist"] = select_random_element(
+        config["additional_story_elements"]["supporting_character_relationships"]
     )
     params["supporting_char1_secret"] = select_random_element(
-        mentor_template["potential_secrets"]
+        config["additional_story_elements"]["supporting_character_secrets"]
     )
-    params["supporting_char1_arc_snippet"] = (
-        "Learns to trust again, finding their own redemption through helping the protagonist succeed"
+    params["supporting_char1_arc_snippet"] = select_random_element(
+        config["additional_story_elements"]["supporting_character_arcs"]
     )
 
     # Ally/Companion character
@@ -220,16 +231,16 @@ def generate_story_parameters(config):
         config["protagonist_elements"]["species_options"]
     )
     params["supporting_char2_skill"] = select_random_element(
-        ally_template["unique_skills"]
+        config["additional_story_elements"]["supporting_character_skills"]
     )
-    params["supporting_char2_relationship_to_protagonist"] = (
-        "Loyal friend who provides support and different perspectives at crucial moments"
+    params["supporting_char2_relationship_to_protagonist"] = select_random_element(
+        config["additional_story_elements"]["supporting_character_relationships"]
     )
-    params["supporting_char2_secret"] = (
-        "Hiding noble identity, fled from political marriage"
+    params["supporting_char2_secret"] = select_random_element(
+        config["additional_story_elements"]["supporting_character_secrets"]
     )
-    params["supporting_char2_arc_snippet"] = (
-        "Transforms from naive to mature, learning to maintain kindness in a cruel world"
+    params["supporting_char2_arc_snippet"] = select_random_element(
+        config["additional_story_elements"]["supporting_character_arcs"]
     )
 
     # Love Interest character
@@ -245,15 +256,17 @@ def generate_story_parameters(config):
     params["supporting_char3_species"] = select_random_element(
         config["protagonist_elements"]["species_options"]
     )
-    params["supporting_char3_skill"] = "Expert in healing magic and herbalism"
-    params["supporting_char3_relationship_to_protagonist"] = (
-        "Initially strangers, gradually developing deep emotional connections"
+    params["supporting_char3_skill"] = select_random_element(
+        config["additional_story_elements"]["supporting_character_skills"]
     )
-    params["supporting_char3_secret"] = (
-        "Possesses forbidden magical bloodline, fears discovery"
+    params["supporting_char3_relationship_to_protagonist"] = select_random_element(
+        config["additional_story_elements"]["supporting_character_relationships"]
     )
-    params["supporting_char3_arc_snippet"] = (
-        "Overcomes fear of intimate relationships, learns to trust and depend on others"
+    params["supporting_char3_secret"] = select_random_element(
+        config["additional_story_elements"]["supporting_character_secrets"]
+    )
+    params["supporting_char3_arc_snippet"] = select_random_element(
+        config["additional_story_elements"]["supporting_character_arcs"]
     )
     params["romance_conflict_driver"] = select_random_element(
         love_template["conflict_drivers_for_romance"]
@@ -267,28 +280,13 @@ def generate_story_parameters(config):
     )
 
     # === Factions ===
-    faction_names = [
-        "Iron Raven Legion",
-        "Silver Moon Council",
-        "Shadow Cult",
-        "Emerald Guardians",
-        "Starfire Alliance",
-        "Abyss Children",
-    ]
-    faction_descriptions = [
-        "Imperial army that reveres order and military discipline, viewing magic as a tool that needs control",
-        "Ancient mage organization protecting forbidden knowledge, extremely cautious toward outsiders",
-        "Mysterious religious group believing that true power can be gained through suffering",
-        "Guardians of natural magic, maintaining delicate balance with the civilized world",
-        "Alliance of young rebels attempting to overthrow corrupt old systems",
-        "Evil cult corrupted by dark forces, seeking to drag the world into eternal chaos",
-    ]
-    faction_relationships = [
-        "Initial oppressors, but some members may become reluctant allies",
-        "Potential source of aid, but requires proving one's worth",
-        "Complex adversaries, both threat and mentor to some degree",
-        "Natural allies, but cultural differences create communication barriers",
-    ]
+    faction_names = config["additional_story_elements"]["faction_names"].copy()
+    faction_descriptions = config["additional_story_elements"][
+        "faction_descriptions"
+    ].copy()
+    faction_relationships = config["additional_story_elements"][
+        "faction_relationships"
+    ].copy()
 
     params["faction1_name"] = select_random_element(faction_names)
     faction_names.remove(params["faction1_name"])
@@ -318,44 +316,25 @@ def generate_story_parameters(config):
     )
 
     # === World Building ===
-    world_names = ["Aetheria", "Valdora", "Arcanum", "Mirasia", "Zephania"]
-    params["world_name"] = select_random_element(world_names)
+    params["world_name"] = select_random_element(
+        config["additional_story_elements"]["world_names"]
+    )
 
-    landscape_options = [
-        "Rolling magical forests and ancient stone towers",
-        "Desolate deserts hiding lost temples",
-        "Snow-covered mountains and mysterious crystal caves",
-        "Floating islands and ancient cities in the sky",
-        "Underground cities and glowing mushroom forests",
-    ]
-    params["world_landscapes"] = select_random_element(landscape_options)
+    params["world_landscapes"] = select_random_element(
+        config["additional_story_elements"]["landscape_options"]
+    )
 
-    lore_options = [
-        "Ancient wars of the gods tore apart the primal source of magic, leaving dangerous echoes and fragmented power",
-        "Lost civilizations once mastered time-controlling technology, but their arrogance led to catastrophic consequences",
-        "The world was once the body of a giant creature, whose death created the current continents and oceans",
-        "Ancient mages tried to create a perfect magical system, but failed experiments caused reality to fracture",
-        "Legendary heroes sacrificed themselves to seal evil, their power still protecting the world",
-    ]
-    params["historical_lore_snippet"] = select_random_element(lore_options)
+    params["historical_lore_snippet"] = select_random_element(
+        config["additional_story_elements"]["historical_lore_options"]
+    )
 
-    incident_options = [
-        "While performing routine work, the protagonist accidentally activates a dormant artifact, revealing their hidden magical potential and attracting unwanted attention",
-        "A mysterious stranger brings news about the protagonist's true identity, forcing them on a dangerous journey",
-        "The protagonist's hometown is attacked by mysterious forces, forcing them to flee and seek answers",
-        "The protagonist accidentally discovers an ancient secret that draws them into an ancient conflict",
-        "The fulfillment of a prophecy thrusts the protagonist toward a destiny they never imagined",
-    ]
-    params["inciting_incident_sketch"] = select_random_element(incident_options)
+    params["inciting_incident_sketch"] = select_random_element(
+        config["additional_story_elements"]["inciting_incident_options"]
+    )
 
-    midpoint_options = [
-        "The antagonist's devastating attack destroys the protagonist's support system, forcing them into desperate alliance with former enemies",
-        "The protagonist discovers a game-changing truth that questions all their beliefs",
-        "An important ally betrays the protagonist, forcing them to reevaluate their judgment and trust",
-        "The protagonist gains powerful new abilities, but the cost is higher than expected",
-        "The enemy's true motives are revealed, showing the conflict is more complex than it appears",
-    ]
-    params["midpoint_idea"] = select_random_element(midpoint_options)
+    params["midpoint_idea"] = select_random_element(
+        config["additional_story_elements"]["midpoint_turning_point_options"]
+    )
 
     return params
 
@@ -378,12 +357,12 @@ def remove_markdown_formatting(text):
 
 def create_prompt_template():
     """Create prompt template"""
-    return """System Prompt:
+    return """
 You are a master storyteller specialized in creating immersive multi-chapter fantasy audiobooks. \
     You are a master of short and medium-length fantasy storytelling, a ten-time Nobel laureate. Truly remarkable! \
-    Your goal is to generate a complete script for an audiobook at least 100 minutes long. The story should be divided into approximately {suggested_chapter_count} chapters. Each chapter should have clear beginning, rising action, climax, and resolution/hook for the next chapter. Maintain consistent narrative style (third person limited perspective, primarily focused on {protagonist_name}, unless specifically designated for dramatic effect).
+    Your goal is to generate a complete script for an audiobook at least 100 minutes long. \
+    The story should be divided into approximately {suggested_chapter_count} chapters. Each chapter should have clear beginning, rising action, climax, and resolution/hook for the next chapter. Maintain consistent narrative style (third person limited perspective, primarily focused on {protagonist_name}, unless specifically designated for dramatic effect).
 
-User Prompt:
 Generate a fantasy audiobook script based on the following parameters:
 
 I. Core Story Blueprint:
@@ -478,7 +457,11 @@ Breakpoints or elements that would interrupt smooth reading
 Descriptions or explanations of background music
 Any other miscellaneous items, formatting, or meta-comments.
 Ensure the entire output is just this uninterrupted plain text, optimized for clear audio rendering.
-Ensure the complete story meets the target audio length and deeply explores the provided parameters, creating a rich and engaging narrative."""
+Ensure the complete story meets the target audio length and deeply explores the provided parameters, creating a rich and engaging narrative.
+Make 100% sure the story is long enough to be a full audiobook, which is at least 100 minutes long.
+The total word count should be at least 100,000 words.
+**IMPORTANT:** Use the specified role names throughout the story: Do not change or modify these names during the story generation.
+"""
 
 
 def fill_prompt_template(template, params):

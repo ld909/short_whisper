@@ -1,0 +1,3 @@
+# 测试书籍URL - 用于验证抓取器改进
+# Generative AI in Action - 这是用户提供HTML结构的那本书
+https://z-lib.se/book/22284297/b50cbb/generative-ai-in-action.html 
