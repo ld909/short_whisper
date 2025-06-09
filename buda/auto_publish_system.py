@@ -201,6 +201,14 @@ class AutoPublishSystem:
             ]
             print(f"📊 已发布视频数量: {len(published)}")
 
+            # 详细显示已发布的视频信息（便于调试）
+            if len(published) > 0:
+                print(f"🔍 已发布视频详细信息:")
+                for idx, row in published.iterrows():
+                    mp4_name = row.get("MP4名称", "未知")
+                    publish_time = row.get("发布时间", "无")
+                    print(f"   - {mp4_name}: {publish_time}")
+
             # 如果全部都未发布，使用当前时间作为基准
             if len(published) == 0:
                 print("📝 全部视频都未发布，使用当前时间作为基准")
@@ -223,8 +231,8 @@ class AutoPublishSystem:
                 return datetime.now()
 
             # 显示发布时间的详细信息
-            print(f"📅 发布时间样本数据:")
-            for i, time_val in enumerate(publish_times.head()):
+            print(f"📅 所有有效发布时间:")
+            for i, time_val in enumerate(publish_times):
                 print(f"   {i+1}: {time_val} (类型: {type(time_val)})")
 
             # 转换为datetime
@@ -234,6 +242,12 @@ class AutoPublishSystem:
                 print(
                     f"📅 转换后的时间范围: {publish_times_dt.min()} 到 {publish_times_dt.max()}"
                 )
+
+                # 显示转换后的所有时间
+                print(f"📅 转换后的所有发布时间:")
+                for i, dt_val in enumerate(publish_times_dt):
+                    print(f"   {i+1}: {dt_val}")
+
             except Exception as dt_error:
                 print(f"❌ 转换为datetime时出错: {dt_error}")
                 print(f"🔄 尝试使用不同的转换方法...")
@@ -270,7 +284,7 @@ class AutoPublishSystem:
 
     def calculate_next_publish_time(self):
         """计算下一个发布时间
-        
+
         逻辑：
         - 如果最远发布时间 >= 当前时间：最远时间 + 6小时
         - 如果最远发布时间 < 当前时间：当前时间 + 6小时（说明有一段时间没有发布了）
@@ -278,21 +292,31 @@ class AutoPublishSystem:
         print("⏰ 开始计算下一个发布时间...")
         latest_time = self.get_latest_publish_time()
         current_time = datetime.now()
-        
-        print(f"🎯 基准时间: {latest_time}")
-        print(f"🕐 当前时间: {current_time}")
-        
+
+        print(f"🎯 从Excel获取的最远发布时间: {latest_time}")
+        print(f"🎯 最远发布时间类型: {type(latest_time)}")
+        print(f"🕐 当前系统时间: {current_time}")
+        print(f"🕐 当前时间类型: {type(current_time)}")
+
+        # 计算时间差
+        time_diff = latest_time - current_time
+        print(f"📊 时间差 (最远时间 - 当前时间): {time_diff}")
+        print(f"📊 时间差秒数: {time_diff.total_seconds()}")
+
         if latest_time < current_time:
-            print("📅 最远发布时间小于当前时间，说明有一段时间没有发布了")
-            print("🔄 使用当前时间作为基准")
+            print("📅 ✅ 判断结果: 最远发布时间 < 当前时间")
+            print("📅 说明: 有一段时间没有发布了，使用当前时间作为基准")
             base_time = current_time
+            print(f"🔄 选择基准时间: {base_time} (当前时间)")
         else:
-            print("📅 最远发布时间大于等于当前时间，继续按计划发布")
+            print("📅 ✅ 判断结果: 最远发布时间 >= 当前时间")
+            print("📅 说明: 继续按计划发布，使用最远时间作为基准")
             base_time = latest_time
-        
+            print(f"🔄 选择基准时间: {base_time} (最远发布时间)")
+
         next_time = base_time + timedelta(hours=6)
-        print(f"➕ 基准时间 + 6小时: {next_time}")
-        print(f"✅ 下一个发布时间: {next_time}")
+        print(f"➕ 计算过程: {base_time} + 6小时 = {next_time}")
+        print(f"✅ 最终下一个发布时间: {next_time}")
         return next_time
 
     def get_video_content(self, video_name, channel_name):

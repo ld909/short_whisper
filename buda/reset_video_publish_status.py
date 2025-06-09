@@ -161,28 +161,18 @@ def reset_publish_status_after_video(excel_file, channel, language, video_name):
 
     print(f"目标视频发布时间: {target_publish_time}")
 
-    # 获取该频道的所有视频索引，并按顺序排列
+    # 获取该频道的所有视频
     channel_mask = df["频道名称"] == channel
-    channel_indices = df[channel_mask].index.tolist()
+    channel_df = df[channel_mask]
 
-    # 找到目标视频在该频道中的位置
-    try:
-        target_position = channel_indices.index(target_index)
-    except ValueError:
-        print(f"错误: 无法确定目标视频在频道中的位置")
-        return False
-
-    # 获取目标视频之后的所有视频索引
-    after_indices = channel_indices[target_position + 1 :]
-
-    if not after_indices:
-        print(f"提示: 目标视频之后没有其他视频")
-        return True
-
-    # 筛选需要重置的视频：只重置发布时间存在且大于目标视频发布时间的视频
+    # 筛选需要重置的视频：发布时间存在且大于目标视频发布时间的视频
     reset_indices = []
 
-    for idx in after_indices:
+    for idx in channel_df.index:
+        # 跳过目标视频本身
+        if idx == target_index:
+            continue
+
         video_publish_time = df.loc[idx, "发布时间"]
 
         # 检查发布时间是否存在且不为空
