@@ -66,10 +66,15 @@ def setup_openai_client():
         sys.exit(1)
 
     try:
-        client = OpenAI(base_url="https://api.uniapi.io/v1", api_key=api_key)
+        # 确保只传入支持的参数
+        client = OpenAI(api_key=api_key, base_url="https://api.uniapi.io/v1")
         return client
     except Exception as e:
         print(f"初始化OpenAI客户端时出错: {e}")
+        print("这可能是由于以下原因:")
+        print("1. OpenAI库版本不兼容，请尝试: pip install openai --upgrade")
+        print("2. API密钥格式不正确")
+        print("3. 网络连接问题")
         sys.exit(1)
 
 

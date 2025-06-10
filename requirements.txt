@@ -4,4 +4,5 @@ soundfile>=0.10.3
 pydub>=0.25.1
 argparse>=1.4.0
 openai>=1.0.0
-tqdm>=4.62.0 
+tqdm>=4.62.0
+srt>=3.5.0 

@@ -298,73 +298,81 @@ def create_custom_style_ass(
     return font_path  # 返回选择的字体路径
 
 
-# --- 使用方法 ---
-# 1. 先用 ffmpeg -i input.srt temp.ass 将srt转为ass
-# 2. 然后运行这个脚本
-input_srt = "./word_level.srt"
-temp_ass = "temp.ass"
-final_ass_with_fade = "./final_faded.ass"
-fade_in_duration = 200  # 毫秒
-fade_out_duration = 200  # 毫秒
+def main():
+    """主程序入口"""
+    # --- 使用方法 ---
+    # 1. 先用 ffmpeg -i input.srt temp.ass 将srt转为ass
+    # 2. 然后运行这个脚本
+    input_srt = "./word_level.srt"
+    temp_ass = "temp.ass"
+    final_ass_with_fade = "./final_faded.ass"
+    fade_in_duration = 200  # 毫秒
+    fade_out_duration = 200  # 毫秒
 
-# 自定义字体设置 - 现在只需要指定weight，系统会自动选择对应字体
-font_weight = "semi-bold"  # 可选: "extra-light", "light", "normal", "medium", "semi-bold", "bold", "extra-bold" 或数字 100-900
-font_size = 36
-font_dir = "../font/en/"  # 字体目录
+    # 自定义字体设置 - 现在只需要指定weight，系统会自动选择对应字体
+    font_weight = "semi-bold"  # 可选: "extra-light", "light", "normal", "medium", "semi-bold", "bold", "extra-bold" 或数字 100-900
+    font_size = 36
+    font_dir = "../font/en/"  # 字体目录
 
-# 步骤1: SRT to ASS (如果还没有做)
-try:
-    subprocess.run(["ffmpeg", "-i", input_srt, temp_ass], check=True)
-    print(f"Successfully converted {input_srt} to {temp_ass}")
-except subprocess.CalledProcessError as e:
-    print(f"Error converting SRT to ASS: {e}")
-    exit()
-except FileNotFoundError:
-    print(
-        "ffmpeg command not found. Please ensure FFmpeg is installed and in your PATH."
+    # 步骤1: SRT to ASS (如果还没有做)
+    try:
+        subprocess.run(["ffmpeg", "-i", input_srt, temp_ass], check=True)
+        print(f"Successfully converted {input_srt} to {temp_ass}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error converting SRT to ASS: {e}")
+        exit()
+    except FileNotFoundError:
+        print(
+            "ffmpeg command not found. Please ensure FFmpeg is installed and in your PATH."
+        )
+        exit()
+
+    # 步骤1.5: 选择字体并安装到系统
+    selected_font_path, selected_font_name = select_font_by_weight(
+        font_weight, font_dir
     )
-    exit()
+    print(f"\n选择的字体: {selected_font_name}")
+    print(f"字体文件: {selected_font_path}")
+    print(f"\n正在尝试安装字体到系统...")
+    font_installed = install_font_to_system(selected_font_path)
 
-# 步骤1.5: 选择字体并安装到系统
-selected_font_path, selected_font_name = select_font_by_weight(font_weight, font_dir)
-print(f"\n选择的字体: {selected_font_name}")
-print(f"字体文件: {selected_font_path}")
-print(f"\n正在尝试安装字体到系统...")
-font_installed = install_font_to_system(selected_font_path)
+    # 步骤2: 添加淡入淡出和自定义字体到 ASS 文件
+    try:
+        final_font_path = create_custom_style_ass_with_attachment(
+            temp_ass,
+            final_ass_with_fade,
+            fade_in_duration,
+            fade_out_duration,
+            font_weight,  # 直接传入weight，函数内部会选择对应字体
+            font_dir,
+            font_size,
+        )
 
-# 步骤2: 添加淡入淡出和自定义字体到 ASS 文件
-try:
-    final_font_path = create_custom_style_ass_with_attachment(
-        temp_ass,
-        final_ass_with_fade,
-        fade_in_duration,
-        fade_out_duration,
-        font_weight,  # 直接传入weight，函数内部会选择对应字体
-        font_dir,
-        font_size,
-    )
+        print(f"\n使用自定义字体 '{selected_font_name}' 处理完成！")
+        print(f"输出文件: {final_ass_with_fade}")
+        print(f"\n字体处理状态:")
+        print(f"- 选择的字体: {selected_font_name}")
+        print(f"- 字体文件: {os.path.basename(final_font_path)}")
+        print(f"- 字体粗细: {font_weight}")
+        print(f"- 字体是否已安装到系统: {'是' if font_installed else '否'}")
+        print(f"\n播放建议:")
+        print(f"1. 如果字体已安装到系统，大部分播放器应该能正确显示")
+        print(f"2. 如果仍有问题，请将字体文件复制到与字幕文件相同的目录")
+        print(f"3. 推荐使用支持ASS格式的播放器，如VLC、PotPlayer等")
+        print(f"4. 某些播放器可能需要重启才能识别新安装的字体")
 
-    print(f"\n使用自定义字体 '{selected_font_name}' 处理完成！")
-    print(f"输出文件: {final_ass_with_fade}")
-    print(f"\n字体处理状态:")
-    print(f"- 选择的字体: {selected_font_name}")
-    print(f"- 字体文件: {os.path.basename(final_font_path)}")
-    print(f"- 字体粗细: {font_weight}")
-    print(f"- 字体是否已安装到系统: {'是' if font_installed else '否'}")
-    print(f"\n播放建议:")
-    print(f"1. 如果字体已安装到系统，大部分播放器应该能正确显示")
-    print(f"2. 如果仍有问题，请将字体文件复制到与字幕文件相同的目录")
-    print(f"3. 推荐使用支持ASS格式的播放器，如VLC、PotPlayer等")
-    print(f"4. 某些播放器可能需要重启才能识别新安装的字体")
+    finally:
+        # 清理临时文件
+        if os.path.exists(temp_ass):
+            try:
+                os.remove(temp_ass)
+                print(f"\n已删除临时文件: {temp_ass}")
+            except OSError as e:
+                print(f"\n警告：无法删除临时文件 {temp_ass}: {e}")
 
-finally:
-    # 清理临时文件
-    if os.path.exists(temp_ass):
-        try:
-            os.remove(temp_ass)
-            print(f"\n已删除临时文件: {temp_ass}")
-        except OSError as e:
-            print(f"\n警告：无法删除临时文件 {temp_ass}: {e}")
+
+if __name__ == "__main__":
+    main()
 
 # 字体粗细设置示例:
 # font_weight = "extra-light"  # 极细体 -> Oxanium-ExtraLight.ttf
