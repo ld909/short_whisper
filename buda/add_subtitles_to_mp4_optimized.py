@@ -84,11 +84,11 @@ class ResourceManager:
         """判断是否应该使用GPU"""
         if not self.has_gpu:
             return False
-        
+
         # 如果GPU内存大于2GB，推荐使用GPU
         if self.gpu_memory and self.gpu_memory > 2000:
             return True
-        
+
         return False
 
     def get_optimal_workers(self, use_gpu: bool = False) -> int:
@@ -758,7 +758,9 @@ def main():
         "-s", "--single", type=str, help="只处理指定的单个视频，格式: 频道名/视频名"
     )
     parser.add_argument("--gpu", action="store_true", help="强制使用GPU加速ffmpeg处理")
-    parser.add_argument("--no-gpu", action="store_true", help="强制不使用GPU，即使检测到可用GPU")
+    parser.add_argument(
+        "--no-gpu", action="store_true", help="强制不使用GPU，即使检测到可用GPU"
+    )
     parser.add_argument(
         "-w", "--workers", type=int, help="并行工作进程数 (默认根据系统资源自动计算)"
     )
@@ -784,7 +786,7 @@ def main():
 
     # 初始化资源管理器
     resource_manager = ResourceManager()
-    
+
     # 自动检测GPU并决定是否使用
     use_gpu = False
     if args.no_gpu:
@@ -797,11 +799,15 @@ def main():
         # 自动检测
         if resource_manager.should_use_gpu():
             use_gpu = True
-            logger.info(f"检测到GPU内存: {resource_manager.gpu_memory}MB，自动启用GPU加速")
+            logger.info(
+                f"检测到GPU内存: {resource_manager.gpu_memory}MB，自动启用GPU加速"
+            )
         else:
             use_gpu = False
             if resource_manager.has_gpu:
-                logger.info(f"检测到GPU但内存较小: {resource_manager.gpu_memory}MB，使用CPU处理")
+                logger.info(
+                    f"检测到GPU但内存较小: {resource_manager.gpu_memory}MB，使用CPU处理"
+                )
             else:
                 logger.info("未检测到可用GPU，使用CPU处理")
 
