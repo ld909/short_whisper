@@ -126,23 +126,29 @@ def get_gpu_memory_info():
     try:
         # NVIDIA GPU
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.total,memory.used,memory.free", "--format=csv,noheader,nounits"],
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.total,memory.used,memory.free",
+                "--format=csv,noheader,nounits",
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=5
+            timeout=5,
         )
         if result.returncode == 0:
-            lines = result.stdout.strip().split('\n')
+            lines = result.stdout.strip().split("\n")
             gpus = []
             for line in lines:
-                total, used, free = map(int, line.split(', '))
-                gpus.append({
-                    'total': total,
-                    'used': used,
-                    'free': free,
-                    'utilization': (used / total) * 100
-                })
+                total, used, free = map(int, line.split(", "))
+                gpus.append(
+                    {
+                        "total": total,
+                        "used": used,
+                        "free": free,
+                        "utilization": (used / total) * 100,
+                    }
+                )
             return gpus
     except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
         pass
@@ -153,35 +159,35 @@ def get_optimal_gpu_parallel_count(gpu_memory_info=None, force_max=False):
     """根据GPU内存自动计算最优并行数"""
     if not gpu_memory_info:
         gpu_memory_info = get_gpu_memory_info()
-    
+
     if not gpu_memory_info:
         return 1
-    
+
     # 取第一个GPU的信息（大多数系统只有一个GPU）
     gpu = gpu_memory_info[0]
-    free_memory = gpu['free']
-    
+    free_memory = gpu["free"]
+
     if force_max:
         # 最大化模式 - 更激进的并行数
         if free_memory >= 10000:  # 10GB+
             return 8
-        elif free_memory >= 8000:   # 8GB+
+        elif free_memory >= 8000:  # 8GB+
             return 6
-        elif free_memory >= 6000:   # 6GB+
+        elif free_memory >= 6000:  # 6GB+
             return 5
-        elif free_memory >= 4000:   # 4GB+
+        elif free_memory >= 4000:  # 4GB+
             return 4
-        elif free_memory >= 2000:   # 2GB+
+        elif free_memory >= 2000:  # 2GB+
             return 3
         else:
             return 2
     else:
         # 保守模式
-        if free_memory >= 8000:     # 8GB+
+        if free_memory >= 8000:  # 8GB+
             return 4
-        elif free_memory >= 6000:   # 6GB+
+        elif free_memory >= 6000:  # 6GB+
             return 3
-        elif free_memory >= 4000:   # 4GB+
+        elif free_memory >= 4000:  # 4GB+
             return 2
         else:
             return 1
@@ -189,27 +195,27 @@ def get_optimal_gpu_parallel_count(gpu_memory_info=None, force_max=False):
 
 class GPUMonitor:
     """GPU监控器"""
-    
+
     def __init__(self, monitor_interval=2):
         self.monitor_interval = monitor_interval
         self.monitoring = False
         self.monitor_thread = None
         self.stats = []
-    
+
     def start_monitoring(self):
         """开始监控"""
         self.monitoring = True
         self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.monitor_thread.start()
         print("🔍 GPU监控已启动")
-    
+
     def stop_monitoring(self):
         """停止监控"""
         self.monitoring = False
         if self.monitor_thread:
             self.monitor_thread.join(timeout=5)
         print("⏹️  GPU监控已停止")
-    
+
     def _monitor_loop(self):
         """监控循环"""
         while self.monitoring:
@@ -217,25 +223,31 @@ class GPUMonitor:
             if gpu_info:
                 timestamp = time.time()
                 for i, gpu in enumerate(gpu_info):
-                    self.stats.append({
-                        'timestamp': timestamp,
-                        'gpu_id': i,
-                        'memory_used': gpu['used'],
-                        'memory_free': gpu['free'],
-                        'utilization': gpu['utilization']
-                    })
-                    
+                    self.stats.append(
+                        {
+                            "timestamp": timestamp,
+                            "gpu_id": i,
+                            "memory_used": gpu["used"],
+                            "memory_free": gpu["free"],
+                            "utilization": gpu["utilization"],
+                        }
+                    )
+
                 # 显示实时信息
                 gpu = gpu_info[0]  # 显示第一个GPU
-                print(f"\r🚀 GPU状态: 内存 {gpu['used']}/{gpu['total']}MB ({gpu['utilization']:.1f}%)", end='', flush=True)
-            
+                print(
+                    f"\r🚀 GPU状态: 内存 {gpu['used']}/{gpu['total']}MB ({gpu['utilization']:.1f}%)",
+                    end="",
+                    flush=True,
+                )
+
             time.sleep(self.monitor_interval)
-    
+
     def get_average_utilization(self):
         """获取平均利用率"""
         if not self.stats:
             return 0
-        return sum(stat['utilization'] for stat in self.stats) / len(self.stats)
+        return sum(stat["utilization"] for stat in self.stats) / len(self.stats)
 
 
 def check_gpu_support(fast_check=False):
@@ -383,16 +395,20 @@ def debug_gpu_support():
         # 检查nvidia-smi
         try:
             result = subprocess.run(
-                ["nvidia-smi", "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader"],
+                [
+                    "nvidia-smi",
+                    "--query-gpu=name,memory.total,memory.free",
+                    "--format=csv,noheader",
+                ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 timeout=5,
                 text=True,
             )
             if result.returncode == 0 and result.stdout.strip():
-                lines = result.stdout.strip().split('\n')
+                lines = result.stdout.strip().split("\n")
                 for i, line in enumerate(lines):
-                    parts = line.split(', ')
+                    parts = line.split(", ")
                     gpu_name = parts[0]
                     memory_total = parts[1] if len(parts) > 1 else "未知"
                     memory_free = parts[2] if len(parts) > 2 else "未知"
@@ -410,14 +426,18 @@ def debug_gpu_support():
                     )
                     if "h264_nvenc" in result.stdout:
                         print("   ✅ FFmpeg支持NVENC编码器")
-                        
+
                         # 建议最优并行数
                         gpu_info = get_gpu_memory_info()
                         if gpu_info:
                             optimal_parallel = get_optimal_gpu_parallel_count(gpu_info)
-                            max_parallel = get_optimal_gpu_parallel_count(gpu_info, force_max=True)
-                            print(f"   💡 建议并行数: {optimal_parallel} (最大: {max_parallel})")
-                        
+                            max_parallel = get_optimal_gpu_parallel_count(
+                                gpu_info, force_max=True
+                            )
+                            print(
+                                f"   💡 建议并行数: {optimal_parallel} (最大: {max_parallel})"
+                            )
+
                         return True, "cuda"
                     else:
                         print("   ❌ FFmpeg不支持NVENC编码器")
@@ -548,76 +568,93 @@ def detect_subtitle_language(srt_path):
 def benchmark_gpu():
     """GPU性能基准测试"""
     print("🧪 GPU性能基准测试...")
-    
+
     has_gpu, gpu_type = check_gpu_support()
     if not has_gpu:
         print("❌ 未检测到可用GPU")
         return
-    
+
     print(f"🚀 测试GPU类型: {gpu_type}")
-    
+
     # 创建测试视频
     test_video = "/tmp/test_video.mp4"
     test_subtitle = "/tmp/test_subtitle.srt"
-    
+
     # 生成测试内容
     print("📹 生成测试视频...")
     test_cmd = [
-        "ffmpeg", "-f", "lavfi", "-i", "testsrc=duration=10:size=1920x1080:rate=30",
-        "-c:v", "libx264", "-preset", "fast", "-y", test_video
+        "ffmpeg",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc=duration=10:size=1920x1080:rate=30",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-y",
+        test_video,
     ]
     subprocess.run(test_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    
+
     # 生成测试字幕
-    with open(test_subtitle, 'w', encoding='utf-8') as f:
+    with open(test_subtitle, "w", encoding="utf-8") as f:
         f.write("1\n00:00:00,000 --> 00:00:10,000\nGPU Performance Test\n\n")
-    
+
     try:
         # 测试不同并行数的性能
         test_results = []
         for parallel_count in [1, 2, 4, 6, 8]:
             print(f"⚡ 测试并行数: {parallel_count}")
             start_time = time.time()
-            
+
             # 使用多进程模拟并行处理
             tasks = []
             for i in range(parallel_count):
                 output_path = f"/tmp/test_output_{i}.mp4"
                 kwargs = {
-                    'use_gpu': True,
-                    'extreme_speed': True,
-                    'gpu_parallel_test': True
+                    "use_gpu": True,
+                    "extreme_speed": True,
+                    "gpu_parallel_test": True,
                 }
                 tasks.append((test_video, test_subtitle, output_path, kwargs))
-            
+
             # 并行执行
-            with concurrent.futures.ThreadPoolExecutor(max_workers=parallel_count) as executor:
-                futures = [executor.submit(burn_subtitles_to_video, *task) for task in tasks]
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=parallel_count
+            ) as executor:
+                futures = [
+                    executor.submit(burn_subtitles_to_video, *task) for task in tasks
+                ]
                 results = [f.result() for f in concurrent.futures.as_completed(futures)]
-            
+
             end_time = time.time()
             total_time = end_time - start_time
-            
-            test_results.append({
-                'parallel_count': parallel_count,
-                'total_time': total_time,
-                'throughput': parallel_count / total_time
-            })
-            
-            print(f"   耗时: {total_time:.1f}秒, 吞吐量: {parallel_count/total_time:.2f} 视频/秒")
-            
+
+            test_results.append(
+                {
+                    "parallel_count": parallel_count,
+                    "total_time": total_time,
+                    "throughput": parallel_count / total_time,
+                }
+            )
+
+            print(
+                f"   耗时: {total_time:.1f}秒, 吞吐量: {parallel_count/total_time:.2f} 视频/秒"
+            )
+
             # 清理输出文件
             for i in range(parallel_count):
                 try:
                     os.remove(f"/tmp/test_output_{i}.mp4")
                 except:
                     pass
-        
+
         # 找到最佳并行数
-        best_result = max(test_results, key=lambda x: x['throughput'])
+        best_result = max(test_results, key=lambda x: x["throughput"])
         print(f"\n🏆 最佳并行数: {best_result['parallel_count']}")
         print(f"   最佳吞吐量: {best_result['throughput']:.2f} 视频/秒")
-        
+
     finally:
         # 清理测试文件
         for file_path in [test_video, test_subtitle]:
@@ -827,48 +864,84 @@ def burn_subtitles_to_video(video_path, subtitle_path, output_path, **kwargs):
             cmd.extend(["-c:v", "h264_nvenc"])
             if gpu_max_mode:
                 # GPU最大化模式 - 激进设置
-                cmd.extend([
-                    "-preset", "p1",        # 最快预设
-                    "-tune", "ll",          # 低延迟
-                    "-rc", "vbr",           # 可变比特率
-                    "-cq", "32",            # 较低质量换取速度
-                    "-b:v", "1.5M",         # 中等比特率
-                    "-maxrate", "3M",
-                    "-bufsize", "3M",
-                    "-g", "120",            # 大GOP
-                    "-bf", "0",             # 禁用B帧提升编码速度
-                    "-refs", "1",           # 减少参考帧
-                    "-rc-lookahead", "8",   # 减少预测
-                    "-surfaces", "32",      # 增加编码表面数
-                    "-async_depth", "4",    # 异步深度
-                ])
+                cmd.extend(
+                    [
+                        "-preset",
+                        "p1",  # 最快预设
+                        "-tune",
+                        "ll",  # 低延迟
+                        "-rc",
+                        "vbr",  # 可变比特率
+                        "-cq",
+                        "32",  # 较低质量换取速度
+                        "-b:v",
+                        "1.5M",  # 中等比特率
+                        "-maxrate",
+                        "3M",
+                        "-bufsize",
+                        "3M",
+                        "-g",
+                        "120",  # 大GOP
+                        "-bf",
+                        "0",  # 禁用B帧提升编码速度
+                        "-refs",
+                        "1",  # 减少参考帧
+                        "-rc-lookahead",
+                        "8",  # 减少预测
+                        "-surfaces",
+                        "32",  # 增加编码表面数
+                        "-async_depth",
+                        "4",  # 异步深度
+                    ]
+                )
             elif extreme_speed:
                 # 极致速度NVENC设置
-                cmd.extend([
-                    "-preset", "p1",
-                    "-tune", "ll",
-                    "-rc", "vbr",
-                    "-cq", "35",
-                    "-b:v", "1M",
-                    "-maxrate", "2M",
-                    "-bufsize", "2M",
-                    "-g", "60",
-                ])
+                cmd.extend(
+                    [
+                        "-preset",
+                        "p1",
+                        "-tune",
+                        "ll",
+                        "-rc",
+                        "vbr",
+                        "-cq",
+                        "35",
+                        "-b:v",
+                        "1M",
+                        "-maxrate",
+                        "2M",
+                        "-bufsize",
+                        "2M",
+                        "-g",
+                        "60",
+                    ]
+                )
             else:
-                cmd.extend([
-                    "-preset", "fast",
-                    "-b:v", "2M",
-                    "-maxrate", "3M",
-                    "-bufsize", "3M",
-                ])
+                cmd.extend(
+                    [
+                        "-preset",
+                        "fast",
+                        "-b:v",
+                        "2M",
+                        "-maxrate",
+                        "3M",
+                        "-bufsize",
+                        "3M",
+                    ]
+                )
         elif gpu_type == "videotoolbox":
             cmd.extend(["-c:v", "h264_videotoolbox"])
             if gpu_max_mode or extreme_speed:
-                cmd.extend([
-                    "-b:v", "1.5M", 
-                    "-maxrate", "3M",
-                    "-realtime", "true",  # 实时编码
-                ])
+                cmd.extend(
+                    [
+                        "-b:v",
+                        "1.5M",
+                        "-maxrate",
+                        "3M",
+                        "-realtime",
+                        "true",  # 实时编码
+                    ]
+                )
             else:
                 cmd.extend(["-b:v", "2M", "-maxrate", "3M"])
     else:
@@ -878,29 +951,48 @@ def burn_subtitles_to_video(video_path, subtitle_path, output_path, **kwargs):
 
         if gpu_max_mode or extreme_speed:
             # 极致速度CPU设置
-            cmd.extend([
-                "-preset", "ultrafast",
-                "-tune", "fastdecode",
-                "-crf", "28",
-                "-threads", str(min(cpu_count, 8)),
-                "-g", "60",
-                "-sc_threshold", "0",
-                "-b:v", "1M",
-            ])
+            cmd.extend(
+                [
+                    "-preset",
+                    "ultrafast",
+                    "-tune",
+                    "fastdecode",
+                    "-crf",
+                    "28",
+                    "-threads",
+                    str(min(cpu_count, 8)),
+                    "-g",
+                    "60",
+                    "-sc_threshold",
+                    "0",
+                    "-b:v",
+                    "1M",
+                ]
+            )
         else:
-            cmd.extend([
-                "-preset", "fast",
-                "-threads", str(cpu_count),
-                "-b:v", "2M",
-            ])
+            cmd.extend(
+                [
+                    "-preset",
+                    "fast",
+                    "-threads",
+                    str(cpu_count),
+                    "-b:v",
+                    "2M",
+                ]
+            )
 
     # GPU最大化模式的其他优化设置
     if gpu_max_mode or extreme_speed:
-        cmd.extend([
-            "-movflags", "+faststart",
-            "-avoid_negative_ts", "disabled",
-            "-fflags", "+genpts",
-        ])
+        cmd.extend(
+            [
+                "-movflags",
+                "+faststart",
+                "-avoid_negative_ts",
+                "disabled",
+                "-fflags",
+                "+genpts",
+            ]
+        )
 
     # 覆盖输出文件
     cmd.extend(["-y", output_path])
@@ -1000,10 +1092,14 @@ class ParallelGPUProcessor:
         ) as pbar:
 
             # 使用线程池进行并行处理
-            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=self.max_workers
+            ) as executor:
                 # 提交所有任务
                 future_to_story = {
-                    executor.submit(self.process_single_story, story_index, files, **kwargs): story_index
+                    executor.submit(
+                        self.process_single_story, story_index, files, **kwargs
+                    ): story_index
                     for story_index, files in stories_to_process.items()
                 }
 
@@ -1013,10 +1109,14 @@ class ParallelGPUProcessor:
                     try:
                         success = future.result()
                         status = "✅" if success else "❌"
-                        pbar.set_postfix_str(f"故事 {story_index} {status} | 活跃任务: {self.active_tasks}")
+                        pbar.set_postfix_str(
+                            f"故事 {story_index} {status} | 活跃任务: {self.active_tasks}"
+                        )
                         pbar.update(1)
                     except Exception as e:
-                        pbar.set_postfix_str(f"故事 {story_index} ❌ 异常: {str(e)[:20]}")
+                        pbar.set_postfix_str(
+                            f"故事 {story_index} ❌ 异常: {str(e)[:20]}"
+                        )
                         pbar.update(1)
 
         return self.results
@@ -1229,8 +1329,8 @@ def main():
     )
     parser.add_argument(
         "--benchmark-gpu",
-        action="store_true", 
-        help="🏁 GPU性能基准测试（测试不同并行数的性能）"
+        action="store_true",
+        help="🏁 GPU性能基准测试（测试不同并行数的性能）",
     )
     parser.add_argument(
         "--extreme-speed",
@@ -1240,7 +1340,9 @@ def main():
     parser.add_argument(
         "--fast-mode", action="store_true", help="⚡ 快速模式（跳过部分检查和验证）"
     )
-    parser.add_argument("--gpu-max", action="store_true", help="🚀 最大化GPU利用率（推荐）")
+    parser.add_argument(
+        "--gpu-max", action="store_true", help="🚀 最大化GPU利用率（推荐）"
+    )
     parser.add_argument("--gpu-parallel", type=int, help="指定并行处理数量")
     parser.add_argument("--gpu-memory-limit", type=int, help="GPU内存使用限制")
     parser.add_argument("--gpu-monitor", action="store_true", help="实时GPU监控")
@@ -1259,7 +1361,7 @@ def main():
     print("🚀 视频字幕添加器 - GPU优化并行处理版")
     print("=" * 60)
     print(f"🖥️  操作系统: {platform.system()}")
-    
+
     # 检查依赖
     if not args.fast_mode and not check_ffmpeg():
         sys.exit(1)
@@ -1314,38 +1416,48 @@ def main():
         if has_gpu:
             print(f"🚀 GPU 加速: {gpu_type}")
             args.gpu = True
-            
+
             # 获取GPU内存信息
             gpu_memory_info = get_gpu_memory_info()
             if gpu_memory_info:
                 gpu = gpu_memory_info[0]
-                print(f"💾 GPU内存: {gpu['used']}/{gpu['total']}MB (已用{gpu['utilization']:.1f}%)")
-                
+                print(
+                    f"💾 GPU内存: {gpu['used']}/{gpu['total']}MB (已用{gpu['utilization']:.1f}%)"
+                )
+
                 # 自动计算最优并行数
                 if not args.gpu_parallel:
                     if args.gpu_max:
-                        optimal_parallel = get_optimal_gpu_parallel_count(gpu_memory_info, force_max=True)
+                        optimal_parallel = get_optimal_gpu_parallel_count(
+                            gpu_memory_info, force_max=True
+                        )
                         print(f"🚀 GPU最大化模式 - 自动设置并行数: {optimal_parallel}")
                     else:
-                        optimal_parallel = get_optimal_gpu_parallel_count(gpu_memory_info)
+                        optimal_parallel = get_optimal_gpu_parallel_count(
+                            gpu_memory_info
+                        )
                         print(f"⚡ GPU标准模式 - 自动设置并行数: {optimal_parallel}")
                     args.gpu_parallel = optimal_parallel
                 else:
                     print(f"🔧 手动设置并行数: {args.gpu_parallel}")
-                    
+
                 # 检查内存是否足够
                 required_memory_per_task = 800  # 每个任务大约需要800MB GPU内存
                 required_total = args.gpu_parallel * required_memory_per_task
-                if required_total > gpu['free']:
-                    print(f"⚠️  警告: 并行数{args.gpu_parallel}可能需要{required_total}MB内存，但只有{gpu['free']}MB可用")
-                    safe_parallel = max(1, gpu['free'] // required_memory_per_task)
+                if required_total > gpu["free"]:
+                    print(
+                        f"⚠️  警告: 并行数{args.gpu_parallel}可能需要{required_total}MB内存，但只有{gpu['free']}MB可用"
+                    )
+                    safe_parallel = max(1, gpu["free"] // required_memory_per_task)
                     print(f"   建议并行数: {safe_parallel}")
             else:
                 # 无法获取GPU内存信息，使用保守设置
                 if not args.gpu_parallel:
                     args.gpu_parallel = 2 if args.gpu_max else 1
-                    print(f"⚠️  无法获取GPU内存信息，使用保守并行数: {args.gpu_parallel}")
-                
+                    print(
+                        f"⚠️  无法获取GPU内存信息，使用保守并行数: {args.gpu_parallel}"
+                    )
+
             # 启动GPU监控
             if args.gpu_monitor:
                 gpu_monitor = GPUMonitor()
@@ -1497,7 +1609,9 @@ def main():
         start_time = time.time()
 
         # 创建GPU并行处理器
-        processor = ParallelGPUProcessor(max_workers=args.gpu_parallel, gpu_monitor=gpu_monitor)
+        processor = ParallelGPUProcessor(
+            max_workers=args.gpu_parallel, gpu_monitor=gpu_monitor
+        )
 
         # 执行GPU并行处理
         session_stats = processor.process_stories(stories_to_process, **process_kwargs)
@@ -1524,16 +1638,21 @@ def main():
         if session_stats["successful"] > 0:
             avg_time = total_time / session_stats["successful"]
             throughput = session_stats["successful"] / (total_time / 60)  # 每分钟处理数
-            
+
             print(f"📊 平均处理时间: {avg_time:.1f} 秒/故事")
             print(f"🎬 处理速度: {throughput:.1f} 故事/分钟")
-            
+
             # GPU加速效果统计
             if args.gpu and args.gpu_parallel > 1:
                 theoretical_speedup = args.gpu_parallel
-                actual_speedup = min(throughput / (1 / (avg_time * args.gpu_parallel)), theoretical_speedup)
+                actual_speedup = min(
+                    throughput / (1 / (avg_time * args.gpu_parallel)),
+                    theoretical_speedup,
+                )
                 efficiency = (actual_speedup / theoretical_speedup) * 100
-                print(f"🚀 GPU并行效率: {efficiency:.1f}% (实际加速: {actual_speedup:.1f}x)")
+                print(
+                    f"🚀 GPU并行效率: {efficiency:.1f}% (实际加速: {actual_speedup:.1f}x)"
+                )
 
         if stats["pending_subtitles"] > 0:
             success_rate = (
@@ -1561,7 +1680,7 @@ def main():
             print(f"\n⚠️  有 {session_stats['failed']} 个故事处理失败")
             if not args.extreme_speed:
                 print("   建议检查错误日志或重试")
-            
+
         # GPU优化建议
         if args.gpu and gpu_monitor:
             avg_utilization = gpu_monitor.get_average_utilization()

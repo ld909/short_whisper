@@ -283,7 +283,8 @@ The full text must be over ten thousand English words. Let me repeat: this is a 
 Ensure content is non-conversational in format.
 **IMPORTANT:** Use the specified protagonist names throughout the story: the human male protagonist should be called {selected_params["male_human_protagonist_names"]} and the alien female protagonist should be called {selected_params["female_alien_protagonist_names"]}. Do not change or modify these names during the story generation.
 Make 100% sure the story is long enough to be a full audiobook, which is at least 100 minutes long.
-The total word count should be at least 100,000 words.
+*   Ensure the total word count reaches at least 150,000 words.
+*   Ensure the total word count reaches at least 150,000 words.
 """
     return prompt
 

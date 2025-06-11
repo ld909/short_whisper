@@ -459,7 +459,9 @@ Any other miscellaneous items, formatting, or meta-comments.
 Ensure the entire output is just this uninterrupted plain text, optimized for clear audio rendering.
 Ensure the complete story meets the target audio length and deeply explores the provided parameters, creating a rich and engaging narrative.
 Make 100% sure the story is long enough to be a full audiobook, which is at least 100 minutes long.
-The total word count should be at least 100,000 words.
+*   Ensure the total word count reaches at least 150,000 words.
+*   Ensure the total word count reaches at least 150,000 words.
+*   Ensure the total word count reaches at least 150,000 words.
 **IMPORTANT:** Use the specified role names throughout the story: Do not change or modify these names during the story generation.
 """
 
