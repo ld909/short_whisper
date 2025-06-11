@@ -36,6 +36,21 @@ import re
 from tqdm import tqdm
 
 
+def get_base_paths():
+    """根据操作系统获取基础路径"""
+    system = platform.system().lower()
+
+    if system == "darwin":  # Mac
+        base_path = "/Volumes/dhl/audio/scifi"
+    else:  # Linux/Ubuntu
+        base_path = "/media/dhl/audio/scifi"
+
+    return {
+        "story_dir": os.path.join(base_path, "full_story", "language_code"),
+        "cover_dir": os.path.join(base_path, "cover_prompts"),
+    }
+
+
 def setup_openai_client():
     """设置OpenAI客户端并验证API密钥"""
     api_key = os.environ.get("UNI_API_KEY")
@@ -135,7 +150,8 @@ def generate_cover_prompt(client, story_content, story_index, max_retries=3):
 
 def get_existing_stories():
     """获取已经生成的故事文件列表"""
-    story_dir = "/Volumes/dhl/audio/scifi/full_story/language_code"
+    paths = get_base_paths()
+    story_dir = paths["story_dir"]
 
     if not os.path.exists(story_dir):
         print(f"故事目录不存在: {story_dir}")
@@ -165,7 +181,8 @@ def get_existing_stories():
 
 def get_existing_cover_prompts():
     """获取已经生成的封面提示词列表"""
-    cover_dir = "/Volumes/dhl/audio/scifi/cover_prompts"
+    paths = get_base_paths()
+    cover_dir = paths["cover_dir"]
 
     if not os.path.exists(cover_dir):
         os.makedirs(cover_dir, exist_ok=True)
@@ -188,7 +205,8 @@ def get_existing_cover_prompts():
 
 def save_cover_prompt(story_index, prompt_content):
     """保存封面提示词到文件"""
-    cover_dir = "/Volumes/dhl/audio/scifi/cover_prompts"
+    paths = get_base_paths()
+    cover_dir = paths["cover_dir"]
 
     # 检查并创建目录
     try:

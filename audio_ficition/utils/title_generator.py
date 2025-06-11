@@ -47,7 +47,7 @@ def get_base_paths():
     if system == "darwin":  # Mac
         base_path = "/Volumes/dhl/audio/scifi"
     else:  # Linux/Ubuntu
-        base_path = "/mnt/dhl/audio/scifi"
+        base_path = "/media/dhl/audio/scifi"
 
     return {
         "description_dir": os.path.join(base_path, "description"),

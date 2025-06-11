@@ -156,7 +156,7 @@ def get_topic_resource_paths(topic: str):
     if system == "Darwin":  # macOS
         base_path = f"/Volumes/dhl/audio/{topic}"
     else:  # Linux/Ubuntu
-        base_path = f"/mnt/dhl/audio/{topic}"
+        base_path = f"/media/dhl/audio/{topic}"
 
     return {
         "titles_dir": f"{base_path}/titles",
@@ -176,7 +176,7 @@ def get_video_paths(topic: str):
     if system == "Darwin":  # macOS
         base_path = f"/Volumes/dhl/audio/{topic}"
     else:  # Linux/Ubuntu
-        base_path = f"/mnt/dhl/audio/{topic}"
+        base_path = f"/media/dhl/audio/{topic}"
 
     return {
         "video_dir": f"{base_path}/mp4_with_subtitles",  # add_subtitles_to_videos.py 的输出目录

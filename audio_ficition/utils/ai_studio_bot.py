@@ -67,6 +67,7 @@ import glob
 import re
 import argparse
 import random
+import platform
 from playwright.sync_api import sync_playwright
 
 # 主题相关的导入
@@ -139,9 +140,18 @@ WARMUP_QUESTIONS = [
 ]
 
 
+def get_base_audio_dir():
+    """根据操作系统返回合适的音频基础目录"""
+    if platform.system() == "Darwin":  # macOS
+        return "/Volumes/dhl/audio"
+    else:  # Linux 和其他系统
+        return "/media/dhl/audio"
+
+
 def get_theme_story_path_prefix(theme):
     """获取主题对应的故事文件目录路径"""
-    return f"/Volumes/dhl/audio/{theme}/full_story"
+    base_dir = get_base_audio_dir()
+    return f"{base_dir}/{theme}/full_story"
 
 
 def generate_story_prompt_by_theme(theme):

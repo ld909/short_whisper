@@ -48,7 +48,7 @@ def get_topic_paths(topic: str) -> Dict[str, str]:
     if system == "Darwin":  # macOS
         base_path = f"/Volumes/dhl/audio/{topic}"
     else:  # Linux/Ubuntu
-        base_path = f"/mnt/dhl/audio/{topic}"
+        base_path = f"/media/dhl/audio/{topic}"
 
     return {
         "input_dir": f"{base_path}/mp4_with_subtitles",  # add_subtitles_to_videos.py的输出目录

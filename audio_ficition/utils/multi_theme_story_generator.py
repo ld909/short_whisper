@@ -44,37 +44,50 @@ import os
 import sys
 import subprocess
 import argparse
+import platform
 from pathlib import Path
 
 
+def get_base_audio_dir():
+    """根据操作系统返回合适的音频基础目录"""
+    if platform.system() == "Darwin":  # macOS
+        return "/Volumes/dhl/audio"
+    else:  # Linux 和其他系统
+        return "/media/dhl/audio"
+
+
 # 主题配置：每个主题对应的脚本路径和名称
-THEMES_CONFIG = {
-    "thriller": {
-        "script_path": "audio_ficition/thriller/thriller_script_generator.py",
-        "display_name": "惊悚故事",
-        "output_info": "/Volumes/dhl/audio/thriller/story_params/",
-    },
-    "scifi": {
-        "script_path": "audio_ficition/scifi/gen_prompt.py",
-        "display_name": "科幻故事",
-        "output_info": "/Volumes/dhl/audio/scifi/story_param/en/",
-    },
-    "romance": {
-        "script_path": "audio_ficition/romance/romance_script_generator.py",
-        "display_name": "爱情故事",
-        "output_info": "/Volumes/dhl/audio/romance/story_params/",
-    },
-    "horror": {
-        "script_path": "audio_ficition/horror/horror_script_generator.py",
-        "display_name": "恐怖故事",
-        "output_info": "/Volumes/dhl/audio/horror/story_params/",
-    },
-    "fantasy": {
-        "script_path": "audio_ficition/fantasy/fantasy_script_generator.py",
-        "display_name": "奇幻故事",
-        "output_info": "/Volumes/dhl/audio/fantasy/story_param/",
-    },
-}
+def get_themes_config():
+    """获取主题配置，根据操作系统动态设置路径"""
+    base_dir = get_base_audio_dir()
+    
+    return {
+        "thriller": {
+            "script_path": "audio_ficition/thriller/thriller_script_generator.py",
+            "display_name": "惊悚故事",
+            "output_info": f"{base_dir}/thriller/story_params/",
+        },
+        "scifi": {
+            "script_path": "audio_ficition/scifi/gen_prompt.py",
+            "display_name": "科幻故事",
+            "output_info": f"{base_dir}/scifi/story_param/en/",
+        },
+        "romance": {
+            "script_path": "audio_ficition/romance/romance_script_generator.py",
+            "display_name": "爱情故事",
+            "output_info": f"{base_dir}/romance/story_params/",
+        },
+        "horror": {
+            "script_path": "audio_ficition/horror/horror_script_generator.py",
+            "display_name": "恐怖故事",
+            "output_info": f"{base_dir}/horror/story_params/",
+        },
+        "fantasy": {
+            "script_path": "audio_ficition/fantasy/fantasy_script_generator.py",
+            "display_name": "奇幻故事",
+            "output_info": f"{base_dir}/fantasy/story_param/",
+        },
+    }
 
 
 def get_workspace_root():
@@ -84,7 +97,8 @@ def get_workspace_root():
 
 def run_theme_generator(theme, count, workspace_root):
     """运行特定主题的生成器"""
-    config = THEMES_CONFIG[theme]
+    themes_config = get_themes_config()
+    config = themes_config[theme]
     script_path = workspace_root / config["script_path"]
 
     if not script_path.exists():
@@ -172,8 +186,8 @@ def main():
         "-t",
         "--themes",
         nargs="+",
-        choices=list(THEMES_CONFIG.keys()),
-        default=list(THEMES_CONFIG.keys()),
+        choices=list(get_themes_config().keys()),
+        default=list(get_themes_config().keys()),
         help="要生成故事的主题列表 (默认: 所有主题)",
     )
 
@@ -181,10 +195,11 @@ def main():
 
     # 获取工作区根目录
     workspace_root = get_workspace_root()
+    themes_config = get_themes_config()
 
     print("🚀 多主题故事参数生成器启动")
     print(f"工作区根目录: {workspace_root}")
-    print(f"选择的主题: {[THEMES_CONFIG[t]['display_name'] for t in args.themes]}")
+    print(f"选择的主题: {[themes_config[t]['display_name'] for t in args.themes]}")
     print(f"每个主题生成数量: {args.number}")
 
     # 统计信息
@@ -198,7 +213,7 @@ def main():
         if success:
             successful_themes += 1
         else:
-            failed_themes.append(THEMES_CONFIG[theme]["display_name"])
+            failed_themes.append(themes_config[theme]["display_name"])
 
     # 输出最终统计
     print(f"\n{'='*60}")
@@ -217,9 +232,9 @@ def main():
         )
         print("📁 输出目录:")
         for theme in args.themes:
-            if THEMES_CONFIG[theme]["display_name"] not in failed_themes:
+            if themes_config[theme]["display_name"] not in failed_themes:
                 print(
-                    f"  {THEMES_CONFIG[theme]['display_name']}: {THEMES_CONFIG[theme]['output_info']}"
+                    f"  {themes_config[theme]['display_name']}: {themes_config[theme]['output_info']}"
                 )
 
     if failed_themes:

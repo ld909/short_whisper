@@ -38,6 +38,21 @@ import concurrent.futures
 from tqdm import tqdm
 
 
+def get_base_paths():
+    """根据操作系统获取基础路径"""
+    system = platform.system().lower()
+
+    if system == "darwin":  # Mac
+        base_path = "/Volumes/dhl/audio/scifi"
+    else:  # Linux/Ubuntu
+        base_path = "/media/dhl/audio/scifi"
+
+    return {
+        "story_dir": os.path.join(base_path, "full_story", "language_code"),
+        "description_dir": os.path.join(base_path, "description"),
+    }
+
+
 def setup_openai_client():
     """设置OpenAI客户端并验证API密钥"""
     api_key = os.environ.get("UNI_API_KEY")
@@ -364,9 +379,10 @@ def main():
     # 解析命令行参数
     args = parser.parse_args()
 
-    # 设置路径
-    story_dir = "/Volumes/dhl/audio/scifi/full_story/language_code"
-    description_dir = "/Volumes/dhl/audio/scifi/description"
+    # 设置路径 - 根据操作系统自动选择
+    paths = get_base_paths()
+    story_dir = paths["story_dir"]
+    description_dir = paths["description_dir"]
 
     print("=== YouTube故事视频概要生成器 ===")
     print(f"故事源目录: {story_dir}")
