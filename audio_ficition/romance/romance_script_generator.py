@@ -17,7 +17,7 @@ Input:
     - Command line arguments: Optional generation quantity
 
 Output:
-    - Fixed directory: /Volumes/dhl/audio/romance/story_param/
+    - Fixed directory: /Users/donghaoliu/Documents/audio/story_param/romance/
     - File format: {index}.txt (e.g., 1.txt, 2.txt, 3.txt...)
     - Content: Complete story creation prompts, ready for AI story generation
 
@@ -391,7 +391,7 @@ def main():
         print("Configuration file loaded successfully")
 
         # Get starting story index
-        story_directory = "/Volumes/dhl/audio/romance/story_param"
+        story_directory = "/Users/donghaoliu/Documents/audio/story_param/romance"
         starting_index = get_next_story_index(story_directory)
 
         print(f"Starting to generate {args.number} story parameters...")

@@ -18,7 +18,7 @@ Fantasy Story Script Parameter Generator
     - 命令行参数: 可选的生成数量
 
 输出:
-    - 固定目录: /Volumes/dhl/audio/fantasy/story_param/
+    - 固定目录: /Users/donghaoliu/Documents/audio/story_param/fantasy/
     - 文件格式: {索引号}.txt (如: 1.txt, 2.txt, 3.txt...)
     - 内容: 完整的故事创作提示词，可直接用于AI生成故事
 
@@ -515,7 +515,7 @@ def main():
         print("配置文件加载成功")
 
         # Get starting story index
-        story_directory = "/Volumes/dhl/audio/fantasy/story_param"
+        story_directory = "/Users/donghaoliu/Documents/audio/story_param/fantasy"
         starting_index = get_next_story_index(story_directory)
 
         print(f"开始生成 {args.number} 个故事参数...")

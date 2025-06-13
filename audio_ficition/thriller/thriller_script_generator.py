@@ -18,7 +18,7 @@ Thriller Story Script Parameter Generator
     - 命令行参数: 可选的生成数量
 
 输出:
-    - 固定目录: /Volumes/dhl/audio/thriller/story_param/
+    - 固定目录: /Users/donghaoliu/Documents/audio/story_param/thriller/
     - 文件格式: {索引号}.txt (如: 1.txt, 2.txt, 3.txt...)
     - 内容: 完整的故事创作提示词，可直接用于AI生成故事
 
@@ -458,10 +458,9 @@ The output should exclude:
 - Technical formatting or meta-comments
 - Chapter break announcements (transitions should be seamless)
 
-Ensure the complete story reaches the target audio length of {target_audio_length_minutes_min}-{target_audio_length_minutes_max} minutes and maintains thriller pacing throughout.
+Ensure the complete story reaches the target audio length of 100 minutes and maintains thriller pacing throughout.
 The story must contain at least 150,000 words to ensure proper audiobook length.
-The story must contain at least 150,000 words to ensure proper audiobook length.
-The story must contain at least 150,000 words to ensure proper audiobook length.
+
 
 **CRITICAL:** Maintain character name consistency throughout. Use the specified names exactly as provided: {protagonist_name}, {antagonist_name}, {ally_name}, {authority_figure_name}, {victim_witness_name}.
 """
@@ -518,7 +517,7 @@ def main():
         print("配置文件加载成功")
 
         # Get starting story index
-        story_directory = "/Volumes/dhl/audio/thriller/story_param"
+        story_directory = "/Users/donghaoliu/Documents/audio/story_param/thriller"
         starting_index = get_next_story_index(story_directory)
 
         print(f"开始生成 {args.number} 个惊悚故事参数...")

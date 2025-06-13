@@ -8,14 +8,18 @@ AI Studio 多主题故事生成自动化脚本
 这是一个用于 Google AI Studio 的自动化故事生成脚本，支持多种主题类型：
 
 📚 支持的主题类型：
-- scifi: 科幻故事（使用gen_prompt模块）
-- fantasy: 奇幻故事（使用fantasy配置文件）
-- 可扩展：love、detective、mystery等
+- scifi: 科幻故事
+- fantasy: 奇幻故事
+- thriller: 惊悚故事
+- romance: 爱情故事
+- horror: 恐怖故事
 
-1. 📖 批量故事生成
-   - 支持批量生成多个指定主题的故事
-   - 根据主题自动选择对应的参数生成器
+1. 📖 多主题轮流生成
+   - 支持同时为多个主题生成故事（默认所有主题）
+   - 轮流生成模式：先为每个主题生成一个故事，然后进入下一轮
+   - 从multi_theme_story_generator.py的输出读取故事参数
    - 智能索引管理：优先填补缺失的故事索引，然后生成新索引
+   - 自动清理 markdown 标记：在发送前彻底清除所有 markdown 格式符号
 
 2. 🌐 浏览器自动化
    - 通过 AdsPower 浏览器实现多开隔离
@@ -29,7 +33,8 @@ AI Studio 多主题故事生成自动化脚本
 4. 💾 自动保存管理
    - 自动将生成的故事保存为编号的文本文件
    - 支持断点续传：检测已存在的故事，只生成缺失的部分
-   - 文件保存路径格式：/Volumes/dhl/audio/{theme}/full_story/*.txt
+   - 文件保存路径格式：/Users/donghaoliu/Documents/audio/full_story/{theme}/{index}.txt
+   - 自动排除Mac系统产生的点文件
 
 5. 🔄 错误处理与重试
    - 智能检测AI生成状态（通过监控停止按钮状态）
@@ -37,91 +42,64 @@ AI Studio 多主题故事生成自动化脚本
    - 完善的异常处理机制
 
 6. ⚙️ 命令行界面
-   - 支持指定生成数量：--count 或 -c 参数
+   - 支持指定生成数量：--count 或 -c 参数（每个主题的数量）
    - 支持指定浏览器ID：--ads-id 参数
-   - 支持指定主题：--theme 或 -t 参数（必需）
-   - 默认生成2个故事，使用 kyencl7 浏览器配置
+   - 支持指定主题：--theme 或 -t 参数（可选，默认所有主题）
+   - 默认每个主题生成2个故事，使用 kyencl7 浏览器配置
 
 使用方法：
-python ai_studio_bot.py --theme scifi --count 5 --ads-id your_browser_id
-python ai_studio_bot.py --theme fantasy --count 3
+python ai_studio_bot.py --count 5                                    # 所有主题各生成5个故事
+python ai_studio_bot.py --theme scifi fantasy --count 3              # 只为科幻和奇幻各生成3个故事
+python ai_studio_bot.py --theme scifi --count 2 --ads-id your_id     # 指定浏览器ID
 
 依赖组件：
 - AdsPower：提供浏览器环境隔离
 - Playwright：网页自动化控制
-- gen_prompt：科幻故事参数生成模块
-- fantasy配置：奇幻故事参数生成模块
+- multi_theme_story_generator.py：提供故事参数文件
 
 作者：AI Studio 自动化团队
-版本：v3.0
-更新：支持多主题、可扩展架构、主题特定的参数生成
+版本：v4.0
+更新：支持多主题轮流生成、从参数文件读取、新的保存路径结构、断点续传优化
 """
 
-import requests
 import time
 import json
 import sys
-import urllib3
 import os
 import glob
 import re
 import argparse
 import random
 import platform
-from playwright.sync_api import sync_playwright
 
-# 主题相关的导入
-# 添加scifi模块导入路径
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "scifi"))
-try:
-    from gen_prompt import generate_prompt, remove_markdown
+# 不再需要主题相关的导入，直接从参数文件读取
 
-    SCIFI_AVAILABLE = True
-except ImportError:
-    print("警告: gen_prompt 模块未找到，scifi主题将不可用")
-    SCIFI_AVAILABLE = False
-
-# 添加fantasy模块导入路径
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "fantasy"))
-try:
-    from fantasy_script_generator import (
-        generate_story_parameters,
-        load_config,
-        remove_markdown_formatting,
-    )
-
-    FANTASY_AVAILABLE = True
-except ImportError:
-    print("警告: fantasy_script_generator 模块未找到，fantasy主题将不可用")
-    FANTASY_AVAILABLE = False
-
-# 支持的主题配置
+# 支持的主题配置 - 所有主题均默认可用，从参数文件读取
 SUPPORTED_THEMES = {
     "scifi": {
         "name": "科幻",
-        "available": SCIFI_AVAILABLE,
+        "available": True,  # 现在从文件读取，不依赖模块
         "description": "科幻故事生成，包含未来科技、太空探索、时间旅行等元素",
     },
     "fantasy": {
         "name": "奇幻",
-        "available": FANTASY_AVAILABLE,
+        "available": True,  # 现在从文件读取，不依赖模块
         "description": "奇幻故事生成，包含魔法、龙、精灵等奇幻元素",
     },
-    # 为未来扩展预留
-    "love": {
+    "thriller": {
+        "name": "惊悚",
+        "available": True,
+        "description": "惊悚故事生成，包含悬疑、恐怖等元素",
+    },
+    "romance": {
         "name": "爱情",
-        "available": False,
-        "description": "爱情故事生成（即将支持）",
+        "available": True,
+        "description": "爱情故事生成，包含浪漫、情感等元素",
     },
-    "detective": {
-        "name": "侦探",
-        "available": False,
-        "description": "侦探推理故事生成（即将支持）",
-    },
-    "mystery": {
-        "name": "悬疑",
-        "available": False,
-        "description": "悬疑惊悚故事生成（即将支持）",
+    "horror": {
+        "name": "恐怖",
+        "available": True,
+        "description": "恐怖故事生成，包含恐怖、惊悚等元素",
     },
 }
 
@@ -141,64 +119,139 @@ WARMUP_QUESTIONS = [
 
 
 def get_base_audio_dir():
-    """根据操作系统返回合适的音频基础目录"""
-    if platform.system() == "Darwin":  # macOS
-        return "/Volumes/dhl/audio"
-    else:  # Linux 和其他系统
-        return "/media/dhl/audio"
+    """返回音频基础目录"""
+    return "/Users/donghaoliu/Documents/audio"
 
 
 def get_theme_story_path_prefix(theme):
     """获取主题对应的故事文件目录路径"""
     base_dir = get_base_audio_dir()
-    return f"{base_dir}/{theme}/full_story"
+    return f"{base_dir}/full_story/{theme}"
 
 
-def generate_story_prompt_by_theme(theme):
-    """根据主题生成故事参数"""
-    if theme == "scifi":
-        if not SCIFI_AVAILABLE:
-            raise ImportError("scifi主题不可用：gen_prompt模块未找到")
-        story_prompt = generate_prompt()
-        return remove_markdown(story_prompt)
+def get_theme_param_path_prefix(theme):
+    """获取主题对应的参数文件目录路径（从multi_theme_story_generator.py输出读取）"""
+    base_dir = get_base_audio_dir()
+    return f"{base_dir}/story_param/{theme}"
 
-    elif theme == "fantasy":
-        if not FANTASY_AVAILABLE:
-            raise ImportError("fantasy主题不可用：fantasy_script_generator模块未找到")
 
-        # 加载fantasy配置并生成参数
-        try:
-            # 构建配置文件路径
-            fantasy_dir = os.path.join(os.path.dirname(__file__), "..", "fantasy")
-            config_path = os.path.join(fantasy_dir, "config.json")
+def get_available_story_param_files(theme):
+    """获取主题目录下可用的故事参数文件，排除Mac产生的点文件"""
+    param_dir = get_theme_param_path_prefix(theme)
 
-            # 加载配置
-            config = load_config(config_path)
+    if not os.path.exists(param_dir):
+        print(f"参数目录不存在: {param_dir}")
+        return []
 
-            # 生成参数
-            params = generate_story_parameters(config)
+    try:
+        # 获取所有文件
+        all_files = os.listdir(param_dir)
+        # 排除点文件（Mac系统文件）和非文件
+        valid_files = [
+            f
+            for f in all_files
+            if not f.startswith(".") and os.path.isfile(os.path.join(param_dir, f))
+        ]
 
-            # 创建并填充模板
-            from fantasy_script_generator import (
-                create_prompt_template,
-                fill_prompt_template,
-            )
+        # 返回完整路径
+        param_files = [os.path.join(param_dir, f) for f in valid_files]
+        param_files.sort()  # 排序确保顺序一致
 
-            template = create_prompt_template()
-            filled_prompt = fill_prompt_template(template, params)
+        print(f"主题 {theme} 找到 {len(param_files)} 个参数文件")
+        return param_files
 
-            # 移除markdown格式
-            return remove_markdown_formatting(filled_prompt)
+    except Exception as e:
+        print(f"读取主题 {theme} 参数目录失败: {e}")
+        return []
 
-        except FileNotFoundError:
-            raise FileNotFoundError(f"fantasy配置文件未找到: {config_path}")
-        except Exception as e:
-            raise Exception(f"生成fantasy故事参数失败: {e}")
 
-    else:
-        raise ValueError(
-            f"不支持的主题: {theme}。支持的主题: {list(SUPPORTED_THEMES.keys())}"
+def clean_markdown_from_text(text):
+    """清理文本中的所有 markdown 标记符号"""
+    if not text:
+        return text
+
+    import re
+
+    # 保存原始文本用于调试
+    original_length = len(text)
+
+    # 1. 清理代码块 ```code```
+    text = re.sub(r"```[\s\S]*?```", "", text)
+
+    # 2. 清理行内代码 `code`
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+
+    # 3. 清理标题标记 # ## ### 等
+    text = re.sub(r"^#{1,6}\s*", "", text, flags=re.MULTILINE)
+
+    # 4. 清理粗体标记 **text** 和 __text__
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    text = re.sub(r"__([^_]+)__", r"\1", text)
+
+    # 5. 清理斜体标记 *text* 和 _text_
+    text = re.sub(r"\*([^*]+)\*", r"\1", text)
+    text = re.sub(r"_([^_]+)_", r"\1", text)
+
+    # 6. 清理删除线 ~~text~~
+    text = re.sub(r"~~([^~]+)~~", r"\1", text)
+
+    # 7. 清理链接 [text](url)
+    text = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", text)
+
+    # 8. 清理图片 ![alt](url)
+    text = re.sub(r"!\[([^\]]*)\]\([^\)]+\)", r"\1", text)
+
+    # 9. 清理引用标记 > text
+    text = re.sub(r"^>\s*", "", text, flags=re.MULTILINE)
+
+    # 10. 清理无序列表标记 - * +
+    text = re.sub(r"^[\s]*[-*+]\s*", "", text, flags=re.MULTILINE)
+
+    # 11. 清理有序列表标记 1. 2. 等
+    text = re.sub(r"^\s*\d+\.\s*", "", text, flags=re.MULTILINE)
+
+    # 12. 清理水平线 --- *** ___
+    text = re.sub(r"^[-*_]{3,}\s*$", "", text, flags=re.MULTILINE)
+
+    # 13. 清理表格分隔符 | --- |
+    text = re.sub(r"^\s*\|.*\|\s*$", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*\|[\s\-\|]*\|\s*$", "", text, flags=re.MULTILINE)
+
+    # 14. 清理其他常见的 markdown 符号
+    # 清理剩余的单独的星号、下划线等
+    text = re.sub(r"(?<!\w)[\*_]+(?!\w)", "", text)
+
+    # 15. 清理多余的空行（保留单个换行）
+    text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
+
+    # 16. 清理行首行尾的多余空格
+    lines = text.split("\n")
+    cleaned_lines = [line.strip() for line in lines]
+    text = "\n".join(cleaned_lines)
+
+    # 17. 最终清理：去掉开头和结尾的空白
+    text = text.strip()
+
+    # 调试信息
+    cleaned_length = len(text)
+    removed_chars = original_length - cleaned_length
+    if removed_chars > 0:
+        print(
+            f"✂️ 已清理 markdown 标记，移除了 {removed_chars} 个字符 ({original_length} -> {cleaned_length})"
         )
+
+    return text
+
+
+def read_story_param_from_file(file_path):
+    """从文件中读取故事参数"""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+        return content
+    except Exception as e:
+        print(f"读取参数文件 {file_path} 失败: {e}")
+        return None
 
 
 def validate_theme(theme):
@@ -239,6 +292,12 @@ def countdown_wait(seconds=20, window_index=None):
 
 def get_adspower_info(ads_id):
     """连接AdsPower浏览器"""
+    try:
+        import urllib3
+    except ImportError:
+        print("错误: 缺少 urllib3 模块，请安装: pip install urllib3")
+        return None, None, None
+
     open_url = f"http://127.0.0.1:50325/api/v1/browser/start?user_id={ads_id}"
 
     http = urllib3.PoolManager()
@@ -293,86 +352,124 @@ def get_existing_stories(story_dir_path):
     return set(existing_indices)
 
 
-def get_story_parameters_to_generate(theme, num_needed=1):
-    """
-    获取需要生成的故事的参数列表。
-
-    该函数会首先检查已存在的故事，并根据需要生成新的故事参数。
-    """
+def get_next_story_index_for_theme(theme):
+    """获取主题的下一个可用故事索引（支持断点续传）"""
     story_dir_path = get_theme_story_path_prefix(theme)
     existing_indices = get_existing_stories(story_dir_path)
 
-    print(f"\n=== 📊 {SUPPORTED_THEMES[theme]['name']}主题故事索引分析 ===")
-    print(f"故事保存目录: {story_dir_path}")
-    print(f"已存在的故事索引: {existing_indices}")
-    print(f"需要生成的故事数量: {num_needed}")
+    if not existing_indices:
+        return 1  # 如果没有任何故事，从1开始
 
-    stories_to_generate = []
+    # 找出缺失的最小索引
+    max_existing = max(existing_indices)
+    for i in range(1, max_existing + 1):
+        if i not in existing_indices:
+            return i
 
-    if existing_indices:
-        max_existing = max(existing_indices)
-        print(f"当前最大索引: {max_existing}")
+    # 如果没有缺失，返回最大值+1
+    return max_existing + 1
 
-        # 找出缺失的索引（从1到最大值之间的空缺）
-        missing_indices = []
-        for i in range(1, max_existing + 1):
-            if i not in existing_indices:
-                missing_indices.append(i)
 
-        missing_indices.sort()  # 确保从小到大排序
+def get_next_available_param_file_for_theme(theme, used_param_files):
+    """获取主题的下一个可用参数文件"""
+    available_files = get_available_story_param_files(theme)
 
-        if missing_indices:
-            print(f"🔍 发现缺失的故事索引: {missing_indices}")
-            print(f"优先填补从索引 {missing_indices[0]} 开始的缺失位置")
+    if not available_files:
+        return None
+
+    # 找到第一个未使用的参数文件
+    for file_path in available_files:
+        if file_path not in used_param_files:
+            return file_path
+
+    return None
+
+
+def prepare_multi_theme_generation(themes, num_per_theme):
+    """
+    准备多主题轮流生成的参数列表
+
+    返回一个按轮次组织的生成计划，每轮为每个主题生成一个故事
+    """
+    # 检查每个主题的参数文件可用性
+    theme_param_files = {}
+    theme_available_counts = {}
+
+    for theme in themes:
+        param_files = get_available_story_param_files(theme)
+        theme_param_files[theme] = param_files
+        theme_available_counts[theme] = len(param_files)
+
+        if not param_files:
+            print(f"⚠️ 主题 {theme} 没有可用的参数文件")
         else:
-            print(f"✅ 索引 1-{max_existing} 连续完整，无缺失")
+            print(f"✅ 主题 {theme} 有 {len(param_files)} 个参数文件可用")
 
-        indices_to_use = []
+    # 生成轮次计划
+    generation_plan = []
+    used_param_files = {theme: set() for theme in themes}
 
-        # 优先使用缺失的索引（从最小开始）
-        missing_count = 0
-        for missing_idx in missing_indices:
-            if len(indices_to_use) < num_needed:
-                indices_to_use.append(missing_idx)
-                missing_count += 1
-                print(f"  📝 将填补缺失索引: {missing_idx}")
+    for round_num in range(num_per_theme):
+        print(f"\n=== 📋 规划第 {round_num + 1} 轮生成 ===")
+        round_plan = []
 
-        # 如果还需要更多，从最大值+1开始
-        if len(indices_to_use) < num_needed:
-            next_new_index = max_existing + 1
-            remaining_needed = num_needed - len(indices_to_use)
-            print(
-                f"  🆕 需要生成新索引: {next_new_index} ~ {next_new_index + remaining_needed - 1}"
+        for theme in themes:
+            # 获取下一个故事索引
+            next_index = get_next_story_index_for_theme(theme)
+
+            # 获取下一个可用参数文件
+            next_param_file = get_next_available_param_file_for_theme(
+                theme, used_param_files[theme]
             )
 
-            for i in range(remaining_needed):
-                indices_to_use.append(next_new_index + i)
+            if next_param_file:
+                # 读取参数内容
+                param_content = read_story_param_from_file(next_param_file)
+                if param_content:
+                    # 清理 markdown 标记符号
+                    cleaned_content = clean_markdown_from_text(param_content)
 
-        print(f"📋 最终生成索引列表: {sorted(indices_to_use)}")
-        if missing_count > 0:
-            print(f"   其中 {missing_count} 个是填补缺失的索引")
-            print(f"   其中 {len(indices_to_use) - missing_count} 个是新增的索引")
-    else:
-        # 如果没有任何故事，从1开始
-        indices_to_use = list(range(1, num_needed + 1))
-        print(f"🎯 第一次生成{SUPPORTED_THEMES[theme]['name']}故事，从索引 1 开始")
-        print(f"📋 生成索引列表: {indices_to_use}")
+                    story_data = {
+                        "theme": theme,
+                        "index": next_index,
+                        "prompt": cleaned_content,
+                        "param_file": next_param_file,
+                        "dir_path": get_theme_story_path_prefix(theme),
+                    }
+                    round_plan.append(story_data)
+                    used_param_files[theme].add(next_param_file)
 
-    # 生成故事参数
-    print(f"\n=== 🎨 开始生成{SUPPORTED_THEMES[theme]['name']}故事参数 ===")
-    for story_index in sorted(indices_to_use):  # 确保按索引顺序处理
-        try:
-            story_prompt = generate_story_prompt_by_theme(theme)
-            stories_to_generate.append({"index": story_index, "prompt": story_prompt})
-            print(f"✅ 准备生成{SUPPORTED_THEMES[theme]['name']}故事 {story_index}")
-        except Exception as e:
-            print(f"❌ 生成故事 {story_index} 参数失败: {e}")
-            # 继续处理其他故事，不中断整个流程
+                    theme_name = SUPPORTED_THEMES[theme]["name"]
+                    print(
+                        f"  ✅ {theme_name}({theme}) - 故事{next_index} - 参数文件: {os.path.basename(next_param_file)}"
+                    )
+                else:
+                    print(f"  ❌ {theme} - 无法读取参数文件: {next_param_file}")
+            else:
+                print(f"  ⚠️ {theme} - 没有更多可用的参数文件")
 
-    print(
-        f"=== 📝 {SUPPORTED_THEMES[theme]['name']}故事参数生成完成，共 {len(stories_to_generate)} 个 ===\n"
-    )
-    return stories_to_generate
+        if round_plan:
+            generation_plan.extend(round_plan)
+        else:
+            print(f"第 {round_num + 1} 轮没有可生成的故事，停止规划")
+            break
+
+    print(f"\n=== 📊 生成计划汇总 ===")
+    print(f"总计划生成 {len(generation_plan)} 个故事")
+
+    # 按主题统计
+    theme_counts = {}
+    for story in generation_plan:
+        theme = story["theme"]
+        if theme not in theme_counts:
+            theme_counts[theme] = 0
+        theme_counts[theme] += 1
+
+    for theme, count in theme_counts.items():
+        theme_name = SUPPORTED_THEMES[theme]["name"]
+        print(f"  {theme_name}({theme}): {count} 个故事")
+
+    return generation_plan
 
 
 def wait_for_warmup_completion(page, window_index):
@@ -717,25 +814,124 @@ def process_window(
     page, window_index, story_data, theme, is_first_story=True, need_warmup=False
 ):
     """处理单个窗口的故事生成"""
-    try:
-        theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
-        print(f"窗口 {window_index}: 开始处理{theme_name}故事 {story_data['index']}")
-        print(
-            f"窗口 {window_index}: 窗口第一次={is_first_story}, 需要热身={need_warmup}"
-        )
+    max_retries = 3  # 最大重试次数
+    theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
 
-        if is_first_story and need_warmup:
-            # 全局第一次：先进行热身，然后开新tab进行正式生成
-            print(f"窗口 {window_index}: 全局第一次需要热身，正在打开AI Studio...")
-            page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(8000)
+    # 首次运行时处理页面初始化（热身、导航等）
+    if is_first_story and need_warmup:
+        # 全局第一次：先进行热身，然后开新tab进行正式生成
+        print(f"窗口 {window_index}: 全局第一次需要热身，正在打开AI Studio...")
+        page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(8000)
 
-            # 发送随机问题进行热身
-            random_question = random.choice(WARMUP_QUESTIONS)
-            print(f"窗口 {window_index}: 发送热身问题: {random_question}")
+        # 发送随机问题进行热身
+        random_question = random.choice(WARMUP_QUESTIONS)
+        print(f"窗口 {window_index}: 发送热身问题: {random_question}")
 
-            # 查找文本框进行热身 - 使用更精确的选择器
+        # 热身逻辑...（保持不变）
+        textarea_selectors = [
+            ".text-wrapper textarea",
+            "ms-autosize-textarea textarea",
+            'textarea[aria-label*="Type something"]',
+            'textarea[class*="textarea"]',
+            'textarea[class*="gmat-body-medium"]',
+            ".text-input-wrapper textarea",
+            "div.text-wrapper textarea",
+            "textarea",
+        ]
+
+        warmup_textarea = None
+        for selector in textarea_selectors:
+            try:
+                if page.locator(selector).count() > 0:
+                    warmup_textarea = page.locator(selector)
+                    print(
+                        f"窗口 {window_index}: 找到热身文本框，使用选择器: {selector}"
+                    )
+                    break
+            except:
+                continue
+
+        if warmup_textarea and warmup_textarea.count() > 0:
+            warmup_textarea.click()
+            page.wait_for_timeout(1000)
+            warmup_textarea.focus()
+            page.wait_for_timeout(500)
+            warmup_textarea.fill("")
+            page.wait_for_timeout(300)
+            warmup_textarea.type(random_question)
+            page.wait_for_timeout(1000)
+            print(f"窗口 {window_index}: 已输入热身问题到文本框")
+
+            run_button_selectors = [
+                'button[aria-label="Run"][type="submit"]',
+                'button[aria-label="Run"]',
+                'button[type="submit"]',
+                'button:has-text("Run")',
+                ".run-button",
+                'button[class*="run"]',
+            ]
+
+            warmup_run_button = None
+            for selector in run_button_selectors:
+                try:
+                    if page.locator(selector).count() > 0:
+                        warmup_run_button = page.locator(selector)
+                        break
+                except:
+                    continue
+
+            if warmup_run_button and warmup_run_button.count() > 0:
+                print(f"窗口 {window_index}: 发送热身问题...")
+                warmup_run_button.click()
+
+                try:
+                    wait_for_warmup_completion(page, window_index)
+                    print(f"窗口 {window_index}: 热身问题回答完成")
+                except Exception as e:
+                    print(f"窗口 {window_index}: 热身问题回答过程中出错: {e}")
+                    raise Exception(f"窗口 {window_index}: 热身阶段AI生成状态检测失败")
+
+                print(f"窗口 {window_index}: 热身完成，等待5秒...")
+                time.sleep(5)
+
+                print(f"窗口 {window_index}: 开新tab进行正式故事生成...")
+                page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
+                page.wait_for_load_state("networkidle")
+                page.wait_for_timeout(8000)
+                print(f"窗口 {window_index}: 新页面已完全加载")
+            else:
+                print(f"窗口 {window_index}: 热身阶段未找到运行按钮，跳过热身")
+        else:
+            print(f"窗口 {window_index}: 热身阶段未找到文本框，跳过热身")
+    elif is_first_story and not need_warmup:
+        print(f"窗口 {window_index}: 窗口第一次（跳过热身），正在打开AI Studio...")
+        page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(8000)
+        print(f"窗口 {window_index}: 页面已完全加载")
+    elif not is_first_story:
+        print(f"窗口 {window_index}: 导航到新的聊天页面...")
+        page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(8000)
+        print(f"窗口 {window_index}: 新页面已完全加载")
+
+    # 重试逻辑：最多尝试3次生成故事
+    for retry_count in range(max_retries):
+        try:
+            if retry_count > 0:
+                print(
+                    f"窗口 {window_index}: {theme_name}故事 {story_data['index']} 第 {retry_count + 1} 次尝试（重试原因：internal error）"
+                )
+            else:
+                print(
+                    f"窗口 {window_index}: 开始处理{theme_name}故事 {story_data['index']}"
+                )
+
+            # 正式的故事生成流程
+            # 多种可能的文本框选择器 - 使用更精确的选择器
             textarea_selectors = [
                 ".text-wrapper textarea",  # 根据提供的HTML结构
                 "ms-autosize-textarea textarea",  # 具体的组件选择器
@@ -747,314 +943,228 @@ def process_window(
                 "textarea",
             ]
 
-            warmup_textarea = None
-            for selector in textarea_selectors:
+            print(f"窗口 {window_index}: 尝试查找文本框...")
+            textarea = None
+
+            # 首先等待父容器出现
+            try:
+                print(f"窗口 {window_index}: 等待文本输入容器...")
+                page.wait_for_selector(
+                    ".text-wrapper, .text-input-wrapper, ms-chunk-input", timeout=20000
+                )
+                page.wait_for_timeout(3000)  # 额外等待容器内容加载
+                print(f"窗口 {window_index}: 文本输入容器已加载")
+            except:
+                print(f"窗口 {window_index}: 父容器等待超时，继续尝试...")
+
+            # 尝试多个选择器
+            for i, selector in enumerate(textarea_selectors):
                 try:
-                    if page.locator(selector).count() > 0:
-                        warmup_textarea = page.locator(selector)
-                        print(
-                            f"窗口 {window_index}: 找到热身文本框，使用选择器: {selector}"
-                        )
+                    print(
+                        f"窗口 {window_index}: 尝试选择器 {i+1}/{len(textarea_selectors)}: {selector}"
+                    )
+                    page.wait_for_selector(selector, timeout=15000)
+                    textarea = page.locator(selector)
+                    if textarea.count() > 0:
+                        print(f"窗口 {window_index}: 成功找到文本框！")
                         break
-                except:
+                except Exception as e:
+                    print(
+                        f"窗口 {window_index}: 选择器 {selector} 失败: {str(e)[:100]}"
+                    )
                     continue
 
-            if warmup_textarea and warmup_textarea.count() > 0:
-                # 点击文本框并直接输入热身问题
-                warmup_textarea.click()
-                page.wait_for_timeout(1000)
-
-                # 确保文本框获得焦点
-                warmup_textarea.focus()
-                page.wait_for_timeout(500)
-
-                # 清空现有内容并直接输入热身问题
-                warmup_textarea.fill("")  # 清空
-                page.wait_for_timeout(300)
-                warmup_textarea.type(random_question)  # 直接输入文字
-                page.wait_for_timeout(1000)
-                print(f"窗口 {window_index}: 已输入热身问题到文本框")
-
-                # 查找并点击运行按钮
-                run_button_selectors = [
-                    'button[aria-label="Run"][type="submit"]',
-                    'button[aria-label="Run"]',
-                    'button[type="submit"]',
-                    'button:has-text("Run")',
-                    ".run-button",
-                    'button[class*="run"]',
-                ]
-
-                warmup_run_button = None
-                for selector in run_button_selectors:
-                    try:
-                        if page.locator(selector).count() > 0:
-                            warmup_run_button = page.locator(selector)
-                            break
-                    except:
-                        continue
-
-                if warmup_run_button and warmup_run_button.count() > 0:
-                    print(f"窗口 {window_index}: 发送热身问题...")
-                    warmup_run_button.click()
-
-                    # 等待AI回答热身问题 - 使用专门的热身检测函数
-                    try:
-                        wait_for_warmup_completion(page, window_index)
-                        print(f"窗口 {window_index}: 热身问题回答完成")
-                    except Exception as e:
-                        print(f"窗口 {window_index}: 热身问题回答过程中出错: {e}")
-                        # 抛出异常到main函数处理，与正式故事生成保持一致
-                        raise Exception(
-                            f"窗口 {window_index}: 热身阶段AI生成状态检测失败"
-                        )
-
-                    # 等待5秒
-                    print(f"窗口 {window_index}: 热身完成，等待5秒...")
-                    time.sleep(5)
-
-                    # 开新tab进行正式生成
-                    print(f"窗口 {window_index}: 开新tab进行正式故事生成...")
-                    page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
-                    page.wait_for_load_state("networkidle")
-                    page.wait_for_timeout(8000)
-                    print(f"窗口 {window_index}: 新页面已完全加载")
-                else:
-                    print(f"窗口 {window_index}: 热身阶段未找到运行按钮，跳过热身")
-            else:
-                print(f"窗口 {window_index}: 热身阶段未找到文本框，跳过热身")
-        elif is_first_story and not need_warmup:
-            # 窗口第一次但全局热身已完成：直接打开AI Studio
-            print(f"窗口 {window_index}: 窗口第一次（跳过热身），正在打开AI Studio...")
-            page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(8000)
-            print(f"窗口 {window_index}: 页面已完全加载")
-        else:
-            # 后续故事：直接导航到新的聊天页面
-            print(f"窗口 {window_index}: 导航到新的聊天页面...")
-            page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(8000)
-            print(f"窗口 {window_index}: 新页面已完全加载")
-
-        # 下面是正式的故事生成流程（适用于热身后的第一个故事和后续故事）
-        # 多种可能的文本框选择器 - 使用更精确的选择器
-        textarea_selectors = [
-            ".text-wrapper textarea",  # 根据提供的HTML结构
-            "ms-autosize-textarea textarea",  # 具体的组件选择器
-            'textarea[aria-label*="Type something"]',  # aria-label匹配
-            'textarea[class*="textarea"]',
-            'textarea[class*="gmat-body-medium"]',
-            ".text-input-wrapper textarea",
-            "div.text-wrapper textarea",
-            "textarea",
-        ]
-
-        print(f"窗口 {window_index}: 尝试查找文本框...")
-        textarea = None
-
-        # 首先等待父容器出现
-        try:
-            print(f"窗口 {window_index}: 等待文本输入容器...")
-            page.wait_for_selector(
-                ".text-wrapper, .text-input-wrapper, ms-chunk-input", timeout=20000
-            )
-            page.wait_for_timeout(3000)  # 额外等待容器内容加载
-            print(f"窗口 {window_index}: 文本输入容器已加载")
-        except:
-            print(f"窗口 {window_index}: 父容器等待超时，继续尝试...")
-
-        # 尝试多个选择器
-        for i, selector in enumerate(textarea_selectors):
-            try:
-                print(
-                    f"窗口 {window_index}: 尝试选择器 {i+1}/{len(textarea_selectors)}: {selector}"
-                )
-                page.wait_for_selector(selector, timeout=15000)
-                textarea = page.locator(selector)
-                if textarea.count() > 0:
-                    print(f"窗口 {window_index}: 成功找到文本框！")
-                    break
-            except Exception as e:
-                print(f"窗口 {window_index}: 选择器 {selector} 失败: {str(e)[:100]}")
+            if not textarea or textarea.count() == 0:
+                print(f"窗口 {window_index}: 所有文本框选择器都失败了")
+                if retry_count == max_retries - 1:
+                    return False
                 continue
 
-        if not textarea or textarea.count() == 0:
-            print(f"窗口 {window_index}: 所有文本框选择器都失败了")
-            return False
+            # 直接输入故事参数到文本框
+            print(f"窗口 {window_index}: 正在输入故事参数到文本框...")
 
-        # 直接输入故事参数到文本框
-        print(f"窗口 {window_index}: 正在输入故事参数到文本框...")
+            # 确保元素可见和可交互
+            textarea.scroll_into_view_if_needed()
+            page.wait_for_timeout(1000)
 
-        # 确保元素可见和可交互
-        textarea.scroll_into_view_if_needed()
-        page.wait_for_timeout(1000)
-
-        # 点击文本框并获得焦点
-        textarea.click()
-        page.wait_for_timeout(500)
-
-        # 确保文本框获得焦点
-        textarea.focus()
-        page.wait_for_timeout(500)
-
-        # 清空现有内容并直接输入故事参数
-        textarea.fill("")  # 清空
-        page.wait_for_timeout(500)
-
-        # 分段输入长文本，避免一次性输入过多导致问题
-        story_prompt = story_data["prompt"]
-        print(
-            f"窗口 {window_index}: 开始输入故事参数，总长度: {len(story_prompt)} 字符"
-        )
-
-        # 尝试直接使用 fill() 方法快速输入整个文本
-        try:
-            print(f"窗口 {window_index}: 尝试快速输入整个文本...")
-            textarea.fill(story_prompt)
+            # 点击文本框并获得焦点
+            textarea.click()
             page.wait_for_timeout(500)
 
-            # 验证输入是否成功
-            current_value = textarea.input_value()
-            if (
-                len(current_value) >= len(story_prompt) * 0.95
-            ):  # 如果输入了95%以上内容，认为成功
-                print(
-                    f"窗口 {window_index}: 快速输入成功！实际长度: {len(current_value)}"
-                )
-            else:
-                raise Exception("快速输入不完整，切换到分段输入")
+            # 确保文本框获得焦点
+            textarea.focus()
+            page.wait_for_timeout(500)
 
-        except Exception as e:
-            print(f"窗口 {window_index}: 快速输入失败: {e}，切换到分段输入方式...")
+            # 清空现有内容并直接输入故事参数
+            textarea.fill("")  # 清空
+            page.wait_for_timeout(500)
 
-            # 备用方案：分段输入，但使用更快的方式
-            chunk_size = 2000  # 增大chunk大小
-            textarea.fill("")  # 先清空
-            page.wait_for_timeout(300)
+            # 分段输入长文本，避免一次性输入过多导致问题
+            story_prompt = story_data["prompt"]
+            print(
+                f"窗口 {window_index}: 开始输入故事参数，总长度: {len(story_prompt)} 字符"
+            )
 
-            accumulated_text = ""
-            for i in range(0, len(story_prompt), chunk_size):
-                chunk = story_prompt[i : i + chunk_size]
-                accumulated_text += chunk
-
-                # 使用 JavaScript 直接设置值，这比 type() 快很多
-                try:
-                    page.evaluate(
-                        """
-                        (text) => {
-                            const textarea = document.querySelector('.text-wrapper textarea') || 
-                                           document.querySelector('ms-autosize-textarea textarea') || 
-                                           document.querySelector('textarea');
-                            if (textarea) {
-                                textarea.value = text;
-                                textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                                textarea.dispatchEvent(new Event('change', { bubbles: true }));
-                            }
-                        }
-                    """,
-                        accumulated_text,
-                    )
-
-                    print(
-                        f"窗口 {window_index}: 已输入 chunk {i//chunk_size + 1}, 总进度: {len(accumulated_text)}/{len(story_prompt)} 字符"
-                    )
-
-                    # chunk间短暂等待
-                    if i + chunk_size < len(story_prompt):
-                        page.wait_for_timeout(100)  # 减少等待时间
-
-                except Exception as js_error:
-                    print(
-                        f"窗口 {window_index}: JavaScript输入失败，回退到 fill() 方式: {js_error}"
-                    )
-                    # 回退到 fill() 方式
-                    textarea.fill(accumulated_text)
-                    page.wait_for_timeout(200)
-
-        print(f"窗口 {window_index}: 故事参数输入完成")
-
-        # 多种可能的运行按钮选择器
-        run_button_selectors = [
-            'button[aria-label="Run"][type="submit"]',
-            'button[aria-label="Run"]',
-            'button[type="submit"]',
-            'button:has-text("Run")',
-            ".run-button",
-            'button[class*="run"]',
-        ]
-
-        print(f"窗口 {window_index}: 寻找运行按钮...")
-        run_button = None
-
-        for i, selector in enumerate(run_button_selectors):
+            # 尝试直接使用 fill() 方法快速输入整个文本
             try:
-                print(
-                    f"窗口 {window_index}: 尝试运行按钮选择器 {i+1}/{len(run_button_selectors)}: {selector}"
-                )
-                page.wait_for_selector(selector, timeout=10000)
+                print(f"窗口 {window_index}: 尝试快速输入整个文本...")
+                textarea.fill(story_prompt)
+                page.wait_for_timeout(500)
 
-                # 等待按钮变为可用状态
-                page.wait_for_function(
-                    f'document.querySelector("{selector}") && !document.querySelector("{selector}").disabled',
-                    timeout=10000,
-                )
+                # 验证输入是否成功
+                current_value = textarea.input_value()
+                if (
+                    len(current_value) >= len(story_prompt) * 0.95
+                ):  # 如果输入了95%以上内容，认为成功
+                    print(
+                        f"窗口 {window_index}: 快速输入成功！实际长度: {len(current_value)}"
+                    )
+                else:
+                    raise Exception("快速输入不完整，切换到分段输入")
 
-                run_button = page.locator(selector)
-                if run_button.count() > 0:
-                    print(f"窗口 {window_index}: 成功找到运行按钮！")
-                    break
             except Exception as e:
+                print(f"窗口 {window_index}: 快速输入失败: {e}，切换到分段输入方式...")
+
+                # 备用方案：分段输入，但使用更快的方式
+                chunk_size = 2000  # 增大chunk大小
+                textarea.fill("")  # 先清空
+                page.wait_for_timeout(300)
+
+                accumulated_text = ""
+                for i in range(0, len(story_prompt), chunk_size):
+                    chunk = story_prompt[i : i + chunk_size]
+                    accumulated_text += chunk
+
+                    # 使用 JavaScript 直接设置值，这比 type() 快很多
+                    try:
+                        page.evaluate(
+                            """
+                            (text) => {
+                                const textarea = document.querySelector('.text-wrapper textarea') || 
+                                               document.querySelector('ms-autosize-textarea textarea') || 
+                                               document.querySelector('textarea');
+                                if (textarea) {
+                                    textarea.value = text;
+                                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                                    textarea.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                            }
+                        """,
+                            accumulated_text,
+                        )
+
+                        print(
+                            f"窗口 {window_index}: 已输入 chunk {i//chunk_size + 1}, 总进度: {len(accumulated_text)}/{len(story_prompt)} 字符"
+                        )
+
+                        # chunk间短暂等待
+                        if i + chunk_size < len(story_prompt):
+                            page.wait_for_timeout(100)  # 减少等待时间
+
+                    except Exception as js_error:
+                        print(
+                            f"窗口 {window_index}: JavaScript输入失败，回退到 fill() 方式: {js_error}"
+                        )
+                        # 回退到 fill() 方式
+                        textarea.fill(accumulated_text)
+                        page.wait_for_timeout(200)
+
+            print(f"窗口 {window_index}: 故事参数输入完成")
+
+            # 输入完成后等待3-5秒再发送
+            wait_before_run = random.randint(3, 5)
+            print(f"窗口 {window_index}: 等待 {wait_before_run} 秒后使用快捷键发送...")
+            time.sleep(wait_before_run)
+
+            # 确保文本框仍然有焦点
+            textarea.focus()
+            page.wait_for_timeout(500)
+
+            # 使用 Mac 的 cmd+enter 快捷键发送提示词
+            print(f"窗口 {window_index}: 使用 Cmd+Enter 快捷键发送提示词...")
+            page.keyboard.press("Meta+Enter")
+            page.wait_for_timeout(1000)
+
+            # 等待AI运行完成
+            try:
+                wait_for_ai_completion(page, window_index)
+            except Exception as e:
+                error_msg = str(e)
+                print(f"窗口 {window_index}: AI生成失败 - {error_msg}")
+
+                # 检查是否是 internal error
+                if "internal error" in error_msg.lower():
+                    print(f"窗口 {window_index}: 检测到 internal error，准备重试...")
+                    if retry_count < max_retries - 1:
+                        print(
+                            f"窗口 {window_index}: 将在当前tab重新输入提示词并重试..."
+                        )
+                        # 等待3秒后重试
+                        print(f"窗口 {window_index}: 等待3秒后重试...")
+                        time.sleep(3)
+                        continue  # 继续下一次重试
+                    else:
+                        print(
+                            f"窗口 {window_index}: 已达到最大重试次数({max_retries})，跳过此故事"
+                        )
+                        return False
+                else:
+                    # 非 internal error，直接失败
+                    print(f"窗口 {window_index}: 非 internal error，停止重试")
+                    return False
+
+            # 保存生成的故事
+            success = save_generated_story(
+                page, story_data["index"], story_data["dir_path"], theme
+            )
+
+            if success:
                 print(
-                    f"窗口 {window_index}: 运行按钮选择器 {selector} 失败: {str(e)[:100]}"
+                    f"窗口 {window_index}: {theme_name}故事 {story_data['index']} 处理完成"
                 )
-                continue
+                # 生成完成后等待100秒
+                print(f"窗口 {window_index}: 故事生成完成，开始100秒冷却等待...")
+                countdown_wait(100, window_index)
+                return True
+            else:
+                print(
+                    f"窗口 {window_index}: {theme_name}故事 {story_data['index']} 保存失败"
+                )
+                if retry_count < max_retries - 1:
+                    print(f"窗口 {window_index}: 保存失败，准备重试...")
+                    continue
+                else:
+                    return False
 
-        if not run_button or run_button.count() == 0:
-            print(f"窗口 {window_index}: 未找到运行按钮")
-            return False
-
-        print(f"窗口 {window_index}: 正在点击运行按钮...")
-        run_button.click()
-
-        # 等待AI运行完成
-        try:
-            wait_for_ai_completion(page, window_index)
         except Exception as e:
-            print(f"窗口 {window_index}: AI生成失败 - {e}")
-            # 抛出异常到main函数处理
-            raise Exception(f"窗口 {window_index}: AI生成状态检测失败")
-
-        # 保存生成的故事
-        success = save_generated_story(
-            page, story_data["index"], story_data["dir_path"], theme
-        )
-
-        if success:
-            theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
+            error_msg = str(e)
             print(
-                f"窗口 {window_index}: {theme_name}故事 {story_data['index']} 处理完成"
-            )
-            # 生成完成后等待20秒
-            countdown_wait(20, window_index)
-        else:
-            theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
-            print(
-                f"窗口 {window_index}: {theme_name}故事 {story_data['index']} 保存失败"
+                f"窗口 {window_index}: 处理{theme_name}故事 {story_data['index']} 时出错: {error_msg}"
             )
 
-        return success
+            # 检查是否是 internal error
+            if "internal error" in error_msg.lower():
+                print(f"窗口 {window_index}: 异常中检测到 internal error")
+                if retry_count < max_retries - 1:
+                    print(f"窗口 {window_index}: 将重试...")
+                    # 等待3秒后重试
+                    time.sleep(3)
+                    continue
+                else:
+                    print(f"窗口 {window_index}: 已达到最大重试次数，跳过此故事")
+                    return False
+            else:
+                # 非 internal error，打印错误并返回失败
+                import traceback
 
-    except Exception as e:
-        theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
-        print(
-            f"窗口 {window_index}: 处理{theme_name}故事 {story_data['index']} 时出错: {e}"
-        )
-        import traceback
+                traceback.print_exc()
+                return False
 
-        traceback.print_exc()
-        return False
+    # 如果所有重试都用完了但没有成功
+    print(
+        f"窗口 {window_index}: {theme_name}故事 {story_data['index']} 所有重试都失败，跳过此故事"
+    )
+    return False
 
 
 def main():
@@ -1065,25 +1175,30 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 支持的主题:
-  scifi    - 科幻故事
-  fantasy  - 奇幻故事
-  love     - 爱情故事 (即将支持)
-  detective- 侦探推理故事 (即将支持)
-  mystery  - 悬疑故事 (即将支持)
+  scifi     - 科幻故事
+  fantasy   - 奇幻故事
+  thriller  - 惊悚故事
+  romance   - 爱情故事
+  horror    - 恐怖故事
 
 使用示例:
-  python ai_studio_bot.py --theme scifi --count 5
-  python ai_studio_bot.py --theme fantasy --count 3 --ads-id your_browser_id
+  python ai_studio_bot.py --count 5                                    # 所有主题各生成5个故事
+  python ai_studio_bot.py --theme scifi fantasy --count 3              # 只为科幻和奇幻各生成3个故事
+  python ai_studio_bot.py --theme scifi --count 2 --ads-id your_id     # 指定浏览器ID
         """,
     )
     parser.add_argument(
-        "--count", "-c", type=int, default=2, help="要生成的故事数量 (默认: 2)"
+        "--count", "-c", type=int, default=2, help="每个主题要生成的故事数量 (默认: 2)"
     )
     parser.add_argument(
         "--ads-id", default="kyencl7", help="AdsPower 浏览器ID (默认: kyencl7)"
     )
     parser.add_argument(
-        "--theme", "-t", help="要生成故事的主题 (必需，除非使用--list-themes)"
+        "--theme",
+        "-t",
+        nargs="*",
+        choices=list(SUPPORTED_THEMES.keys()),
+        help="要生成故事的主题列表 (默认: 所有主题)",
     )
     parser.add_argument("--list-themes", action="store_true", help="列出所有支持的主题")
 
@@ -1094,61 +1209,67 @@ def main():
         list_available_themes()
         return
 
-    # 如果没有指定主题且没有使用--list-themes，则报错
-    if not args.theme:
-        print("❌ 错误：必须指定主题，使用 --theme 参数")
-        list_available_themes()
-        return
-
-    # 验证主题
-    try:
-        validate_theme(args.theme)
-    except ValueError as e:
-        print(f"❌ {e}")
-        list_available_themes()
-        return
+    # 确定要处理的主题
+    if args.theme:
+        themes = args.theme
+        # 验证每个主题
+        for theme in themes:
+            try:
+                validate_theme(theme)
+            except ValueError as e:
+                print(f"❌ {e}")
+                list_available_themes()
+                return
+    else:
+        # 默认使用所有可用主题
+        themes = list(SUPPORTED_THEMES.keys())
+        print("🎯 未指定主题，将为所有主题生成故事")
 
     # 验证参数
     if args.count <= 0:
         print("❌ 错误：故事数量必须大于 0")
         return
 
-    if args.count > 10:
-        print("⚠️  警告：建议不要一次生成超过 10 个故事，以免浏览器性能问题")
+    total_stories = len(themes) * args.count
+    if total_stories > 20:
+        print(
+            f"⚠️ 警告：总共要生成 {total_stories} 个故事（{len(themes)}个主题 × {args.count}个/主题）"
+        )
+        print("建议不要一次生成超过 20 个故事，以免浏览器性能问题")
         response = input("是否继续？(y/N): ")
         if response.lower() != "y":
             print("已取消")
             return
 
     ads_id = args.ads_id
-    story_count = args.count
-    theme = args.theme
-    theme_name = SUPPORTED_THEMES[theme]["name"]
+    story_count_per_theme = args.count
 
-    print(f"🎯 准备生成 {story_count} 个 {theme_name}({theme}) 故事")
+    print(f"🎯 准备轮流为 {len(themes)} 个主题生成故事")
+    for theme in themes:
+        theme_name = SUPPORTED_THEMES[theme]["name"]
+        print(f"  📚 {theme_name}({theme}): {story_count_per_theme} 个故事")
     print(f"📱 使用 AdsPower ID: {ads_id}")
 
     close_url = f"http://127.0.0.1:50325/api/v1/browser/stop?user_id={ads_id}"
 
     try:
-        story_dir_path = get_theme_story_path_prefix(theme)
+        # 为所有主题创建故事保存目录
+        for theme in themes:
+            story_dir_path = get_theme_story_path_prefix(theme)
+            os.makedirs(story_dir_path, exist_ok=True)
+            theme_name = SUPPORTED_THEMES[theme]["name"]
+            print(f"{theme_name}({theme}) 故事保存目录: {story_dir_path}")
 
-        # 确保故事目录存在
-        os.makedirs(story_dir_path, exist_ok=True)
-        print(f"故事将保存在: {story_dir_path}")
-
-        # 获取需要生成的故事参数
-        stories_to_generate = get_story_parameters_to_generate(theme, story_count)
+        # 准备多主题轮流生成计划
+        stories_to_generate = prepare_multi_theme_generation(
+            themes, story_count_per_theme
+        )
 
         if not stories_to_generate:
             print("没有需要生成的故事")
             return
 
-        print(f"📝 实际需要生成 {len(stories_to_generate)} 个故事")
-
-        # 为每个故事参数添加目录路径，以提高后续处理效率
-        for story in stories_to_generate:
-            story["dir_path"] = story_dir_path
+        print(f"📝 实际需要生成 {len(stories_to_generate)} 个故事（轮流模式）")
 
         # 获取WebDriver
         ws_endpoint, remote_debugging_url, http = get_adspower_info(ads_id)
@@ -1157,6 +1278,12 @@ def main():
             return
 
         # 使用Playwright连接浏览器
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            print("错误: 缺少 playwright 模块，请安装: pip install playwright")
+            return
+
         print("正在使用Playwright连接浏览器...")
         with sync_playwright() as p:
             browser = p.chromium.connect_over_cdp(remote_debugging_url)
@@ -1234,12 +1361,19 @@ def main():
                     for i, window in enumerate(windows):
                         if i < len(current_batch):
                             story_data = current_batch[i]
+                            story_theme = story_data["theme"]
+                            theme_name = SUPPORTED_THEMES[story_theme]["name"]
                             print(
-                                f"\n=== 开始处理窗口 {i+1}，故事 {story_data['index']} ==="
+                                f"\n=== 开始处理窗口 {i+1}，{theme_name}故事 {story_data['index']} ==="
                             )
 
                             # 切换到当前窗口并使其获得焦点
-                            window.bring_to_front()
+                            try:
+                                window.bring_to_front()
+                            except Exception as bring_error:
+                                print(f"窗口 {i+1} 已失效，跳过此故事: {bring_error}")
+                                batch_results.append(False)
+                                continue
 
                             # 处理当前窗口的故事
                             try:
@@ -1250,7 +1384,7 @@ def main():
                                     window,
                                     i + 1,
                                     story_data,
-                                    theme,
+                                    story_theme,  # 使用故事数据中的主题
                                     is_first,
                                     need_warmup,
                                 )
@@ -1272,11 +1406,11 @@ def main():
 
                                 if success:
                                     print(
-                                        f"窗口 {i+1}：故事 {story_data['index']} 生成成功！"
+                                        f"窗口 {i+1}：{theme_name}故事 {story_data['index']} 生成成功！"
                                     )
                                 else:
                                     print(
-                                        f"窗口 {i+1}：故事 {story_data['index']} 生成失败！"
+                                        f"窗口 {i+1}：{theme_name}故事 {story_data['index']} 生成失败！"
                                     )
 
                                 # 在处理下一个窗口前稍作等待（已在process_window中有20秒等待）
@@ -1285,33 +1419,11 @@ def main():
                                     time.sleep(2)
 
                             except Exception as e:
-                                if "AI生成状态检测失败" in str(e):
-                                    print(f"\n❌ 检测到AI生成状态失败！")
-                                    print(f"错误信息: {e}")
-                                    print(f"正在退出浏览器...")
-
-                                    # 关闭所有窗口
-                                    for j, close_window in enumerate(windows):
-                                        try:
-                                            close_window.close()
-                                            print(f"已关闭窗口 {j+1}")
-                                        except Exception as close_e:
-                                            print(f"关闭窗口 {j+1} 时出错: {close_e}")
-
-                                    # 断开Playwright连接
-                                    browser.close()
-                                    print("已断开Playwright连接")
-
-                                    # 关闭AdsPower浏览器
-                                    print("正在关闭AdsPower浏览器...")
-                                    http.request("GET", close_url)
-                                    print("AdsPower浏览器已关闭")
-
-                                    print("\n🔄 生成失败，请重新运行程序")
-                                    return
-                                else:
-                                    # 其他异常继续抛出
-                                    raise e
+                                # 现在所有错误都在process_window中处理，包括internal error重试
+                                # 这里只记录错误并继续处理下一个故事
+                                print(f"窗口 {i+1}: 处理故事时发生异常: {e}")
+                                batch_results.append(False)
+                                # 继续处理下一个窗口
 
                     # 更新处理进度
                     stories_processed += len(current_batch)
@@ -1345,14 +1457,52 @@ def main():
 
             print(f"\n=== 🎉 所有故事处理完成 ===")
             print(f"✅ 成功生成: {successful_stories}/{total_stories} 个故事")
-            print(f"📊 成功率: {successful_stories/total_stories*100:.1f}%")
+            if total_stories > 0:
+                print(f"📊 成功率: {successful_stories/total_stories*100:.1f}%")
+            else:
+                print("📊 成功率: 无法计算（没有处理任何故事）")
+
+            # 按主题分类显示结果
+            print(f"\n📊 分主题统计:")
+            theme_success = {}
+            theme_total = {}
+
+            for i, story_data in enumerate(stories_to_generate):
+                theme = story_data["theme"]
+                theme_name = SUPPORTED_THEMES[theme]["name"]
+
+                if theme not in theme_total:
+                    theme_total[theme] = 0
+                    theme_success[theme] = 0
+
+                theme_total[theme] += 1
+                if i < len(all_results) and all_results[i]:
+                    theme_success[theme] += 1
+
+            for theme in sorted(theme_total.keys()):
+                theme_name = SUPPORTED_THEMES[theme]["name"]
+                success_count = theme_success[theme]
+                total_count = theme_total[theme]
+                if total_count > 0:
+                    success_rate = success_count / total_count * 100
+                    print(
+                        f"  {theme_name}({theme}): {success_count}/{total_count} ({success_rate:.1f}%)"
+                    )
+                else:
+                    print(
+                        f"  {theme_name}({theme}): {success_count}/{total_count} (无数据)"
+                    )
 
             # 关闭所有窗口
             print("正在关闭所有窗口...")
             for i, window in enumerate(windows):
                 try:
-                    window.close()
-                    print(f"已关闭窗口 {i+1}")
+                    # 检查窗口是否仍然有效
+                    if not window.is_closed():
+                        window.close()
+                        print(f"已关闭窗口 {i+1}")
+                    else:
+                        print(f"窗口 {i+1} 已经关闭")
                 except Exception as e:
                     print(f"关闭窗口 {i+1} 时出错: {e}")
 

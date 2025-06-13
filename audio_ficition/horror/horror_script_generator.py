@@ -29,7 +29,7 @@ Horror Story Script Parameter Generator
     - 命令行参数: 可选的生成数量和输出目录
 
 输出:
-    - 默认目录: /Volumes/dhl/audio/horror/story_param/ (macOS)
+    - 默认目录: /Users/donghaoliu/Documents/audio/story_param/horror/ (macOS)
     - 备选目录: /media/dhl/audio/horror/story_param/ (Linux)
     - 文件格式: {索引号}.txt (如: 1.txt, 2.txt, 3.txt...)
     - 内容: 完整的恐怖故事创作提示词，可直接用于AI生成故事
@@ -80,7 +80,7 @@ def get_base_output_path():
     """根据操作系统返回适当的输出路径"""
     system = platform.system()
     if system == "Darwin":  # macOS
-        return "/Volumes/dhl/audio/horror/story_param"
+        return "/Users/donghaoliu/Documents/audio/story_param/horror"
     else:  # 默认为Linux/Ubuntu
         return "/media/dhl/audio/horror/story_param"
 

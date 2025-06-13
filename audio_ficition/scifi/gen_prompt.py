@@ -80,7 +80,7 @@ def get_base_output_path():
     """根据操作系统返回适当的输出路径"""
     system = platform.system()
     if system == "Darwin":  # macOS
-        return "/Volumes/dhl/audio/scifi/story_param/en"
+        return "/Users/donghaoliu/Documents/audio/story_param/scifi"
     else:  # 默认为Linux/Ubuntu
         return "/media/dhl/audio/scifi/story_param/en"
 

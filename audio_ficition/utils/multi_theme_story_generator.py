@@ -8,6 +8,7 @@ Multi-Theme Story Parameter Generator
     一次性为多个主题生成故事参数，支持 thriller（惊悚）、scifi（科幻）、
     romance（爱情）、horror（恐怖）、fantasy（奇幻）五个主题。
     可以批量生成指定数量的故事参数，每个主题独立生成。
+    支持断点续传，自动排除Mac系统产生的点文件。
 
 支持的主题:
     - thriller: 惊悚故事
@@ -30,14 +31,14 @@ Multi-Theme Story Parameter Generator
        python multi_theme_story_generator.py -h
 
 输出目录:
-    - Thriller: /Volumes/dhl/audio/thriller/story_params/
-    - Scifi: /Volumes/dhl/audio/scifi/story_params/
-    - Romance: /Volumes/dhl/audio/romance/story_params/
-    - Horror: /Volumes/dhl/audio/horror/story_params/
-    - Fantasy: /Volumes/dhl/audio/fantasy/story_params/
+    - 本地目录: /Users/donghaoliu/Documents/audio/story_param/[theme_name]/
+
+系统要求:
+    - 必须在 macOS 系统上运行
+    - 必须是 Apple Silicon (M1/M2/M3) 芯片
 
 作者: 多主题故事生成系统
-版本: 1.0
+版本: 2.0
 """
 
 import os
@@ -48,44 +49,92 @@ import platform
 from pathlib import Path
 
 
+def check_system_requirements():
+    """检查系统要求：必须是Mac且必须是M1芯片"""
+    # 检查操作系统
+    if platform.system() != "Darwin":
+        print("❌ 错误：此程序只能在 macOS 系统上运行")
+        print(f"当前系统：{platform.system()}")
+        sys.exit(1)
+
+    # 检查芯片架构
+    machine = platform.machine().lower()
+    processor = platform.processor().lower()
+
+    # M1/M2/M3 芯片通常显示为 arm64
+    is_apple_silicon = (
+        machine == "arm64"
+        or "arm" in machine
+        or "apple" in processor
+        or "m1" in processor
+        or "m2" in processor
+        or "m3" in processor
+    )
+
+    if not is_apple_silicon:
+        print("❌ 错误：此程序只能在 Apple Silicon (M1/M2/M3) 芯片的 Mac 上运行")
+        print(f"当前芯片架构：{machine}")
+        print(f"当前处理器：{processor}")
+        sys.exit(1)
+
+    print("✅ 系统检查通过：macOS + Apple Silicon")
+    print(f"芯片架构：{machine}")
+
+
 def get_base_audio_dir():
-    """根据操作系统返回合适的音频基础目录"""
-    if platform.system() == "Darwin":  # macOS
-        return "/Volumes/dhl/audio"
-    else:  # Linux 和其他系统
-        return "/media/dhl/audio"
+    """返回本地音频基础目录"""
+    return "/Users/donghaoliu/Documents/audio/story_param"
+
+
+def count_existing_files(directory):
+    """统计目录中已存在的有效文件数量，排除Mac产生的点文件"""
+    if not os.path.exists(directory):
+        return 0
+
+    try:
+        files = os.listdir(directory)
+        # 排除点文件（Mac系统文件）
+        valid_files = [
+            f
+            for f in files
+            if not f.startswith(".") and os.path.isfile(os.path.join(directory, f))
+        ]
+        return len(valid_files)
+    except Exception as e:
+        print(f"警告：无法读取目录 {directory}: {e}")
+        return 0
 
 
 # 主题配置：每个主题对应的脚本路径和名称
 def get_themes_config():
-    """获取主题配置，根据操作系统动态设置路径"""
+    """获取主题配置，使用本地路径"""
     base_dir = get_base_audio_dir()
-    
+
     return {
         "thriller": {
             "script_path": "audio_ficition/thriller/thriller_script_generator.py",
             "display_name": "惊悚故事",
-            "output_info": f"{base_dir}/thriller/story_params/",
+            "output_info": f"{base_dir}/thriller/",
         },
         "scifi": {
             "script_path": "audio_ficition/scifi/gen_prompt.py",
             "display_name": "科幻故事",
-            "output_info": f"{base_dir}/scifi/story_param/en/",
+            "output_info": f"{base_dir}/scifi/",
         },
         "romance": {
             "script_path": "audio_ficition/romance/romance_script_generator.py",
             "display_name": "爱情故事",
-            "output_info": f"{base_dir}/romance/story_params/",
+            "output_info": f"{base_dir}/romance/",
         },
         "horror": {
             "script_path": "audio_ficition/horror/horror_script_generator.py",
             "display_name": "恐怖故事",
-            "output_info": f"{base_dir}/horror/story_params/",
+            "output_info": f"{base_dir}/horror/",
         },
         "fantasy": {
             "script_path": "audio_ficition/fantasy/fantasy_script_generator.py",
             "display_name": "奇幻故事",
-            "output_info": f"{base_dir}/fantasy/story_param/",
+            "output_info": f"{base_dir}/fantasy/",
         },
     }
 
@@ -96,7 +145,7 @@ def get_workspace_root():
 
 
 def run_theme_generator(theme, count, workspace_root):
-    """运行特定主题的生成器"""
+    """运行特定主题的生成器，支持断点续传"""
     themes_config = get_themes_config()
     config = themes_config[theme]
     script_path = workspace_root / config["script_path"]
@@ -105,21 +154,39 @@ def run_theme_generator(theme, count, workspace_root):
         print(f"错误: 未找到 {config['display_name']} 生成器脚本: {script_path}")
         return False
 
+    # 检查断点续传
+    output_dir = config["output_info"]
+    existing_count = count_existing_files(output_dir)
+
+    if existing_count >= count:
+        print(f"\n{'='*50}")
+        print(f"📁 {config['display_name']} 已有 {existing_count} 个文件，无需生成")
+        print(f"目标数量: {count}，已存在: {existing_count}")
+        print(f"输出目录: {output_dir}")
+        print(f"{'='*50}")
+        print(f"✅ {config['display_name']} 跳过生成（已完成）!")
+        return True
+
+    need_generate = count - existing_count
     print(f"\n{'='*50}")
-    print(f"正在为 {config['display_name']} 生成 {count} 个故事参数...")
+    print(f"正在为 {config['display_name']} 生成 {need_generate} 个故事参数...")
+    print(f"目标数量: {count}，已存在: {existing_count}，需要生成: {need_generate}")
     print(f"脚本路径: {script_path}")
-    print(f"输出目录: {config['output_info']}")
+    print(f"输出目录: {output_dir}")
     print(f"{'='*50}")
 
     try:
+        # 确保输出目录存在
+        os.makedirs(output_dir, exist_ok=True)
+
         # 构建命令
         cmd = [sys.executable, str(script_path)]
 
         # 为科幻主题使用不同的参数名
         if theme == "scifi":
-            cmd.extend(["--num", str(count)])
+            cmd.extend(["--num", str(need_generate)])
         else:
-            cmd.extend(["-n", str(count)])
+            cmd.extend(["-n", str(need_generate)])
 
         # 设置正确的工作目录（脚本所在目录）
         script_dir = script_path.parent
@@ -147,7 +214,9 @@ def run_theme_generator(theme, count, workspace_root):
             has_error = True
 
         if result.returncode == 0 and not has_error:
-            print(f"✅ {config['display_name']} 生成完成!")
+            # 再次检查文件数量确认生成成功
+            final_count = count_existing_files(output_dir)
+            print(f"✅ {config['display_name']} 生成完成! 最终文件数量: {final_count}")
             return True
         else:
             print(f"❌ {config['display_name']} 生成失败! 返回码: {result.returncode}")
@@ -160,8 +229,11 @@ def run_theme_generator(theme, count, workspace_root):
 
 def main():
     """主函数"""
+    # 首先检查系统要求
+    check_system_requirements()
+
     parser = argparse.ArgumentParser(
-        description="一次性生成多个主题的故事参数",
+        description="一次性生成多个主题的故事参数（支持断点续传）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 支持的主题:
@@ -170,6 +242,15 @@ def main():
   romance   - 爱情故事
   horror    - 恐怖故事
   fantasy   - 奇幻故事
+
+系统要求:
+  - macOS 系统
+  - Apple Silicon (M1/M2/M3) 芯片
+
+断点续传:
+  - 自动检测已存在的文件数量
+  - 只生成缺少的文件
+  - 自动排除 Mac 系统产生的点文件
 
 示例:
   %(prog)s                          # 为所有主题各生成1个故事
@@ -197,10 +278,23 @@ def main():
     workspace_root = get_workspace_root()
     themes_config = get_themes_config()
 
-    print("🚀 多主题故事参数生成器启动")
+    print("🚀 多主题故事参数生成器启动 (支持断点续传)")
     print(f"工作区根目录: {workspace_root}")
     print(f"选择的主题: {[themes_config[t]['display_name'] for t in args.themes]}")
-    print(f"每个主题生成数量: {args.number}")
+    print(f"每个主题目标数量: {args.number}")
+    print(f"输出基础目录: {get_base_audio_dir()}")
+
+    # 显示断点续传信息
+    print(f"\n📊 断点续传检查:")
+    for theme in args.themes:
+        config = themes_config[theme]
+        existing = count_existing_files(config["output_info"])
+        status = (
+            "✅ 已完成"
+            if existing >= args.number
+            else f"📝 需要生成 {args.number - existing} 个"
+        )
+        print(f"  {config['display_name']}: {existing}/{args.number} - {status}")
 
     # 统计信息
     total_themes = len(args.themes)
@@ -227,21 +321,20 @@ def main():
         print(f"失败的主题: {', '.join(failed_themes)}")
 
     if successful_themes > 0:
-        print(
-            f"\n✅ 成功为 {successful_themes} 个主题各生成了 {args.number} 个故事参数"
-        )
+        print(f"\n✅ 成功处理 {successful_themes} 个主题")
         print("📁 输出目录:")
         for theme in args.themes:
             if themes_config[theme]["display_name"] not in failed_themes:
+                final_count = count_existing_files(themes_config[theme]["output_info"])
                 print(
-                    f"  {themes_config[theme]['display_name']}: {themes_config[theme]['output_info']}"
+                    f"  {themes_config[theme]['display_name']}: {themes_config[theme]['output_info']} ({final_count} 个文件)"
                 )
 
     if failed_themes:
         print(f"\n❌ {len(failed_themes)} 个主题生成失败，请检查错误信息")
         return 1
     else:
-        print(f"\n🎉 所有主题都成功生成！")
+        print(f"\n🎉 所有主题都成功处理！")
         return 0
 
 
