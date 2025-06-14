@@ -33,8 +33,11 @@ AI Studio 多主题故事生成自动化脚本
 4. 💾 自动保存管理
    - 自动将生成的故事保存为编号的文本文件
    - 支持断点续传：检测已存在的故事，只生成缺失的部分
-   - 文件保存路径格式：/Users/donghaoliu/Documents/audio/full_story/{theme}/{index}.txt
-   - 自动排除Mac系统产生的点文件
+   - 智能路径选择：
+     * Intel Mac (x86_64): /Volumes/dhl/audio/{theme}/full_story/{index}.txt
+     * Apple Silicon Mac (M1/M2/M3): /Users/donghaoliu/Documents/audio/{theme}/full_story/{index}.txt
+   - 文件命名格式：{索引号}.txt (例如: 1.txt, 2.txt, 3.txt...)
+   - 自动排除Mac系统产生的点文件(.DS_Store等)
 
 5. 🔄 错误处理与重试
    - 智能检测AI生成状态（通过监控停止按钮状态）
@@ -47,10 +50,33 @@ AI Studio 多主题故事生成自动化脚本
    - 支持指定主题：--theme 或 -t 参数（可选，默认所有主题）
    - 默认每个主题生成2个故事，使用 kyencl7 浏览器配置
 
+🗂️ 路径结构说明：
+Intel Mac (x86_64) 系统:
+  /Volumes/dhl/audio/
+  ├── scifi/
+  │   ├── full_story/      ← 生成的故事保存位置 (1.txt, 2.txt, ...)
+  │   └── story_param/     ← 故事参数文件 (由multi_theme_story_generator.py生成)
+  ├── fantasy/
+  │   ├── full_story/
+  │   └── story_param/
+  └── ...
+
+Apple Silicon Mac (M1/M2/M3) 系统:
+  /Users/donghaoliu/Documents/audio/
+  ├── scifi/
+  │   ├── full_story/      ← 生成的故事保存位置 (1.txt, 2.txt, ...)
+  │   └── story_param/     ← 故事参数文件 (由multi_theme_story_generator.py生成)
+  ├── fantasy/
+  │   ├── full_story/
+  │   └── story_param/
+  └── ...
+
 使用方法：
 python ai_studio_bot.py --count 5                                    # 所有主题各生成5个故事
 python ai_studio_bot.py --theme scifi fantasy --count 3              # 只为科幻和奇幻各生成3个故事
 python ai_studio_bot.py --theme scifi --count 2 --ads-id your_id     # 指定浏览器ID
+python ai_studio_bot.py --check-resume                               # 检查所有主题的断点续传状态
+python ai_studio_bot.py --check-resume --theme scifi thriller        # 检查指定主题的断点续传状态
 
 依赖组件：
 - AdsPower：提供浏览器环境隔离
@@ -119,20 +145,92 @@ WARMUP_QUESTIONS = [
 
 
 def get_base_audio_dir():
-    """返回音频基础目录"""
-    return "/Users/donghaoliu/Documents/audio"
+    """返回音频基础目录，根据Mac芯片类型区分路径
+
+    详细路径说明：
+    - Intel Mac (x86_64): /Volumes/dhl/audio
+      └── 故事保存路径示例: /Volumes/dhl/audio/scifi/full_story/1.txt
+    - Apple Silicon Mac (M1/M2/M3等): /Users/donghaoliu/Documents/audio
+      └── 故事保存路径示例: /Users/donghaoliu/Documents/audio/scifi/full_story/1.txt
+
+    返回:
+        str: 基础音频目录路径
+    """
+    # 检查操作系统
+    if platform.system() == "Darwin":
+        machine = platform.machine().lower()
+        processor = platform.processor().lower()
+        # Apple Silicon (M芯片)
+        is_apple_silicon = (
+            machine == "arm64"
+            or "arm" in machine
+            or "apple" in processor
+            or "m1" in processor
+            or "m2" in processor
+            or "m3" in processor
+        )
+        if is_apple_silicon:
+            base_dir = "/Users/donghaoliu/Documents/audio"
+            print(f"🔍 检测到 Apple Silicon Mac，使用基础目录: {base_dir}")
+            return base_dir
+        else:
+            # Intel Mac
+            base_dir = "/Volumes/dhl/audio"
+            print(f"🔍 检测到 Intel Mac，使用基础目录: {base_dir}")
+            return base_dir
+    # 其他系统暂时不支持
+    base_dir = "/Users/donghaoliu/Documents/audio"
+    print(f"🔍 未识别系统类型，使用默认目录: {base_dir}")
+    return base_dir
 
 
 def get_theme_story_path_prefix(theme):
-    """获取主题对应的故事文件目录路径"""
+    """获取主题对应的故事文件目录路径
+
+    参数:
+        theme (str): 主题名称 (scifi, fantasy, thriller, romance, horror)
+
+    返回路径格式:
+        - Intel Mac: /Volumes/dhl/audio/{theme}/full_story/
+        - Apple Silicon Mac: /Users/donghaoliu/Documents/audio/{theme}/full_story/
+
+    故事文件命名格式: {index}.txt
+    例如: 1.txt, 2.txt, 3.txt...
+    """
     base_dir = get_base_audio_dir()
-    return f"{base_dir}/full_story/{theme}"
+    story_dir = f"{base_dir}/{theme}/full_story"
+
+    # 添加详细的路径说明输出
+    print(
+        f"📁 {SUPPORTED_THEMES.get(theme, {}).get('name', theme)}({theme}) 主题故事保存目录:"
+    )
+    print(f"   完整路径: {story_dir}")
+    print(f"   文件格式: {story_dir}/{{索引号}}.txt")
+    print(f"   示例文件: {story_dir}/1.txt, {story_dir}/2.txt, ...")
+
+    return story_dir
 
 
 def get_theme_param_path_prefix(theme):
-    """获取主题对应的参数文件目录路径（从multi_theme_story_generator.py输出读取）"""
+    """获取主题对应的参数文件目录路径（从multi_theme_story_generator.py输出读取）
+
+    参数:
+        theme (str): 主题名称 (scifi, fantasy, thriller, romance, horror)
+
+    返回路径格式:
+        - Intel Mac: /Volumes/dhl/audio/{theme}/story_param/
+        - Apple Silicon Mac: /Users/donghaoliu/Documents/audio/{theme}/story_param/
+
+    参数文件由 multi_theme_story_generator.py 脚本生成
+    """
     base_dir = get_base_audio_dir()
-    return f"{base_dir}/story_param/{theme}"
+    param_dir = f"{base_dir}/{theme}/story_param"
+
+    print(
+        f"📋 {SUPPORTED_THEMES.get(theme, {}).get('name', theme)}({theme}) 主题参数文件目录: {param_dir}"
+    )
+
+    return param_dir
 
 
 def get_available_story_param_files(theme):
@@ -281,13 +379,13 @@ def list_available_themes():
 def countdown_wait(seconds=20, window_index=None):
     """显示倒计时等待"""
     prefix = f"窗口 {window_index}: " if window_index else ""
-    print(f"{prefix}等待 {seconds} 秒后继续...")
+    print(f"⏳ {prefix}等待 {seconds} 秒后继续...")
 
     for i in range(seconds, 0, -1):
-        print(f"\r{prefix}倒计时: {i:2d} 秒", end="", flush=True)
+        print(f"\r⏰ {prefix}倒计时: {i:2d} 秒", end="", flush=True)
         time.sleep(1)
 
-    print(f"\r{prefix}等待完成！{'':10}")  # 清除倒计时显示
+    print(f"\r✅ {prefix}等待完成！{'':10}")  # 清除倒计时显示
 
 
 def get_adspower_info(ads_id):
@@ -328,46 +426,105 @@ def get_adspower_info(ads_id):
 
 
 def get_existing_stories(story_dir_path):
-    """获取已存在的故事索引"""
+    """获取已存在的故事索引，支持Intel Mac断点续传"""
+    # 确保目录存在
+    if not os.path.exists(story_dir_path):
+        print(f"故事目录不存在: {story_dir_path}")
+        return set()
+
     # 搜索目录下的数字命名txt文件
     story_files = glob.glob(f"{story_dir_path}/*.txt")
-    print(f"DEBUG: Searching for stories with pattern: {story_dir_path}/*.txt")
-    print(f"DEBUG: Found story files: {story_files}")
+    print(f"🔍 在目录 {story_dir_path} 中搜索故事文件...")
+    print(f"📁 使用搜索模式: {story_dir_path}/*.txt")
+    print(f"📊 找到 {len(story_files)} 个 .txt 文件")
 
     existing_indices = []
+    valid_stories = []
+
     for f in story_files:
-        # 从文件名中提取数字索引
         filename = os.path.basename(f)
+
+        # 排除Mac系统产生的点文件
+        if filename.startswith("."):
+            print(f"⏭️  跳过Mac系统文件: {filename}")
+            continue
+
+        # 从文件名中提取数字索引
         match = re.search(r"^(\d+)\.txt$", filename)
         if match:
-            existing_indices.append(int(match.group(1)))
+            story_index = int(match.group(1))
+
+            # 验证文件是否有效（检查文件大小和内容）
+            try:
+                file_size = os.path.getsize(f)
+                if file_size > 100:  # 文件大小应该大于100字节
+                    with open(f, "r", encoding="utf-8") as file:
+                        content = file.read(200)  # 读取前200字符检查
+                        if content.strip():  # 确保文件有内容
+                            existing_indices.append(story_index)
+                            valid_stories.append((story_index, filename, file_size))
+                        else:
+                            print(f"⚠️  空文件: {filename}")
+                else:
+                    print(f"⚠️  文件过小: {filename} ({file_size} 字节)")
+            except Exception as e:
+                print(f"⚠️  无法验证文件: {filename} - {e}")
+        else:
+            print(f"⏭️  跳过非数字命名文件: {filename}")
 
     if existing_indices:
-        print(
-            f"找到 {len(existing_indices)} 个已存在的故事，索引为: {sorted(existing_indices)}"
-        )
+        sorted_indices = sorted(existing_indices)
+        print(f"✅ 找到 {len(existing_indices)} 个有效的已存在故事:")
+        for story_index, filename, file_size in sorted(valid_stories):
+            print(f"   📄 故事 {story_index}: {filename} ({file_size} 字节)")
+        print(f"📋 故事索引范围: {min(sorted_indices)} - {max(sorted_indices)}")
     else:
-        print("未找到任何已存在的故事。")
+        print("❌ 未找到任何有效的已存在故事")
 
     return set(existing_indices)
 
 
 def get_next_story_index_for_theme(theme):
     """获取主题的下一个可用故事索引（支持断点续传）"""
+    theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
     story_dir_path = get_theme_story_path_prefix(theme)
+
+    print(f"\n🔍 检查 {theme_name}({theme}) 主题的已存在故事...")
+    print(f"📁 故事目录: {story_dir_path}")
+
+    # 确保目录存在
+    os.makedirs(story_dir_path, exist_ok=True)
+
     existing_indices = get_existing_stories(story_dir_path)
 
     if not existing_indices:
-        return 1  # 如果没有任何故事，从1开始
+        print(f"🆕 {theme_name} 主题还没有任何故事，将从索引 1 开始")
+        return 1
 
-    # 找出缺失的最小索引
+    # 找出缺失的最小索引（优先填补空缺）
     max_existing = max(existing_indices)
+    min_existing = min(existing_indices)
+
+    print(f"📊 {theme_name} 主题现有故事索引分析:")
+    print(f"   最小索引: {min_existing}")
+    print(f"   最大索引: {max_existing}")
+    print(f"   故事总数: {len(existing_indices)}")
+
+    # 查找空缺
+    missing_indices = []
     for i in range(1, max_existing + 1):
         if i not in existing_indices:
-            return i
+            missing_indices.append(i)
 
-    # 如果没有缺失，返回最大值+1
-    return max_existing + 1
+    if missing_indices:
+        next_index = min(missing_indices)
+        print(f"🔄 发现空缺索引，{theme_name} 下一个生成索引: {next_index} (填补空缺)")
+        print(f"   所有空缺索引: {missing_indices}")
+        return next_index
+    else:
+        next_index = max_existing + 1
+        print(f"➕ 无空缺索引，{theme_name} 下一个生成索引: {next_index} (续接最大值)")
+        return next_index
 
 
 def get_next_available_param_file_for_theme(theme, used_param_files):
@@ -385,25 +542,115 @@ def get_next_available_param_file_for_theme(theme, used_param_files):
     return None
 
 
+def check_theme_resume_status(theme):
+    """检查主题的断点续传状态"""
+    theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
+    story_dir_path = get_theme_story_path_prefix(theme)
+    param_dir_path = get_theme_param_path_prefix(theme)
+
+    print(f"\n=== 📋 {theme_name}({theme}) 断点续传状态检查 ===")
+
+    # 检查目录是否存在
+    story_dir_exists = os.path.exists(story_dir_path)
+    param_dir_exists = os.path.exists(param_dir_path)
+
+    print(
+        f"📁 故事目录: {story_dir_path} {'✅存在' if story_dir_exists else '❌不存在'}"
+    )
+    print(
+        f"📁 参数目录: {param_dir_path} {'✅存在' if param_dir_exists else '❌不存在'}"
+    )
+
+    if not story_dir_exists and not param_dir_exists:
+        print(f"⚠️  {theme_name} 主题相关目录都不存在，可能是首次运行")
+        return
+
+    # 获取已有故事
+    existing_stories = set()
+    if story_dir_exists:
+        existing_stories = get_existing_stories(story_dir_path)
+
+    # 获取可用参数文件
+    available_params = []
+    if param_dir_exists:
+        available_params = get_available_story_param_files(theme)
+
+    print(f"📊 {theme_name} 主题状态汇总:")
+    print(f"   已有故事: {len(existing_stories)} 个")
+    print(f"   可用参数: {len(available_params)} 个")
+
+    if existing_stories:
+        sorted_stories = sorted(existing_stories)
+        print(f"   故事索引: {sorted_stories}")
+
+        # 检查是否有空缺
+        max_story = max(existing_stories)
+        expected_range = set(range(1, max_story + 1))
+        missing = expected_range - existing_stories
+
+        if missing:
+            print(f"   ⚠️  发现空缺索引: {sorted(missing)}")
+        else:
+            print(f"   ✅ 故事索引连续完整")
+
+    if available_params:
+        print(f"   参数文件: {[os.path.basename(p) for p in available_params]}")
+
+    # 计算可以生成的故事数量
+    if available_params:
+        if existing_stories:
+            next_index = get_next_story_index_for_theme(theme)
+            print(f"   🎯 下一个生成索引: {next_index}")
+        print(f"   🚀 理论可生成: {len(available_params)} 个新故事")
+    else:
+        print(f"   ❌ 无可用参数文件，无法生成新故事")
+
+    print(f"{'='*50}")
+
+    return {
+        "theme": theme,
+        "existing_stories": len(existing_stories),
+        "available_params": len(available_params),
+        "can_generate": len(available_params) > 0,
+    }
+
+
 def prepare_multi_theme_generation(themes, num_per_theme):
     """
     准备多主题轮流生成的参数列表
 
     返回一个按轮次组织的生成计划，每轮为每个主题生成一个故事
     """
+    print(f"\n🔍 开始检查所有主题的断点续传状态...")
+
+    # 先检查所有主题的断点续传状态
+    theme_status = {}
+    for theme in themes:
+        status = check_theme_resume_status(theme)
+        theme_status[theme] = status
+
     # 检查每个主题的参数文件可用性
     theme_param_files = {}
     theme_available_counts = {}
 
+    print(f"\n📋 汇总所有主题状态:")
     for theme in themes:
         param_files = get_available_story_param_files(theme)
         theme_param_files[theme] = param_files
         theme_available_counts[theme] = len(param_files)
 
+        theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
+        status = theme_status.get(theme, {})
+        existing_count = status.get("existing_stories", 0)
+
         if not param_files:
-            print(f"⚠️ 主题 {theme} 没有可用的参数文件")
+            print(
+                f"❌ {theme_name}({theme}): 无可用参数文件 (已有故事: {existing_count})"
+            )
         else:
-            print(f"✅ 主题 {theme} 有 {len(param_files)} 个参数文件可用")
+            print(
+                f"✅ {theme_name}({theme}): {len(param_files)} 个参数文件可用 (已有故事: {existing_count})"
+            )
 
     # 生成轮次计划
     generation_plan = []
@@ -474,7 +721,7 @@ def prepare_multi_theme_generation(themes, num_per_theme):
 
 def wait_for_warmup_completion(page, window_index):
     """等待热身问题的AI回答完成 - 停止按钮状态判断+错误检测"""
-    print(f"窗口 {window_index}: 正在等待热身问题AI回答完成...")
+    print(f"🔄 窗口 {window_index}: 正在等待热身问题AI回答完成...")
 
     # 多种可能的停止按钮选择器
     stop_selectors = [
@@ -496,11 +743,11 @@ def wait_for_warmup_completion(page, window_index):
 
     try:
         # 先等待3秒让AI开始运行
-        print(f"窗口 {window_index}: 等待3秒让热身AI开始运行...")
+        print(f"⏳ 窗口 {window_index}: 等待热身AI启动...")
         time.sleep(3)
 
         # 检查停止按钮状态和错误提示
-        print(f"窗口 {window_index}: 检查热身AI停止按钮状态和错误提示...")
+        print(f"👀 窗口 {window_index}: 监控热身AI运行状态...")
 
         while True:
             # 首先检查是否有错误提示
@@ -508,9 +755,7 @@ def wait_for_warmup_completion(page, window_index):
             for error_selector in error_selectors:
                 try:
                     if page.locator(error_selector).count() > 0:
-                        print(
-                            f"窗口 {window_index}: ❌ 热身阶段检测到AI生成错误: {error_selector}"
-                        )
+                        print(f"❌ 窗口 {window_index}: 热身阶段检测到AI生成错误")
                         error_detected = True
                         break
                 except:
@@ -531,24 +776,23 @@ def wait_for_warmup_completion(page, window_index):
                 except:
                     continue
 
-            print(f"窗口 {window_index}: 热身停止按钮存在: {stop_buttons_exist}")
-
-            # 如果停止按钮不存在，认为热身完成
-            if not stop_buttons_exist:
-                print(f"窗口 {window_index}: ✅ 热身AI运行完成（停止按钮不存在）")
+            if stop_buttons_exist:
+                print(f"🏃‍♂️ 窗口 {window_index}: 热身AI正在运行...")
+            else:
+                print(f"✅ 窗口 {window_index}: 热身AI运行完成")
                 return
 
             # 每2秒检查一次
             time.sleep(2)
 
     except Exception as e:
-        print(f"窗口 {window_index}: 热身等待过程中出现异常: {e}")
+        print(f"⚠️ 窗口 {window_index}: 热身等待过程中出现异常: {e}")
         raise e
 
 
 def wait_for_ai_completion(page, window_index):
     """等待AI运行完成 - 停止按钮状态判断+错误检测"""
-    print(f"窗口 {window_index}: 正在等待AI运行完成...")
+    print(f"🔄 窗口 {window_index}: 正在等待AI运行完成...")
 
     # 等待一下让AI开始运行
     page.wait_for_timeout(3000)
@@ -573,7 +817,7 @@ def wait_for_ai_completion(page, window_index):
 
     try:
         # 第一步：等待AI开始运行（等待停止按钮出现）
-        print(f"窗口 {window_index}: 等待AI开始运行...")
+        print(f"⏳ 窗口 {window_index}: 等待AI启动...")
         found_stop_button = False
 
         for attempt in range(15):  # 等待最多30秒
@@ -581,9 +825,7 @@ def wait_for_ai_completion(page, window_index):
             for error_selector in error_selectors:
                 try:
                     if page.locator(error_selector).count() > 0:
-                        print(
-                            f"窗口 {window_index}: ❌ 检测到AI生成错误: {error_selector}"
-                        )
+                        print(f"❌ 窗口 {window_index}: 检测到AI生成错误")
                         raise Exception(
                             f"窗口 {window_index}: AI生成出现internal error"
                         )
@@ -597,27 +839,25 @@ def wait_for_ai_completion(page, window_index):
                 try:
                     count = page.locator(selector).count()
                     if count > 0:
-                        print(
-                            f"窗口 {window_index}: 发现停止按钮: {selector} (数量: {count})"
-                        )
+                        print(f"🚦 窗口 {window_index}: 检测到AI已启动")
                         found_stop_button = True
                         break
                 except:
                     continue
 
             if found_stop_button:
-                print(f"窗口 {window_index}: AI开始运行")
+                print(f"🏃‍♂️ 窗口 {window_index}: AI开始运行")
                 break
 
-            print(f"窗口 {window_index}: 尝试 {attempt + 1}/15 - 等待停止按钮出现...")
+            print(f"⏳ 窗口 {window_index}: 等待AI启动... ({attempt + 1}/15)")
             page.wait_for_timeout(2000)
 
         if not found_stop_button:
-            print(f"窗口 {window_index}: ⚠️ 未检测到停止按钮，可能AI没有开始运行")
+            print(f"⚠️ 窗口 {window_index}: 未检测到AI启动，可能存在问题")
             raise Exception(f"窗口 {window_index}: 无法检测到AI运行状态")
 
         # 第二步：等待停止按钮消失，同时检测错误
-        print(f"窗口 {window_index}: 监控停止按钮状态和错误提示...")
+        print(f"👀 窗口 {window_index}: 监控AI运行状态...")
         consecutive_no_stop_button = 0
         check_count = 0
 
@@ -629,9 +869,7 @@ def wait_for_ai_completion(page, window_index):
             for error_selector in error_selectors:
                 try:
                     if page.locator(error_selector).count() > 0:
-                        print(
-                            f"窗口 {window_index}: ❌ 检测到AI生成错误: {error_selector}"
-                        )
+                        print(f"❌ 窗口 {window_index}: 检测到AI生成错误")
                         error_detected = True
                         break
                 except:
@@ -642,60 +880,71 @@ def wait_for_ai_completion(page, window_index):
 
             # 检查所有停止按钮是否都消失了
             stop_buttons_exist = False
-            active_stop_selectors = []
             for selector in stop_selectors:
                 try:
                     count = page.locator(selector).count()
                     if count > 0:
                         stop_buttons_exist = True
-                        active_stop_selectors.append(f"{selector}({count})")
+                        break
                 except:
                     continue
 
-            print(
-                f"窗口 {window_index}: 检查第{check_count}次 - 停止按钮存在: {stop_buttons_exist}"
-            )
             if stop_buttons_exist:
-                print(
-                    f"窗口 {window_index}: 活跃的停止按钮: {', '.join(active_stop_selectors)}"
-                )
-
-            if not stop_buttons_exist:
+                print(f"🏃‍♂️ 窗口 {window_index}: AI正在运行... (检查 {check_count})")
+            else:
                 consecutive_no_stop_button += 1
                 print(
-                    f"窗口 {window_index}: 停止按钮已消失 (连续 {consecutive_no_stop_button} 次)"
+                    f"⏸️ 窗口 {window_index}: AI运行状态检查 (连续无活动 {consecutive_no_stop_button} 次)"
                 )
 
                 # 连续3次检查都没有停止按钮，认为完成
                 if consecutive_no_stop_button >= 3:
-                    print(
-                        f"窗口 {window_index}: ✅ AI运行完成 - 停止按钮已连续消失{consecutive_no_stop_button}次"
-                    )
+                    print(f"✅ 窗口 {window_index}: AI运行完成")
                     break
+
+            if not stop_buttons_exist:
+                pass  # 已在上面处理
             else:
                 consecutive_no_stop_button = 0  # 重置计数器
 
             # 安全超时：如果检查超过120次（约10分钟）
             if check_count >= 120:
-                print(f"窗口 {window_index}: ⚠️ 已达到最大等待时间（10分钟）")
+                print(f"⏰ 窗口 {window_index}: 已达到最大等待时间（10分钟）")
                 raise Exception(f"窗口 {window_index}: AI生成超时")
 
             # 每次等待5秒
             time.sleep(5)
 
         # 额外等待确保完全完成
-        print(f"窗口 {window_index}: 额外等待3秒确保完成...")
+        print(f"⏳ 窗口 {window_index}: 等待3秒确保完成...")
         time.sleep(3)
-        print(f"窗口 {window_index}: ✅ 运行完成")
+        print(f"✅ 窗口 {window_index}: 运行完成")
 
     except Exception as e:
-        print(f"窗口 {window_index}: 等待过程中出现异常: {e}")
+        print(f"⚠️ 窗口 {window_index}: 等待过程中出现异常: {e}")
         raise e
 
 
 def save_generated_story(page, story_index, story_dir_path, theme=""):
-    """保存生成的故事内容"""
+    """保存生成的故事内容到指定路径
+
+    参数:
+        page: Playwright页面对象
+        story_index (int): 故事索引号
+        story_dir_path (str): 故事保存目录路径
+        theme (str): 主题名称
+
+    保存路径说明:
+        完整文件路径格式: {story_dir_path}/{story_index}.txt
+        例如: /Volumes/dhl/audio/scifi/full_story/1.txt
+    """
     try:
+        theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
+        final_file_path = f"{story_dir_path}/{story_index}.txt"
+
+        print(f"💾 准备保存{theme_name}故事 {story_index}:")
+        print(f"   目标文件路径: {final_file_path}")
+
         # 等待内容生成完成
         page.wait_for_timeout(2000)
 
@@ -775,20 +1024,19 @@ def save_generated_story(page, story_index, story_dir_path, theme=""):
             content = content.strip()
 
             # 保存到文件，使用简单的数字命名
-            file_path = f"{story_dir_path}/{story_index}.txt"
-            with open(file_path, "w", encoding="utf-8") as f:
+            with open(final_file_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
-            theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
-            print(f"{theme_name}故事 {story_index} 已保存到: {file_path}")
-            print(f"内容长度: {len(content)} 字符")
+            print(f"✅ {theme_name}故事 {story_index} 保存成功!")
+            print(f"   保存位置: {final_file_path}")
+            print(f"   内容长度: {len(content)} 字符")
             # 打印内容的前200个字符作为预览
             preview = content[:200] + "..." if len(content) > 200 else content
-            print(f"内容预览: {preview}")
+            print(f"   内容预览: {preview}")
             return True
         else:
             theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
-            print(f"{theme_name}故事 {story_index}: 未找到生成的内容")
+            print(f"❌ {theme_name}故事 {story_index}: 未找到生成的内容")
             # 尝试打印页面的部分内容用于调试
             try:
                 page_content = page.content()
@@ -820,14 +1068,14 @@ def process_window(
     # 首次运行时处理页面初始化（热身、导航等）
     if is_first_story and need_warmup:
         # 全局第一次：先进行热身，然后开新tab进行正式生成
-        print(f"窗口 {window_index}: 全局第一次需要热身，正在打开AI Studio...")
+        print(f"🌐 窗口 {window_index}: 首次启动，正在打开AI Studio...")
         page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(8000)
 
         # 发送随机问题进行热身
         random_question = random.choice(WARMUP_QUESTIONS)
-        print(f"窗口 {window_index}: 发送热身问题: {random_question}")
+        print(f"🔥 窗口 {window_index}: 发送热身问题: {random_question}")
 
         # 热身逻辑...（保持不变）
         textarea_selectors = [
@@ -961,27 +1209,25 @@ def process_window(
             for i, selector in enumerate(textarea_selectors):
                 try:
                     print(
-                        f"窗口 {window_index}: 尝试选择器 {i+1}/{len(textarea_selectors)}: {selector}"
+                        f"🔍 窗口 {window_index}: 尝试定位文本框... ({i+1}/{len(textarea_selectors)})"
                     )
                     page.wait_for_selector(selector, timeout=15000)
                     textarea = page.locator(selector)
                     if textarea.count() > 0:
-                        print(f"窗口 {window_index}: 成功找到文本框！")
+                        print(f"✅ 窗口 {window_index}: 成功找到文本框")
                         break
                 except Exception as e:
-                    print(
-                        f"窗口 {window_index}: 选择器 {selector} 失败: {str(e)[:100]}"
-                    )
+                    print(f"⚠️ 窗口 {window_index}: 文本框定位尝试失败")
                     continue
 
             if not textarea or textarea.count() == 0:
-                print(f"窗口 {window_index}: 所有文本框选择器都失败了")
+                print(f"❌ 窗口 {window_index}: 无法找到文本框")
                 if retry_count == max_retries - 1:
                     return False
                 continue
 
             # 直接输入故事参数到文本框
-            print(f"窗口 {window_index}: 正在输入故事参数到文本框...")
+            print(f"📝 窗口 {window_index}: 正在输入故事参数...")
 
             # 确保元素可见和可交互
             textarea.scroll_into_view_if_needed()
@@ -1001,13 +1247,11 @@ def process_window(
 
             # 分段输入长文本，避免一次性输入过多导致问题
             story_prompt = story_data["prompt"]
-            print(
-                f"窗口 {window_index}: 开始输入故事参数，总长度: {len(story_prompt)} 字符"
-            )
+            print(f"📊 窗口 {window_index}: 故事参数长度: {len(story_prompt)} 字符")
 
             # 尝试直接使用 fill() 方法快速输入整个文本
             try:
-                print(f"窗口 {window_index}: 尝试快速输入整个文本...")
+                print(f"⚡ 窗口 {window_index}: 尝试快速输入文本...")
                 textarea.fill(story_prompt)
                 page.wait_for_timeout(500)
 
@@ -1017,13 +1261,13 @@ def process_window(
                     len(current_value) >= len(story_prompt) * 0.95
                 ):  # 如果输入了95%以上内容，认为成功
                     print(
-                        f"窗口 {window_index}: 快速输入成功！实际长度: {len(current_value)}"
+                        f"✅ 窗口 {window_index}: 快速输入成功 ({len(current_value)} 字符)"
                     )
                 else:
                     raise Exception("快速输入不完整，切换到分段输入")
 
             except Exception as e:
-                print(f"窗口 {window_index}: 快速输入失败: {e}，切换到分段输入方式...")
+                print(f"📝 窗口 {window_index}: 切换到分段输入模式...")
 
                 # 备用方案：分段输入，但使用更快的方式
                 chunk_size = 2000  # 增大chunk大小
@@ -1053,27 +1297,24 @@ def process_window(
                             accumulated_text,
                         )
 
-                        print(
-                            f"窗口 {window_index}: 已输入 chunk {i//chunk_size + 1}, 总进度: {len(accumulated_text)}/{len(story_prompt)} 字符"
-                        )
+                        progress = (i + chunk_size) / len(story_prompt) * 100
+                        print(f"📝 窗口 {window_index}: 输入进度 {progress:.0f}%")
 
                         # chunk间短暂等待
                         if i + chunk_size < len(story_prompt):
                             page.wait_for_timeout(100)  # 减少等待时间
 
                     except Exception as js_error:
-                        print(
-                            f"窗口 {window_index}: JavaScript输入失败，回退到 fill() 方式: {js_error}"
-                        )
+                        print(f"⚠️ 窗口 {window_index}: 切换到备用输入方式...")
                         # 回退到 fill() 方式
                         textarea.fill(accumulated_text)
                         page.wait_for_timeout(200)
 
-            print(f"窗口 {window_index}: 故事参数输入完成")
+            print(f"✅ 窗口 {window_index}: 故事参数输入完成")
 
             # 输入完成后等待3-5秒再发送
             wait_before_run = random.randint(3, 5)
-            print(f"窗口 {window_index}: 等待 {wait_before_run} 秒后使用快捷键发送...")
+            print(f"⏰ 窗口 {window_index}: 等待 {wait_before_run} 秒后发送...")
             time.sleep(wait_before_run)
 
             # 确保文本框仍然有焦点
@@ -1081,7 +1322,7 @@ def process_window(
             page.wait_for_timeout(500)
 
             # 使用 Mac 的 cmd+enter 快捷键发送提示词
-            print(f"窗口 {window_index}: 使用 Cmd+Enter 快捷键发送提示词...")
+            print(f"🚀 窗口 {window_index}: 发送故事生成请求...")
             page.keyboard.press("Meta+Enter")
             page.wait_for_timeout(1000)
 
@@ -1094,23 +1335,23 @@ def process_window(
 
                 # 检查是否是 internal error
                 if "internal error" in error_msg.lower():
-                    print(f"窗口 {window_index}: 检测到 internal error，准备重试...")
+                    print(f"🔄 窗口 {window_index}: 检测到内部错误，准备重试...")
                     if retry_count < max_retries - 1:
                         print(
-                            f"窗口 {window_index}: 将在当前tab重新输入提示词并重试..."
+                            f"🔁 窗口 {window_index}: 将在当前标签页重新输入并重试..."
                         )
                         # 等待3秒后重试
-                        print(f"窗口 {window_index}: 等待3秒后重试...")
+                        print(f"⏳ 窗口 {window_index}: 等待3秒后重试...")
                         time.sleep(3)
                         continue  # 继续下一次重试
                     else:
                         print(
-                            f"窗口 {window_index}: 已达到最大重试次数({max_retries})，跳过此故事"
+                            f"❌ 窗口 {window_index}: 已达到最大重试次数({max_retries})，跳过此故事"
                         )
                         return False
                 else:
                     # 非 internal error，直接失败
-                    print(f"窗口 {window_index}: 非 internal error，停止重试")
+                    print(f"❌ 窗口 {window_index}: 遇到其他错误，停止重试")
                     return False
 
             # 保存生成的故事
@@ -1120,18 +1361,21 @@ def process_window(
 
             if success:
                 print(
-                    f"窗口 {window_index}: {theme_name}故事 {story_data['index']} 处理完成"
+                    f"🎉 窗口 {window_index}: {theme_name}故事 {story_data['index']} 处理完成"
                 )
-                # 生成完成后等待100秒
-                print(f"窗口 {window_index}: 故事生成完成，开始100秒冷却等待...")
-                countdown_wait(100, window_index)
+                # 生成完成后随机等待20-30秒
+                wait_time = random.randint(20, 30)
+                print(
+                    f"❄️ 窗口 {window_index}: 故事生成完成，开始随机冷却等待 {wait_time} 秒..."
+                )
+                countdown_wait(wait_time, window_index)
                 return True
             else:
                 print(
-                    f"窗口 {window_index}: {theme_name}故事 {story_data['index']} 保存失败"
+                    f"❌ 窗口 {window_index}: {theme_name}故事 {story_data['index']} 保存失败"
                 )
                 if retry_count < max_retries - 1:
-                    print(f"窗口 {window_index}: 保存失败，准备重试...")
+                    print(f"🔄 窗口 {window_index}: 保存失败，准备重试...")
                     continue
                 else:
                     return False
@@ -1201,12 +1445,53 @@ def main():
         help="要生成故事的主题列表 (默认: 所有主题)",
     )
     parser.add_argument("--list-themes", action="store_true", help="列出所有支持的主题")
+    parser.add_argument(
+        "--check-resume", action="store_true", help="检查断点续传状态（不执行生成）"
+    )
 
     args = parser.parse_args()
 
     # 如果用户请求列出主题，显示后退出
     if args.list_themes:
         list_available_themes()
+        return
+
+    # 如果用户请求检查断点续传状态，检查后退出
+    if args.check_resume:
+        # 确定要检查的主题
+        if args.theme:
+            themes_to_check = args.theme
+        else:
+            themes_to_check = list(SUPPORTED_THEMES.keys())
+
+        print(f"\n🔍 检查断点续传状态 - 共 {len(themes_to_check)} 个主题")
+
+        # 显示系统信息
+        base_dir = get_base_audio_dir()
+        machine_type = (
+            "Intel Mac" if "/Volumes/dhl" in base_dir else "Apple Silicon Mac"
+        )
+        print(f"💻 检测到系统类型: {machine_type}")
+        print(f"📁 音频基础目录: {base_dir}")
+
+        total_existing = 0
+        total_params = 0
+
+        for theme in themes_to_check:
+            try:
+                validate_theme(theme)
+                status = check_theme_resume_status(theme)
+                if status:
+                    total_existing += status.get("existing_stories", 0)
+                    total_params += status.get("available_params", 0)
+            except ValueError as e:
+                print(f"❌ {e}")
+
+        print(f"\n📊 总体统计:")
+        print(f"   总已有故事: {total_existing} 个")
+        print(f"   总可用参数: {total_params} 个")
+        print(f"   理论可生成: {total_params} 个新故事")
+
         return
 
     # 确定要处理的主题
@@ -1248,17 +1533,31 @@ def main():
     for theme in themes:
         theme_name = SUPPORTED_THEMES[theme]["name"]
         print(f"  📚 {theme_name}({theme}): {story_count_per_theme} 个故事")
-    print(f"📱 使用 AdsPower ID: {ads_id}")
+    print(f"🌐 使用 AdsPower ID: {ads_id}")
 
     close_url = f"http://127.0.0.1:50325/api/v1/browser/stop?user_id={ads_id}"
 
     try:
+        # 显示系统信息和保存路径
+        base_dir = get_base_audio_dir()
+        machine_type = (
+            "Intel Mac" if "/Volumes/dhl" in base_dir else "Apple Silicon Mac"
+        )
+        print(f"\n🖥️  系统信息:")
+        print(f"   检测到: {machine_type}")
+        print(f"   基础目录: {base_dir}")
+
+        print(f"\n📁 故事保存路径说明:")
+        print(f"   路径格式: {base_dir}/{{主题}}/full_story/{{索引}}.txt")
+        print(f"   例如科幻故事: {base_dir}/scifi/full_story/1.txt")
+
         # 为所有主题创建故事保存目录
+        print(f"\n📂 创建各主题故事保存目录:")
         for theme in themes:
             story_dir_path = get_theme_story_path_prefix(theme)
             os.makedirs(story_dir_path, exist_ok=True)
             theme_name = SUPPORTED_THEMES[theme]["name"]
-            print(f"{theme_name}({theme}) 故事保存目录: {story_dir_path}")
+            print(f"   ✅ {theme_name}({theme}): {story_dir_path}")
 
         # 准备多主题轮流生成计划
         stories_to_generate = prepare_multi_theme_generation(
@@ -1266,10 +1565,10 @@ def main():
         )
 
         if not stories_to_generate:
-            print("没有需要生成的故事")
+            print("⚠️ 没有需要生成的故事")
             return
 
-        print(f"📝 实际需要生成 {len(stories_to_generate)} 个故事（轮流模式）")
+        print(f"📋 实际需要生成 {len(stories_to_generate)} 个故事（轮流模式）")
 
         # 获取WebDriver
         ws_endpoint, remote_debugging_url, http = get_adspower_info(ads_id)
@@ -1281,13 +1580,13 @@ def main():
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
-            print("错误: 缺少 playwright 模块，请安装: pip install playwright")
+            print("❌ 错误: 缺少 playwright 模块，请安装: pip install playwright")
             return
 
-        print("正在使用Playwright连接浏览器...")
+        print("🔌 正在使用Playwright连接浏览器...")
         with sync_playwright() as p:
             browser = p.chromium.connect_over_cdp(remote_debugging_url)
-            print("成功连接到浏览器！")
+            print("✅ 成功连接到浏览器！")
 
             # 获取或创建上下文
             if not browser.contexts:

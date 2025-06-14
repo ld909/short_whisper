@@ -9,7 +9,7 @@ YouTube故事视频概要生成器
 
 输入:
 - 故事全文内容 (来自ai_studio_bot.py的输出)
-- 路径: /Volumes/dhl/audio/scifi/full_story/language_code/{story_index}.txt
+- 路径: /Volumes/dhl/audio/scifi/full_story/{story_index}.txt
 
 输出:
 - 概要文件: /Volumes/dhl/audio/scifi/description/{story_index}.txt
@@ -48,7 +48,7 @@ def get_base_paths():
         base_path = "/media/dhl/audio/scifi"
 
     return {
-        "story_dir": os.path.join(base_path, "full_story", "language_code"),
+        "story_dir": os.path.join(base_path, "full_story"),
         "description_dir": os.path.join(base_path, "description"),
     }
 
@@ -86,7 +86,7 @@ def generate_story_description(client, story_content, story_index, max_retries=3
         try:
             system_prompt = """你是一个 youtube 视频概要专家，大师，老炮。给你一段故事全文，\
                 你可以根据全文生成 youtube 的视频概要，概要吸引人，用词老道有风格，\
-                    让人看了就想听完故事，想关注频道哈。
+                    让人看了就想听完故事，想关注频道。
 
 要求：
 1. 概要要抓住故事的核心亮点和悬念

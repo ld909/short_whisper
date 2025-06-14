@@ -18,7 +18,8 @@ Fantasy Story Script Parameter Generator
     - 命令行参数: 可选的生成数量
 
 输出:
-    - 固定目录: /Users/donghaoliu/Documents/audio/story_param/fantasy/
+    - Intel Mac: /Volumes/dhl/audio/fantasy/story_param/
+    - Apple Silicon Mac: /Users/donghaoliu/Documents/audio/fantasy/story_param/
     - 文件格式: {索引号}.txt (如: 1.txt, 2.txt, 3.txt...)
     - 内容: 完整的故事创作提示词，可直接用于AI生成故事
 
@@ -48,6 +49,45 @@ import random
 import os
 import re
 import argparse
+import platform
+
+
+def get_output_directory():
+    """获取正确的输出目录，支持Intel Mac和Apple Silicon"""
+    # 首先尝试从环境变量获取（由multi_theme_story_generator.py设置）
+    base_dir = os.environ.get("AUDIO_BASE_DIR")
+
+    if base_dir:
+        output_dir = f"{base_dir}/fantasy/story_param"
+        print(f"📁 使用环境变量指定的输出目录: {output_dir}")
+        return output_dir
+
+    # 如果环境变量未设置，根据芯片类型自动判断
+    if platform.system() == "Darwin":
+        machine = platform.machine().lower()
+        processor = platform.processor().lower()
+
+        # Apple Silicon
+        is_apple_silicon = (
+            machine == "arm64"
+            or "arm" in machine
+            or "apple" in processor
+            or "m1" in processor
+            or "m2" in processor
+            or "m3" in processor
+        )
+
+        if is_apple_silicon:
+            output_dir = "/Users/donghaoliu/Documents/audio/fantasy/story_param"
+            print(f"🍎 检测到Apple Silicon Mac，使用路径: {output_dir}")
+        else:
+            output_dir = "/Volumes/dhl/audio/fantasy/story_param"
+            print(f"💻 检测到Intel Mac，使用路径: {output_dir}")
+
+        return output_dir
+
+    # 其他系统暂时不支持
+    return "/Users/donghaoliu/Documents/audio/fantasy/story_param"
 
 
 def load_config(filepath="config.json"):
@@ -515,7 +555,7 @@ def main():
         print("配置文件加载成功")
 
         # Get starting story index
-        story_directory = "/Users/donghaoliu/Documents/audio/story_param/fantasy"
+        story_directory = get_output_directory()
         starting_index = get_next_story_index(story_directory)
 
         print(f"开始生成 {args.number} 个故事参数...")

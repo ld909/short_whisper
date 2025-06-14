@@ -17,7 +17,8 @@ Input:
     - Command line arguments: Optional generation quantity
 
 Output:
-    - Fixed directory: /Users/donghaoliu/Documents/audio/story_param/romance/
+    - Intel Mac: /Volumes/dhl/audio/romance/story_param/
+    - Apple Silicon Mac: /Users/donghaoliu/Documents/audio/romance/story_param/
     - File format: {index}.txt (e.g., 1.txt, 2.txt, 3.txt...)
     - Content: Complete story creation prompts, ready for AI story generation
 
@@ -47,6 +48,45 @@ import random
 import os
 import re
 import argparse
+import platform
+
+
+def get_output_directory():
+    """获取正确的输出目录，支持Intel Mac和Apple Silicon"""
+    # 首先尝试从环境变量获取（由multi_theme_story_generator.py设置）
+    base_dir = os.environ.get("AUDIO_BASE_DIR")
+
+    if base_dir:
+        output_dir = f"{base_dir}/romance/story_param"
+        print(f"📁 使用环境变量指定的输出目录: {output_dir}")
+        return output_dir
+
+    # 如果环境变量未设置，根据芯片类型自动判断
+    if platform.system() == "Darwin":
+        machine = platform.machine().lower()
+        processor = platform.processor().lower()
+
+        # Apple Silicon
+        is_apple_silicon = (
+            machine == "arm64"
+            or "arm" in machine
+            or "apple" in processor
+            or "m1" in processor
+            or "m2" in processor
+            or "m3" in processor
+        )
+
+        if is_apple_silicon:
+            output_dir = "/Users/donghaoliu/Documents/audio/romance/story_param"
+            print(f"🍎 检测到Apple Silicon Mac，使用路径: {output_dir}")
+        else:
+            output_dir = "/Volumes/dhl/audio/romance/story_param"
+            print(f"💻 检测到Intel Mac，使用路径: {output_dir}")
+
+        return output_dir
+
+    # 其他系统暂时不支持
+    return "/Users/donghaoliu/Documents/audio/romance/story_param"
 
 
 def load_config(filepath="config.json"):
@@ -391,7 +431,7 @@ def main():
         print("Configuration file loaded successfully")
 
         # Get starting story index
-        story_directory = "/Users/donghaoliu/Documents/audio/story_param/romance"
+        story_directory = get_output_directory()
         starting_index = get_next_story_index(story_directory)
 
         print(f"Starting to generate {args.number} story parameters...")

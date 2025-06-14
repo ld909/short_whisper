@@ -35,7 +35,7 @@ Multi-Theme Story Parameter Generator
 
 系统要求:
     - 必须在 macOS 系统上运行
-    - 必须是 Apple Silicon (M1/M2/M3) 芯片
+    - 支持 Apple Silicon (M1/M2/M3) 或 Intel 芯片
 
 作者: 多主题故事生成系统
 版本: 2.0
@@ -50,18 +50,15 @@ from pathlib import Path
 
 
 def check_system_requirements():
-    """检查系统要求：必须是Mac且必须是M1芯片"""
-    # 检查操作系统
+    """检查系统要求：必须是Mac（支持Intel和Apple Silicon）"""
     if platform.system() != "Darwin":
         print("❌ 错误：此程序只能在 macOS 系统上运行")
         print(f"当前系统：{platform.system()}")
         sys.exit(1)
 
-    # 检查芯片架构
     machine = platform.machine().lower()
     processor = platform.processor().lower()
 
-    # M1/M2/M3 芯片通常显示为 arm64
     is_apple_silicon = (
         machine == "arm64"
         or "arm" in machine
@@ -70,20 +67,49 @@ def check_system_requirements():
         or "m2" in processor
         or "m3" in processor
     )
+    is_intel_mac = (
+        machine == "x86_64"
+        or "intel" in processor
+        or "i7" in processor
+        or "i5" in processor
+        or "i9" in processor
+    )
 
-    if not is_apple_silicon:
-        print("❌ 错误：此程序只能在 Apple Silicon (M1/M2/M3) 芯片的 Mac 上运行")
+    if not (is_apple_silicon or is_intel_mac):
+        print("❌ 错误：此程序只能在 Apple Silicon 或 Intel 芯片的 Mac 上运行")
         print(f"当前芯片架构：{machine}")
         print(f"当前处理器：{processor}")
         sys.exit(1)
 
-    print("✅ 系统检查通过：macOS + Apple Silicon")
+    if is_apple_silicon:
+        print("✅ 系统检查通过：macOS + Apple Silicon")
+    else:
+        print("✅ 系统检查通过：macOS + Intel")
     print(f"芯片架构：{machine}")
 
 
 def get_base_audio_dir():
-    """返回本地音频基础目录"""
-    return "/Users/donghaoliu/Documents/audio/story_param"
+    """返回音频基础目录，根据芯片类型区分路径"""
+    # 检查操作系统
+    if platform.system() == "Darwin":
+        machine = platform.machine().lower()
+        processor = platform.processor().lower()
+        # Apple Silicon
+        is_apple_silicon = (
+            machine == "arm64"
+            or "arm" in machine
+            or "apple" in processor
+            or "m1" in processor
+            or "m2" in processor
+            or "m3" in processor
+        )
+        if is_apple_silicon:
+            return "/Users/donghaoliu/Documents/audio"
+        else:
+            # Intel Mac
+            return "/Volumes/dhl/audio"
+    # 其他系统暂时不支持
+    return "/Users/donghaoliu/Documents/audio"
 
 
 def count_existing_files(directory):
@@ -107,34 +133,34 @@ def count_existing_files(directory):
 
 # 主题配置：每个主题对应的脚本路径和名称
 def get_themes_config():
-    """获取主题配置，使用本地路径"""
+    """获取主题配置，使用正确的输出路径"""
     base_dir = get_base_audio_dir()
 
     return {
         "thriller": {
             "script_path": "audio_ficition/thriller/thriller_script_generator.py",
             "display_name": "惊悚故事",
-            "output_info": f"{base_dir}/thriller/",
+            "output_info": f"{base_dir}/thriller/story_param",
         },
         "scifi": {
             "script_path": "audio_ficition/scifi/gen_prompt.py",
             "display_name": "科幻故事",
-            "output_info": f"{base_dir}/scifi/",
+            "output_info": f"{base_dir}/scifi/story_param",
         },
         "romance": {
             "script_path": "audio_ficition/romance/romance_script_generator.py",
             "display_name": "爱情故事",
-            "output_info": f"{base_dir}/romance/",
+            "output_info": f"{base_dir}/romance/story_param",
         },
         "horror": {
             "script_path": "audio_ficition/horror/horror_script_generator.py",
             "display_name": "恐怖故事",
-            "output_info": f"{base_dir}/horror/",
+            "output_info": f"{base_dir}/horror/story_param",
         },
         "fantasy": {
             "script_path": "audio_ficition/fantasy/fantasy_script_generator.py",
             "display_name": "奇幻故事",
-            "output_info": f"{base_dir}/fantasy/",
+            "output_info": f"{base_dir}/fantasy/story_param",
         },
     }
 
@@ -191,16 +217,28 @@ def run_theme_generator(theme, count, workspace_root):
         # 设置正确的工作目录（脚本所在目录）
         script_dir = script_path.parent
 
+        # 设置环境变量，传递正确的基础路径给子脚本
+        env = os.environ.copy()
+        env["AUDIO_BASE_DIR"] = get_base_audio_dir()
+
+        print(f"🔧 设置环境变量 AUDIO_BASE_DIR={env['AUDIO_BASE_DIR']}")
+
         # 执行命令
         result = subprocess.run(
-            cmd, cwd=script_dir, capture_output=True, text=True, encoding="utf-8"
+            cmd,
+            cwd=script_dir,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=env,
         )
 
         # 输出结果
         if result.stdout:
+            print("📤 脚本标准输出:")
             print(result.stdout)
         if result.stderr:
-            print(f"错误输出: {result.stderr}")
+            print(f"⚠️  脚本错误输出: {result.stderr}")
 
         # 检查是否包含明显的错误信息
         has_error = False
@@ -208,10 +246,18 @@ def run_theme_generator(theme, count, workspace_root):
             "错误:" in result.stdout
             or "Error:" in result.stdout
             or "未找到" in result.stdout
+            or "Too many levels of symbolic links" in result.stdout
+            or "符号链接" in result.stdout
         ):
             has_error = True
-        if result.stderr:
+            print("🚨 在标准输出中检测到错误信息")
+        if result.stderr and (
+            "error" in result.stderr.lower()
+            or "Too many levels of symbolic links" in result.stderr
+            or "符号链接" in result.stderr
+        ):
             has_error = True
+            print("🚨 在错误输出中检测到错误信息")
 
         if result.returncode == 0 and not has_error:
             # 再次检查文件数量确认生成成功
@@ -245,7 +291,7 @@ def main():
 
 系统要求:
   - macOS 系统
-  - Apple Silicon (M1/M2/M3) 芯片
+  - Apple Silicon 或 Intel 芯片
 
 断点续传:
   - 自动检测已存在的文件数量

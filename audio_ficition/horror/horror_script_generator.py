@@ -77,10 +77,39 @@ FIXED_TARGET_LENGTH = 120
 
 
 def get_base_output_path():
-    """根据操作系统返回适当的输出路径"""
+    """获取正确的输出目录，支持Intel Mac和Apple Silicon"""
+    # 首先尝试从环境变量获取（由multi_theme_story_generator.py设置）
+    base_dir = os.environ.get("AUDIO_BASE_DIR")
+
+    if base_dir:
+        output_dir = f"{base_dir}/horror/story_param"
+        print(f"📁 使用环境变量指定的输出目录: {output_dir}")
+        return output_dir
+
+    # 如果环境变量未设置，根据芯片类型自动判断
     system = platform.system()
     if system == "Darwin":  # macOS
-        return "/Users/donghaoliu/Documents/audio/story_param/horror"
+        machine = platform.machine().lower()
+        processor = platform.processor().lower()
+
+        # Apple Silicon
+        is_apple_silicon = (
+            machine == "arm64"
+            or "arm" in machine
+            or "apple" in processor
+            or "m1" in processor
+            or "m2" in processor
+            or "m3" in processor
+        )
+
+        if is_apple_silicon:
+            output_dir = "/Users/donghaoliu/Documents/audio/horror/story_param"
+            print(f"🍎 检测到Apple Silicon Mac，使用路径: {output_dir}")
+        else:
+            output_dir = "/Volumes/dhl/audio/horror/story_param"
+            print(f"💻 检测到Intel Mac，使用路径: {output_dir}")
+
+        return output_dir
     else:  # 默认为Linux/Ubuntu
         return "/media/dhl/audio/horror/story_param"
 
