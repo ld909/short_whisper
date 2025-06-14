@@ -9,16 +9,20 @@ YouTube故事视频概要生成器
 
 输入:
 - 故事全文内容 (来自ai_studio_bot.py的输出)
-- 路径: /Volumes/dhl/audio/scifi/full_story/{story_index}.txt
+- 路径: /Volumes/dhl/audio/{theme}/full_story/{story_index}.txt
 
 输出:
-- 概要文件: /Volumes/dhl/audio/scifi/description/{story_index}.txt
+- 概要文件: /Volumes/dhl/audio/{theme}/description/{story_index}.txt
+
+支持的主题: scifi, thriller, horror, fantasy, romance
 
 使用方法:
-1. 基本使用: python story_description_generator.py
-2. 强制重新生成: python story_description_generator.py -f
-3. 设置批处理大小: python story_description_generator.py -b 5
-4. 指定处理范围: python story_description_generator.py --start 1 --end 10
+1. 处理所有主题: python story_description_generator.py
+2. 处理指定主题: python story_description_generator.py --theme scifi
+3. 处理多个主题: python story_description_generator.py --theme scifi thriller
+4. 强制重新生成: python story_description_generator.py -f
+5. 设置批处理大小: python story_description_generator.py -b 5
+6. 指定处理范围: python story_description_generator.py --start 1 --end 10
 
 注意:
 - 需要设置环境变量UNI_API_KEY以提供OpenAI API密钥
@@ -37,20 +41,49 @@ from openai import OpenAI
 import concurrent.futures
 from tqdm import tqdm
 
+# 支持的主题列表
+SUPPORTED_THEMES = ["scifi", "thriller", "horror", "fantasy", "romance"]
 
-def get_base_paths():
-    """根据操作系统获取基础路径"""
+
+def get_base_paths(theme):
+    """根据操作系统和主题获取基础路径"""
     system = platform.system().lower()
 
-    if system == "darwin":  # Mac
-        base_path = "/Volumes/dhl/audio/scifi"
-    else:  # Linux/Ubuntu
-        base_path = "/media/dhl/audio/scifi"
+    # 根据CPU架构确定路径
+    import subprocess
+
+    try:
+        # 获取CPU架构信息
+        arch_result = subprocess.run(["uname", "-m"], capture_output=True, text=True)
+        arch = arch_result.stdout.strip()
+
+        if system == "darwin":  # Mac
+            if arch == "x86_64":  # Intel Mac
+                base_path = f"/Volumes/dhl/audio/{theme}"
+            else:  # Apple Silicon (arm64)
+                base_path = f"/Users/donghaoliu/Documents/audio/{theme}"
+        else:  # Linux/Ubuntu
+            base_path = f"/media/dhl/audio/{theme}"
+    except:
+        # 降级处理：使用默认路径
+        if system == "darwin":
+            base_path = f"/Volumes/dhl/audio/{theme}"
+        else:
+            base_path = f"/media/dhl/audio/{theme}"
 
     return {
         "story_dir": os.path.join(base_path, "full_story"),
         "description_dir": os.path.join(base_path, "description"),
     }
+
+
+def validate_theme(theme):
+    """验证主题是否有效"""
+    if theme not in SUPPORTED_THEMES:
+        print(f"错误: 不支持的主题 '{theme}'")
+        print(f"支持的主题: {', '.join(SUPPORTED_THEMES)}")
+        return False
+    return True
 
 
 def setup_openai_client():
@@ -259,6 +292,7 @@ def process_all_stories(
     client,
     story_dir,
     description_dir,
+    theme,
     force=False,
     batch_size=5,
     start_index=None,
@@ -268,7 +302,7 @@ def process_all_stories(
 
     # 检查故事目录是否存在
     if not os.path.exists(story_dir):
-        print(f"错误: 故事目录不存在: {story_dir}")
+        print(f"错误: {theme} 主题故事目录不存在: {story_dir}")
         return
 
     # 确保概要目录存在
@@ -278,7 +312,7 @@ def process_all_stories(
     existing_stories = get_existing_stories(story_dir)
 
     if not existing_stories:
-        print(f"在 {story_dir} 中未找到任何故事文件")
+        print(f"在 {theme} 主题的 {story_dir} 中未找到任何故事文件")
         return
 
     # 筛选处理范围
@@ -289,10 +323,12 @@ def process_all_stories(
         existing_stories = [s for s in existing_stories if s <= end_index]
 
     if not existing_stories:
-        print("在指定范围内未找到任何故事文件")
+        print(f"在 {theme} 主题的指定范围内未找到任何故事文件")
         return
 
-    print(f"找到 {len(existing_stories)} 个故事文件: {existing_stories}")
+    print(
+        f"【{theme.upper()}】找到 {len(existing_stories)} 个故事文件: {existing_stories}"
+    )
 
     # 获取已生成的概要
     existing_descriptions = get_existing_descriptions(description_dir)
@@ -302,24 +338,28 @@ def process_all_stories(
 
     if force:
         stories_to_process = existing_stories
-        print(f"强制重新生成模式：将处理所有 {len(stories_to_process)} 个故事")
+        print(
+            f"【{theme.upper()}】强制重新生成模式：将处理所有 {len(stories_to_process)} 个故事"
+        )
     else:
         stories_to_process = [
             s for s in existing_stories if s not in existing_descriptions
         ]
         skipped_count = len(existing_stories) - len(stories_to_process)
         if skipped_count > 0:
-            print(f"跳过已存在概要的 {skipped_count} 个故事")
-        print(f"需要生成概要的故事: {len(stories_to_process)} 个")
+            print(f"【{theme.upper()}】跳过已存在概要的 {skipped_count} 个故事")
+        print(f"【{theme.upper()}】需要生成概要的故事: {len(stories_to_process)} 个")
 
     if not stories_to_process:
-        print("所有故事概要都已生成完毕")
+        print(f"【{theme.upper()}】所有故事概要都已生成完毕")
         return
 
-    print(f"开始处理 {len(stories_to_process)} 个故事的概要生成...")
+    print(f"【{theme.upper()}】开始处理 {len(stories_to_process)} 个故事的概要生成...")
 
     # 批量处理
-    with tqdm(total=len(stories_to_process), desc="概要生成进度") as pbar:
+    with tqdm(
+        total=len(stories_to_process), desc=f"{theme.upper()} 概要生成进度"
+    ) as pbar:
         for i in range(0, len(stories_to_process), batch_size):
             batch = stories_to_process[i : i + batch_size]
 
@@ -340,11 +380,43 @@ def process_all_stories(
 
             # 统计成功率
             success_count = sum(1 for r in results if r)
-            print(f"批次处理完成: {success_count}/{len(batch)} 成功")
+            print(f"【{theme.upper()}】批次处理完成: {success_count}/{len(batch)} 成功")
 
             # 批次间稍作等待，避免API限制
             if i + batch_size < len(stories_to_process):
                 time.sleep(2)
+
+
+def process_theme(client, theme, force, batch_size, start_index, end_index):
+    """处理单个主题的概要生成"""
+    print(f"\n=== 开始处理 {theme.upper()} 主题 ===")
+
+    # 验证主题
+    if not validate_theme(theme):
+        return False
+
+    # 获取路径
+    paths = get_base_paths(theme)
+    story_dir = paths["story_dir"]
+    description_dir = paths["description_dir"]
+
+    print(f"故事源目录: {story_dir}")
+    print(f"概要输出目录: {description_dir}")
+
+    # 处理故事
+    process_all_stories(
+        client,
+        story_dir,
+        description_dir,
+        theme,
+        force,
+        batch_size,
+        start_index,
+        end_index,
+    )
+
+    print(f"=== {theme.upper()} 主题处理完成 ===\n")
+    return True
 
 
 def main():
@@ -352,6 +424,12 @@ def main():
     parser = argparse.ArgumentParser(description="YouTube故事视频概要生成器")
 
     # 添加命令行参数
+    parser.add_argument(
+        "--theme",
+        nargs="*",
+        choices=SUPPORTED_THEMES,
+        help=f"指定要处理的主题，支持的主题: {', '.join(SUPPORTED_THEMES)}。不指定则处理所有主题",
+    )
     parser.add_argument(
         "-f",
         "--force",
@@ -379,14 +457,12 @@ def main():
     # 解析命令行参数
     args = parser.parse_args()
 
-    # 设置路径 - 根据操作系统自动选择
-    paths = get_base_paths()
-    story_dir = paths["story_dir"]
-    description_dir = paths["description_dir"]
+    # 确定要处理的主题
+    themes_to_process = args.theme if args.theme else SUPPORTED_THEMES
 
     print("=== YouTube故事视频概要生成器 ===")
-    print(f"故事源目录: {story_dir}")
-    print(f"概要输出目录: {description_dir}")
+    print(f"支持的主题: {', '.join(SUPPORTED_THEMES)}")
+    print(f"将处理的主题: {', '.join(themes_to_process)}")
 
     if args.start is not None or args.end is not None:
         range_info = f"处理范围: {args.start or '开始'} ~ {args.end or '结束'}"
@@ -403,17 +479,36 @@ def main():
     # 设置OpenAI客户端
     client = setup_openai_client()
 
-    # 开始处理
-    process_all_stories(
-        client,
-        story_dir,
-        description_dir,
-        args.force,
-        args.batch_size,
-        args.start,
-        args.end,
-    )
+    # 处理每个主题
+    successful_themes = []
+    failed_themes = []
 
+    for theme in themes_to_process:
+        try:
+            success = process_theme(
+                client,
+                theme,
+                args.force,
+                args.batch_size,
+                args.start,
+                args.end,
+            )
+            if success:
+                successful_themes.append(theme)
+            else:
+                failed_themes.append(theme)
+        except Exception as e:
+            print(f"处理 {theme} 主题时发生错误: {e}")
+            failed_themes.append(theme)
+
+    # 总结结果
+    print("=" * 50)
+    print("处理完成总结:")
+    print(
+        f"成功处理的主题: {', '.join(successful_themes) if successful_themes else '无'}"
+    )
+    if failed_themes:
+        print(f"处理失败的主题: {', '.join(failed_themes)}")
     print("所有故事概要生成任务完成!")
 
 

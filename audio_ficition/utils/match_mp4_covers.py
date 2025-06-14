@@ -12,23 +12,27 @@ MP4视频与封面图片匹配工具
 3. 并行地为多张封面图片与所有视频帧进行像素级别的差异比较
 4. 找到差异最小的MP4文件并复制到指定目录
 5. 支持断点续传，避免重复计算
+6. 支持多个主题：scifi、thriller、horror、fantasy、romance
 
 输入:
 - MP4视频目录: /home/dhl/Documents/Wan2GP/outputs/
-- 封面图片目录: /mnt/dhl/audio/scifi/cover_img_small/
+- 封面图片目录: /mnt/dhl/audio/{theme}/cover_img_small/
 
 输出:
-- 匹配的MP4文件: /mnt/dhl/audio/scifi/starting_mp4/story_index.mp4
+- 匹配的MP4文件: /mnt/dhl/audio/{theme}/starting_mp4/story_index.mp4
 
 使用方法:
-1. 基本使用: python match_mp4_covers.py
-2. 强制重新匹配: python match_mp4_covers.py -f
-3. 指定故事索引范围: python match_mp4_covers.py --start 1 --end 10
+1. 基本使用（所有主题）: python match_mp4_covers.py
+2. 指定单个主题: python match_mp4_covers.py --theme scifi
+3. 指定多个主题: python match_mp4_covers.py --theme scifi thriller
+4. 强制重新匹配: python match_mp4_covers.py -f
+5. 指定故事索引范围: python match_mp4_covers.py --start 1 --end 10
 
 注意:
 - 仅支持Ubuntu系统
 - 需要安装 OpenCV 和 PIL 库
 - 脚本支持断点续传，已匹配的文件不会重复处理
+- 支持的主题：scifi、thriller、horror、fantasy、romance
 """
 
 import os
@@ -48,6 +52,9 @@ from PIL import Image
 
 # 用于工作进程的全局变量，存放预处理的MP4帧
 g_mp4_frames = {}
+
+# 支持的主题列表
+SUPPORTED_THEMES = ["scifi", "thriller", "horror", "fantasy", "romance"]
 
 
 def check_ubuntu_system():
@@ -193,10 +200,9 @@ def get_mp4_files():
     return mp4_files
 
 
-def get_cover_images():
-    """获取所有封面图片"""
-    # 修改为Linux系统路径
-    cover_dir = "/mnt/dhl/audio/scifi/cover_img_small"
+def get_cover_images(theme):
+    """获取指定主题的所有封面图片"""
+    cover_dir = f"/mnt/dhl/audio/{theme}/cover_img_small"
 
     if not os.path.exists(cover_dir):
         print(f"❌ 封面图片目录不存在: {cover_dir}")
@@ -215,13 +221,13 @@ def get_cover_images():
             story_index = int(match.group(1))
             covers[story_index] = cover_file
 
-    print(f"🖼️ 找到 {len(covers)} 张封面图片")
+    print(f"🖼️ 主题 {theme}: 找到 {len(covers)} 张封面图片")
     return covers
 
 
-def get_existing_matches():
-    """获取已经匹配的MP4文件"""
-    output_dir = "/mnt/dhl/audio/scifi/starting_mp4"
+def get_existing_matches(theme):
+    """获取指定主题已经匹配的MP4文件"""
+    output_dir = f"/mnt/dhl/audio/{theme}/starting_mp4"
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
@@ -309,9 +315,9 @@ def find_best_match_worker(story_index, cover_image_path, cache_data):
     return story_index, best_mp4, min_diff, local_cache_updates
 
 
-def copy_matched_mp4(source_mp4, story_index):
-    """将匹配的MP4文件复制到目标目录"""
-    output_dir = "/mnt/dhl/audio/scifi/starting_mp4"
+def copy_matched_mp4(source_mp4, story_index, theme):
+    """将匹配的MP4文件复制到指定主题的目标目录"""
+    output_dir = f"/mnt/dhl/audio/{theme}/starting_mp4"
 
     try:
         os.makedirs(output_dir, exist_ok=True)
@@ -333,22 +339,21 @@ def copy_matched_mp4(source_mp4, story_index):
         return False
 
 
-def process_matching(force=False, start_index=None, end_index=None):
-    """处理MP4与封面图片的匹配"""
-    # 获取所有MP4文件和封面图片
-    mp4_files = get_mp4_files()
-    cover_images = get_cover_images()
+def process_matching_for_theme(
+    theme, force=False, start_index=None, end_index=None, mp4_frames=None
+):
+    """处理单个主题的MP4与封面图片匹配"""
+    print(f"\n🎭 处理主题: {theme}")
+    print("=" * 50)
 
-    if not mp4_files:
-        print("❌ 未找到任何MP4文件")
-        return
-
+    # 获取封面图片
+    cover_images = get_cover_images(theme)
     if not cover_images:
-        print("❌ 未找到任何封面图片")
-        return
+        print(f"❌ 主题 {theme} 未找到任何封面图片")
+        return False
 
     # 获取已存在的匹配
-    existing_matches = get_existing_matches()
+    existing_matches = get_existing_matches(theme)
 
     # 过滤需要处理的封面图片
     covers_to_process = {}
@@ -365,24 +370,17 @@ def process_matching(force=False, start_index=None, end_index=None):
             covers_to_process[story_index] = cover_path
 
     if not covers_to_process:
-        print("✅ 所有指定范围内的封面都已匹配MP4文件")
-        return
+        print(f"✅ 主题 {theme} 的所有指定范围内的封面都已匹配MP4文件")
+        return True
 
-    print(f"\n=== 📊 MP4匹配分析 ===")
+    print(f"\n=== 📊 主题 {theme} MP4匹配分析 ===")
     print(f"总封面图片数量: {len(cover_images)}")
-    print(f"总MP4文件数量: {len(mp4_files)}")
     print(f"已有匹配: {len(existing_matches)}")
     print(f"需要处理的封面: {len(covers_to_process)}")
     print(f"处理的故事索引: {sorted(covers_to_process.keys())}")
 
-    # 1. 并行预处理所有MP4文件，提取第一帧
-    mp4_frames = preprocess_mp4_frames(mp4_files)
-    if not mp4_frames:
-        print("❌ 预处理失败，未能提取任何MP4帧。")
-        return
-
     # 加载匹配缓存
-    cache_file = "/tmp/mp4_cover_match_cache.json"
+    cache_file = f"/tmp/mp4_cover_match_cache_{theme}.json"
     cache_data = load_match_cache(cache_file)
 
     # 统计变量
@@ -390,7 +388,7 @@ def process_matching(force=False, start_index=None, end_index=None):
     failure_count = 0
     results = {}
 
-    # 2. 使用多进程并行处理匹配
+    # 使用多进程并行处理匹配
     with concurrent.futures.ProcessPoolExecutor(
         initializer=init_worker, initargs=(mp4_frames,)
     ) as executor:
@@ -402,7 +400,7 @@ def process_matching(force=False, start_index=None, end_index=None):
         for future in tqdm(
             concurrent.futures.as_completed(futures),
             total=len(covers_to_process),
-            desc="匹配封面",
+            desc=f"匹配 {theme} 封面",
         ):
             try:
                 story_idx, best_mp4, min_diff, local_cache = future.result()
@@ -411,18 +409,18 @@ def process_matching(force=False, start_index=None, end_index=None):
             except Exception as e:
                 story_idx = futures[future]
                 results[story_idx] = (None, float("inf"))
-                print(f"❌ 故事 {story_idx} 的匹配任务失败: {e}")
+                print(f"❌ 主题 {theme} 故事 {story_idx} 的匹配任务失败: {e}")
 
-    # 3. 按顺序处理和报告结果
-    print("\n=== 📝 处理匹配结果 ===")
+    # 按顺序处理和报告结果
+    print(f"\n=== 📝 主题 {theme} 处理匹配结果 ===")
     for story_index in sorted(covers_to_process.keys()):
         if story_index not in results:
-            print(f"🤷‍♂️ 故事 {story_index} 没有结果，可能在处理中被跳过。")
+            print(f"🤷‍♂️ 主题 {theme} 故事 {story_index} 没有结果，可能在处理中被跳过。")
             continue
 
         best_mp4, min_diff = results[story_index]
 
-        print(f"\n--- 故事 {story_index} ---")
+        print(f"\n--- 主题 {theme} 故事 {story_index} ---")
         if best_mp4:
             print(
                 f"🎯 找到最佳匹配: {os.path.basename(best_mp4)} (差异值: {min_diff:.2f})"
@@ -433,39 +431,79 @@ def process_matching(force=False, start_index=None, end_index=None):
                 print(
                     f"⚠️ 差异值 {min_diff:.2f} 大于阈值 20，认为MP4视频未正确生成，跳过复制"
                 )
-                print(f"⏭️  跳过故事 {story_index}")
+                print(f"⏭️  跳过主题 {theme} 故事 {story_index}")
                 failure_count += 1
             else:
                 # 复制MP4文件
-                if copy_matched_mp4(best_mp4, story_index):
+                if copy_matched_mp4(best_mp4, story_index, theme):
                     success_count += 1
-                    print(f"✅ 故事 {story_index} 匹配成功")
+                    print(f"✅ 主题 {theme} 故事 {story_index} 匹配成功")
                 else:
                     failure_count += 1
-                    print(f"❌ 故事 {story_index} 文件复制失败")
+                    print(f"❌ 主题 {theme} 故事 {story_index} 文件复制失败")
         else:
             failure_count += 1
-            print(f"❌ 故事 {story_index} 未找到匹配的MP4文件")
+            print(f"❌ 主题 {theme} 故事 {story_index} 未找到匹配的MP4文件")
 
     # 保存最终缓存
     save_match_cache(cache_file, cache_data)
 
     # 输出最终统计
     total_processed = len(covers_to_process)
-    print(f"\n=== 📈 匹配完成统计 ===")
+    print(f"\n=== 📈 主题 {theme} 匹配完成统计 ===")
     print(f"✅ 成功匹配: {success_count}/{total_processed} 个封面图片")
     print(f"❌ 匹配失败: {failure_count}/{total_processed} 个封面图片")
     if total_processed > 0:
         success_rate = (success_count / total_processed) * 100
         print(f"📊 成功率: {success_rate:.1f}%")
 
+    return success_count > 0
+
+
+def process_matching(themes, force=False, start_index=None, end_index=None):
+    """处理MP4与封面图片的匹配"""
+    # 获取所有MP4文件
+    mp4_files = get_mp4_files()
+    if not mp4_files:
+        print("❌ 未找到任何MP4文件")
+        return
+
+    print(f"\n=== 🎬 开始处理 {len(themes)} 个主题 ===")
+    print(f"处理的主题: {', '.join(themes)}")
+    print(f"总MP4文件数量: {len(mp4_files)}")
+
+    # 并行预处理所有MP4文件，提取第一帧（只需要做一次）
+    mp4_frames = preprocess_mp4_frames(mp4_files)
+    if not mp4_frames:
+        print("❌ 预处理失败，未能提取任何MP4帧。")
+        return
+
+    # 处理每个主题
+    total_success_themes = 0
+    for theme in themes:
+        if process_matching_for_theme(theme, force, start_index, end_index, mp4_frames):
+            total_success_themes += 1
+
+    # 输出总体统计
+    print(f"\n=== 🏆 所有主题处理完成 ===")
+    print(f"✅ 成功处理的主题: {total_success_themes}/{len(themes)}")
+    print(f"📋 处理的主题列表: {', '.join(themes)}")
+
 
 def main():
     """主函数"""
     # 创建命令行参数解析器
-    parser = argparse.ArgumentParser(description="MP4视频与封面图片匹配工具")
+    parser = argparse.ArgumentParser(
+        description="MP4视频与封面图片匹配工具（支持多主题）"
+    )
 
     # 添加命令行参数
+    parser.add_argument(
+        "--theme",
+        nargs="+",
+        choices=SUPPORTED_THEMES,
+        help=f"指定要处理的主题（可多选）。支持的主题: {', '.join(SUPPORTED_THEMES)}。如不指定，默认处理所有主题",
+    )
     parser.add_argument(
         "-f",
         "--force",
@@ -495,15 +533,20 @@ def main():
             print("❌ 错误：索引必须大于 0")
             return
 
-    print("🎬 MP4视频与封面图片匹配工具")
-    print("=" * 50)
+    # 确定要处理的主题
+    themes_to_process = args.theme if args.theme else SUPPORTED_THEMES
+
+    print("🎬 MP4视频与封面图片匹配工具（多主题支持）")
+    print("=" * 60)
+    print(f"🎭 支持的主题: {', '.join(SUPPORTED_THEMES)}")
+    print(f"🎯 将要处理的主题: {', '.join(themes_to_process)}")
 
     # 检查Ubuntu系统
     if not check_ubuntu_system():
         sys.exit(1)
 
     # 处理匹配
-    process_matching(args.force, args.start, args.end)
+    process_matching(themes_to_process, args.force, args.start, args.end)
 
     print("\n🎉 MP4匹配任务完成!")
 

@@ -8,20 +8,22 @@
 1. 读取封面图片文件（来自 enhance_cover_images.py 的输出）
 2. 调用阿里云图像增强服务进行超分辨率处理
 3. 将处理后的高清图片保存到指定目录
+4. 支持多个主题：scifi、thriller、horror、fantasy、romance
 
 输入:
-- macOS: /Volumes/dhl/audio/scifi/cover_enhanced/[故事索引].png
-- Linux: /media/dhl/audio/scifi/cover_enhanced/[故事索引].png
+- macOS: /Volumes/dhl/audio/{theme}/cover_enhanced/[故事索引].png
+- Linux: /media/dhl/audio/{theme}/cover_enhanced/[故事索引].png
 
 输出:
-- macOS: /Volumes/dhl/audio/scifi/cover_img_large/[故事索引].png
-- Linux: /media/dhl/audio/scifi/cover_img_large/[故事索引].png
+- macOS: /Volumes/dhl/audio/{theme}/cover_img_large/[故事索引].png
+- Linux: /media/dhl/audio/{theme}/cover_img_large/[故事索引].png
 
 使用方法:
-1. 基本使用: python upscale_cover_images.py
-2. 强制重新处理: python upscale_cover_images.py -f
-3. 指定故事索引范围: python upscale_cover_images.py --start 1 --end 10
-4. 指定超分倍数: python upscale_cover_images.py --scale 4
+1. 处理所有主题: python upscale_cover_images.py
+2. 处理指定主题: python upscale_cover_images.py --theme scifi
+3. 强制重新处理: python upscale_cover_images.py -f --theme thriller
+4. 指定故事索引范围: python upscale_cover_images.py --theme fantasy --start 1 --end 10
+5. 指定超分倍数: python upscale_cover_images.py --theme horror --scale 4
 
 注意:
 - 需要设置环境变量 ALIBABA_CLOUD_ACCESS_KEY_ID 和 ALIBABA_CLOUD_ACCESS_KEY_SECRET
@@ -30,6 +32,7 @@
 - 处理本地文件，使用阿里云图像增强的advance接口
 - 自动排除以点开头的meta文件（如.DS_Store等）
 - 根据操作系统自动选择合适的路径（macOS使用/Volumes，Linux使用/media）
+- 默认处理所有支持的主题，也可指定单个主题处理
 """
 
 import os
@@ -56,23 +59,26 @@ from alibabacloud_tea_util.client import Client as UtilClient
 import requests
 from PIL import Image
 
+# 支持的主题列表
+SUPPORTED_THEMES = ["scifi", "thriller", "horror", "fantasy", "romance"]
 
-def get_base_input_path():
-    """根据操作系统返回原始图片的适当路径"""
+
+def get_base_input_path(theme: str):
+    """根据操作系统和主题返回原始图片的适当路径"""
     system = platform.system()
     if system == "Darwin":  # macOS
-        return "/Volumes/dhl/audio/scifi/cover_enhanced"
+        return f"/Volumes/dhl/audio/{theme}/cover_enhanced"
     else:  # 默认为Linux/Ubuntu
-        return "/media/dhl/audio/scifi/cover_enhanced"
+        return f"/media/dhl/audio/{theme}/cover_enhanced"
 
 
-def get_base_output_path():
-    """根据操作系统返回输出图片的适当路径"""
+def get_base_output_path(theme: str):
+    """根据操作系统和主题返回输出图片的适当路径"""
     system = platform.system()
     if system == "Darwin":  # macOS
-        return "/Volumes/dhl/audio/scifi/cover_img_large"
+        return f"/Volumes/dhl/audio/{theme}/cover_img_large"
     else:  # 默认为Linux/Ubuntu
-        return "/media/dhl/audio/scifi/cover_img_large"
+        return f"/media/dhl/audio/{theme}/cover_img_large"
 
 
 def create_client() -> ImageEnhanClient:
@@ -114,6 +120,7 @@ def upscale_image(
     client: ImageEnhanClient,
     image_path: str,
     story_index: int,
+    theme: str,
     upscale_factor: int = 2,
     max_retries: int = 3,
 ):
@@ -124,6 +131,7 @@ def upscale_image(
         client: 阿里云图像增强客户端
         image_path: 本地图片文件路径
         story_index: 故事索引
+        theme: 主题名称
         upscale_factor: 超分倍数（2 或 4）
         max_retries: 最大重试次数
 
@@ -139,7 +147,7 @@ def upscale_image(
     for attempt in range(max_retries):
         try:
             print(
-                f"正在处理故事 {story_index} 的图片超分 (尝试 {attempt+1}/{max_retries})..."
+                f"正在处理 {theme} 主题故事 {story_index} 的图片超分 (尝试 {attempt+1}/{max_retries})..."
             )
             print(f"处理本地文件: {image_path}")
 
@@ -171,7 +179,7 @@ def upscale_image(
                     img_response = requests.get(result_url, timeout=30)
                     img_response.raise_for_status()
 
-                    print(f"✅ 已成功处理故事 {story_index} 的图片超分")
+                    print(f"✅ 已成功处理 {theme} 主题故事 {story_index} 的图片超分")
                     return img_response.content
                 else:
                     print(f"❌ API返回数据格式异常或未包含图片URL")
@@ -188,9 +196,9 @@ def upscale_image(
                 return None
 
 
-def get_existing_images():
-    """获取原始封面图片列表"""
-    image_dir = get_base_input_path()
+def get_existing_images(theme: str):
+    """获取指定主题的原始封面图片列表"""
+    image_dir = get_base_input_path(theme)
 
     if not os.path.exists(image_dir):
         print(f"原始图片目录不存在: {image_dir}")
@@ -212,9 +220,9 @@ def get_existing_images():
     return images
 
 
-def get_existing_upscaled_images():
-    """获取已处理的超分图片列表"""
-    output_dir = get_base_output_path()
+def get_existing_upscaled_images(theme: str):
+    """获取指定主题已处理的超分图片列表"""
+    output_dir = get_base_output_path(theme)
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
@@ -235,9 +243,9 @@ def get_existing_upscaled_images():
     return existing_indices
 
 
-def save_upscaled_image(story_index: int, image_data: bytes):
-    """保存超分后的图片到文件"""
-    output_dir = get_base_output_path()
+def save_upscaled_image(story_index: int, image_data: bytes, theme: str):
+    """保存指定主题的超分后的图片到文件"""
+    output_dir = get_base_output_path(theme)
 
     # 检查并创建目录
     try:
@@ -251,7 +259,7 @@ def save_upscaled_image(story_index: int, image_data: bytes):
 
     # 检查图片数据是否为空
     if not image_data:
-        print(f"⚠️ 警告: 故事 {story_index} 的图片数据为空，跳过保存")
+        print(f"⚠️ 警告: {theme} 主题故事 {story_index} 的图片数据为空，跳过保存")
         return False
 
     try:
@@ -262,7 +270,9 @@ def save_upscaled_image(story_index: int, image_data: bytes):
         # 验证文件是否成功写入
         if os.path.exists(file_path):
             file_size = os.path.getsize(file_path)
-            print(f"📁 已保存超分图片到: {file_path} (大小: {file_size} 字节)")
+            print(
+                f"📁 已保存 {theme} 主题超分图片到: {file_path} (大小: {file_size} 字节)"
+            )
             return True
         else:
             print(f"❌ 文件保存后未找到: {file_path}")
@@ -273,25 +283,28 @@ def save_upscaled_image(story_index: int, image_data: bytes):
         return False
 
 
-def process_images(
+def process_theme_images(
     client: ImageEnhanClient,
+    theme: str,
     force: bool = False,
     start_index: int = None,
     end_index: int = None,
     upscale_factor: int = 2,
 ):
-    """处理图片，进行超分辨率处理"""
+    """处理指定主题的图片，进行超分辨率处理"""
+
+    print(f"\n🎨 开始处理 {theme.upper()} 主题...")
 
     # 获取所有已存在的原始图片
-    original_images = get_existing_images()
+    original_images = get_existing_images(theme)
 
     if not original_images:
-        print("未找到任何色彩增强的封面图片文件")
-        print("请先运行 enhance_cover_images.py 生成色彩增强图片")
-        return
+        print(f"未找到 {theme} 主题的色彩增强封面图片文件")
+        print(f"请先运行 enhance_cover_images.py 生成 {theme} 主题的色彩增强图片")
+        return False
 
     # 获取已存在的超分图片
-    existing_upscaled = get_existing_upscaled_images()
+    existing_upscaled = get_existing_upscaled_images(theme)
 
     # 过滤需要处理的图片
     images_to_process = {}
@@ -308,10 +321,10 @@ def process_images(
             images_to_process[story_index] = image_path
 
     if not images_to_process:
-        print("所有指定范围内的故事都已有超分图片")
-        return
+        print(f"所有指定范围内的 {theme} 主题故事都已有超分图片")
+        return True
 
-    print(f"\n=== 📊 图片超分处理分析 ===")
+    print(f"\n=== 📊 {theme.upper()} 主题图片超分处理分析 ===")
     print(f"总原始图片数量: {len(original_images)}")
     print(f"已有超分图片: {len(existing_upscaled)}")
     print(f"需要处理的图片: {len(images_to_process)}")
@@ -323,29 +336,31 @@ def process_images(
     failure_count = 0
 
     # 处理每个图片
-    with tqdm(total=len(images_to_process), desc="图片超分处理进度") as pbar:
+    with tqdm(
+        total=len(images_to_process), desc=f"{theme.upper()} 主题图片超分处理进度"
+    ) as pbar:
         for story_index in sorted(images_to_process.keys()):
             image_path = images_to_process[story_index]
 
-            print(f"\n=== 处理故事 {story_index} ===")
+            print(f"\n=== 处理 {theme} 主题故事 {story_index} ===")
             print(f"原始图片路径: {image_path}")
 
             # 进行超分处理
             upscaled_data = upscale_image(
-                client, image_path, story_index, upscale_factor
+                client, image_path, story_index, theme, upscale_factor
             )
 
             if upscaled_data:
                 # 保存超分后的图片
-                if save_upscaled_image(story_index, upscaled_data):
+                if save_upscaled_image(story_index, upscaled_data, theme):
                     success_count += 1
-                    print(f"✅ 故事 {story_index} 图片超分处理成功")
+                    print(f"✅ {theme} 主题故事 {story_index} 图片超分处理成功")
                 else:
                     failure_count += 1
-                    print(f"❌ 故事 {story_index} 图片保存失败")
+                    print(f"❌ {theme} 主题故事 {story_index} 图片保存失败")
             else:
                 failure_count += 1
-                print(f"❌ 故事 {story_index} 图片超分处理失败")
+                print(f"❌ {theme} 主题故事 {story_index} 图片超分处理失败")
 
             pbar.update(1)
 
@@ -353,18 +368,65 @@ def process_images(
             time.sleep(2)
 
     # 输出最终统计
-    print(f"\n=== 📈 处理完成统计 ===")
+    print(f"\n=== 📈 {theme.upper()} 主题处理完成统计 ===")
     print(f"✅ 成功处理: {success_count}/{len(images_to_process)} 个图片")
     print(f"❌ 处理失败: {failure_count}/{len(images_to_process)} 个图片")
     print(f"📊 成功率: {success_count/len(images_to_process)*100:.1f}%")
+
+    return success_count > 0
+
+
+def process_images(
+    client: ImageEnhanClient,
+    themes: List[str],
+    force: bool = False,
+    start_index: int = None,
+    end_index: int = None,
+    upscale_factor: int = 2,
+):
+    """处理多个主题的图片，进行超分辨率处理"""
+
+    total_themes = len(themes)
+    successful_themes = 0
+
+    print(f"\n🚀 开始处理 {total_themes} 个主题的图片超分任务...")
+    print(f"主题列表: {', '.join(themes)}")
+
+    for i, theme in enumerate(themes, 1):
+        print(f"\n{'='*60}")
+        print(f"📍 处理进度: {i}/{total_themes} - 当前主题: {theme.upper()}")
+        print(f"{'='*60}")
+
+        success = process_theme_images(
+            client, theme, force, start_index, end_index, upscale_factor
+        )
+
+        if success:
+            successful_themes += 1
+            print(f"✅ {theme.upper()} 主题处理完成")
+        else:
+            print(f"❌ {theme.upper()} 主题处理失败或无图片需要处理")
+
+    # 输出总体统计
+    print(f"\n{'='*60}")
+    print(f"🎉 所有主题处理完成!")
+    print(f"📊 成功处理的主题: {successful_themes}/{total_themes}")
+    print(f"📊 总体成功率: {successful_themes/total_themes*100:.1f}%")
+    print(f"{'='*60}")
 
 
 def main():
     """主函数"""
     # 创建命令行参数解析器
-    parser = argparse.ArgumentParser(description="对科幻故事封面图片进行超分辨率处理")
+    parser = argparse.ArgumentParser(description="对故事封面图片进行超分辨率处理")
 
     # 添加命令行参数
+    parser.add_argument(
+        "--theme",
+        type=str,
+        choices=SUPPORTED_THEMES,
+        help=f"指定要处理的主题 ({', '.join(SUPPORTED_THEMES)})，不指定则处理所有主题",
+    )
     parser.add_argument(
         "-f",
         "--force",
@@ -401,7 +463,15 @@ def main():
             print("❌ 错误：索引必须大于 0")
             return
 
-    print("🔍 科幻故事封面图片超分辨率处理器")
+    # 确定要处理的主题
+    if args.theme:
+        themes_to_process = [args.theme]
+        print(f"🎯 指定处理主题: {args.theme}")
+    else:
+        themes_to_process = SUPPORTED_THEMES
+        print(f"🌟 默认处理所有主题: {', '.join(SUPPORTED_THEMES)}")
+
+    print("🔍 故事封面图片超分辨率处理器")
     print("=" * 50)
 
     # 创建阿里云客户端
@@ -409,7 +479,9 @@ def main():
     print("✅ 阿里云图像增强客户端初始化成功")
 
     # 处理图片超分
-    process_images(client, args.force, args.start, args.end, args.scale)
+    process_images(
+        client, themes_to_process, args.force, args.start, args.end, args.scale
+    )
 
     print("\n🎉 图片超分处理任务完成!")
 

@@ -8,19 +8,28 @@
 1. 读取封面图片文件（来自 generate_cover_images.py 的输出）
 2. 调用阿里云图像增强服务进行色彩增强处理
 3. 将处理后的增强图片保存到指定目录
+4. 支持多个主题：scifi、thriller、horror、fantasy、romance
 
 输入:
-- macOS: /Volumes/dhl/audio/scifi/cover_img_small/[故事索引].png
-- Linux: /media/dhl/audio/scifi/cover_img_small/[故事索引].png
+- macOS: /Volumes/dhl/audio/{theme}/cover_img_small/[故事索引].png
+- Linux: /media/dhl/audio/{theme}/cover_img_small/[故事索引].png
 
 输出:
-- macOS: /Volumes/dhl/audio/scifi/cover_enhanced/[故事索引].png
-- Linux: /media/dhl/audio/scifi/cover_enhanced/[故事索引].png
+- macOS: /Volumes/dhl/audio/{theme}/cover_enhanced/[故事索引].png
+- Linux: /media/dhl/audio/{theme}/cover_enhanced/[故事索引].png
 
 使用方法:
-1. 基本使用: python enhance_cover_images.py
-2. 强制重新处理: python enhance_cover_images.py -f
-3. 指定故事索引范围: python enhance_cover_images.py --start 1 --end 10
+1. 处理所有主题: python enhance_cover_images.py
+2. 处理特定主题: python enhance_cover_images.py --theme scifi
+3. 强制重新处理: python enhance_cover_images.py -f --theme thriller
+4. 指定故事索引范围: python enhance_cover_images.py --theme horror --start 1 --end 10
+
+支持的主题:
+- scifi: 科幻
+- thriller: 惊悚
+- horror: 恐怖
+- fantasy: 奇幻
+- romance: 浪漫
 
 注意:
 - 需要设置环境变量 ALIBABA_CLOUD_ACCESS_KEY_ID 和 ALIBABA_CLOUD_ACCESS_KEY_SECRET
@@ -29,6 +38,7 @@
 - 处理本地文件，使用阿里云图像增强的advance接口
 - 自动排除以点开头的meta文件（如.DS_Store等）
 - 根据操作系统自动选择合适的路径（macOS使用/Volumes，Linux使用/media）
+- 默认处理所有主题，也可指定单个主题处理
 """
 
 import os
@@ -55,23 +65,26 @@ from alibabacloud_tea_util.client import Client as UtilClient
 import requests
 from PIL import Image
 
+# 支持的主题列表
+SUPPORTED_THEMES = ["scifi", "thriller", "horror", "fantasy", "romance"]
 
-def get_base_input_path():
-    """根据操作系统返回原始图片的适当路径"""
+
+def get_base_input_path(theme: str):
+    """根据操作系统和主题返回原始图片的适当路径"""
     system = platform.system()
     if system == "Darwin":  # macOS
-        return "/Volumes/dhl/audio/scifi/cover_img_small"
+        return f"/Volumes/dhl/audio/{theme}/cover_img_small"
     else:  # 默认为Linux/Ubuntu
-        return "/media/dhl/audio/scifi/cover_img_small"
+        return f"/media/dhl/audio/{theme}/cover_img_small"
 
 
-def get_base_output_path():
-    """根据操作系统返回输出图片的适当路径"""
+def get_base_output_path(theme: str):
+    """根据操作系统和主题返回输出图片的适当路径"""
     system = platform.system()
     if system == "Darwin":  # macOS
-        return "/Volumes/dhl/audio/scifi/cover_enhanced"
+        return f"/Volumes/dhl/audio/{theme}/cover_enhanced"
     else:  # 默认为Linux/Ubuntu
-        return "/media/dhl/audio/scifi/cover_enhanced"
+        return f"/media/dhl/audio/{theme}/cover_enhanced"
 
 
 def create_client() -> ImageEnhanClient:
@@ -185,9 +198,9 @@ def enhance_image_color(
                 return None
 
 
-def get_existing_images():
+def get_existing_images(theme: str):
     """获取原始封面图片列表"""
-    image_dir = get_base_input_path()
+    image_dir = get_base_input_path(theme)
 
     if not os.path.exists(image_dir):
         print(f"原始图片目录不存在: {image_dir}")
@@ -209,9 +222,9 @@ def get_existing_images():
     return images
 
 
-def get_existing_enhanced_images():
+def get_existing_enhanced_images(theme: str):
     """获取已处理的增强图片列表"""
-    output_dir = get_base_output_path()
+    output_dir = get_base_output_path(theme)
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
@@ -232,9 +245,9 @@ def get_existing_enhanced_images():
     return existing_indices
 
 
-def save_enhanced_image(story_index: int, image_data: bytes):
+def save_enhanced_image(theme: str, story_index: int, image_data: bytes):
     """保存色彩增强后的图片到文件"""
-    output_dir = get_base_output_path()
+    output_dir = get_base_output_path(theme)
 
     # 检查并创建目录
     try:
@@ -272,22 +285,25 @@ def save_enhanced_image(story_index: int, image_data: bytes):
 
 def process_images(
     client: ImageEnhanClient,
+    theme: str,
     force: bool = False,
     start_index: int = None,
     end_index: int = None,
 ):
     """处理图片，进行色彩增强处理"""
 
+    print(f"\n=== 🎨 处理主题: {theme.upper()} ===")
+
     # 获取所有已存在的原始图片
-    original_images = get_existing_images()
+    original_images = get_existing_images(theme)
 
     if not original_images:
-        print("未找到任何原始封面图片文件")
-        print("请先运行 generate_cover_images.py 生成封面图片")
-        return
+        print(f"未找到 {theme} 主题的任何原始封面图片文件")
+        print(f"请先运行 generate_cover_images.py --theme {theme} 生成封面图片")
+        return 0, 0  # 返回成功和失败计数
 
     # 获取已存在的增强图片
-    existing_enhanced = get_existing_enhanced_images()
+    existing_enhanced = get_existing_enhanced_images(theme)
 
     # 过滤需要处理的图片
     images_to_process = {}
@@ -304,10 +320,10 @@ def process_images(
             images_to_process[story_index] = image_path
 
     if not images_to_process:
-        print("所有指定范围内的故事都已有色彩增强图片")
-        return
+        print(f"主题 {theme} 的所有指定范围内的故事都已有色彩增强图片")
+        return 0, 0  # 返回成功和失败计数
 
-    print(f"\n=== 📊 图片色彩增强处理分析 ===")
+    print(f"\n=== 📊 主题 {theme} 图片色彩增强处理分析 ===")
     print(f"总原始图片数量: {len(original_images)}")
     print(f"已有增强图片: {len(existing_enhanced)}")
     print(f"需要处理的图片: {len(images_to_process)}")
@@ -319,11 +335,13 @@ def process_images(
     failure_count = 0
 
     # 处理每个图片
-    with tqdm(total=len(images_to_process), desc="图片色彩增强处理进度") as pbar:
+    with tqdm(
+        total=len(images_to_process), desc=f"{theme} 图片色彩增强处理进度"
+    ) as pbar:
         for story_index in sorted(images_to_process.keys()):
             image_path = images_to_process[story_index]
 
-            print(f"\n=== 处理故事 {story_index} ===")
+            print(f"\n=== 处理 {theme} 主题故事 {story_index} ===")
             print(f"原始图片路径: {image_path}")
 
             # 进行色彩增强处理
@@ -331,32 +349,35 @@ def process_images(
 
             if enhanced_data:
                 # 保存增强后的图片
-                if save_enhanced_image(story_index, enhanced_data):
+                if save_enhanced_image(theme, story_index, enhanced_data):
                     success_count += 1
-                    print(f"✅ 故事 {story_index} 图片色彩增强处理成功")
+                    print(f"✅ {theme} 主题故事 {story_index} 图片色彩增强处理成功")
                 else:
                     failure_count += 1
-                    print(f"❌ 故事 {story_index} 图片保存失败")
+                    print(f"❌ {theme} 主题故事 {story_index} 图片保存失败")
             else:
                 failure_count += 1
-                print(f"❌ 故事 {story_index} 图片色彩增强处理失败")
+                print(f"❌ {theme} 主题故事 {story_index} 图片色彩增强处理失败")
 
             pbar.update(1)
 
             # 短暂延迟，避免API请求过快
             time.sleep(2)
 
-    # 输出最终统计
-    print(f"\n=== 📈 处理完成统计 ===")
+    # 输出主题统计
+    print(f"\n=== 📈 主题 {theme} 处理完成统计 ===")
     print(f"✅ 成功处理: {success_count}/{len(images_to_process)} 个图片")
     print(f"❌ 处理失败: {failure_count}/{len(images_to_process)} 个图片")
-    print(f"📊 成功率: {success_count/len(images_to_process)*100:.1f}%")
+    if len(images_to_process) > 0:
+        print(f"📊 成功率: {success_count/len(images_to_process)*100:.1f}%")
+
+    return success_count, failure_count
 
 
 def main():
     """主函数"""
     # 创建命令行参数解析器
-    parser = argparse.ArgumentParser(description="对科幻故事封面图片进行色彩增强处理")
+    parser = argparse.ArgumentParser(description="对故事封面图片进行色彩增强处理")
 
     # 添加命令行参数
     parser.add_argument(
@@ -375,6 +396,11 @@ def main():
         type=int,
         help="指定结束处理的故事索引",
     )
+    parser.add_argument(
+        "--theme",
+        choices=SUPPORTED_THEMES,
+        help=f"指定要处理的主题，支持: {', '.join(SUPPORTED_THEMES)}，不指定则处理所有主题",
+    )
 
     # 解析命令行参数
     args = parser.parse_args()
@@ -388,17 +414,39 @@ def main():
             print("❌ 错误：索引必须大于 0")
             return
 
-    print("🎨 科幻故事封面图片色彩增强器")
+    print("🎨 故事封面图片色彩增强器")
     print("=" * 50)
 
     # 创建阿里云客户端
     client = create_client()
     print("✅ 阿里云图像增强客户端初始化成功")
 
-    # 处理图片色彩增强
-    process_images(client, args.force, args.start, args.end)
+    # 确定要处理的主题
+    themes_to_process = [args.theme] if args.theme else SUPPORTED_THEMES
 
-    print("\n🎉 图片色彩增强处理任务完成!")
+    print(f"📋 将处理以下主题: {', '.join(themes_to_process)}")
+
+    # 总体统计
+    total_success = 0
+    total_failure = 0
+
+    # 处理每个主题的图片色彩增强
+    for theme in themes_to_process:
+        success, failure = process_images(
+            client, theme, args.force, args.start, args.end
+        )
+        total_success += success
+        total_failure += failure
+
+    # 输出最终总体统计
+    print(f"\n🎉 所有主题图片色彩增强处理任务完成!")
+    print(f"=== 📈 总体统计 ===")
+    print(f"✅ 总成功处理: {total_success} 个图片")
+    print(f"❌ 总处理失败: {total_failure} 个图片")
+    if total_success + total_failure > 0:
+        print(
+            f"📊 总体成功率: {total_success/(total_success + total_failure)*100:.1f}%"
+        )
 
 
 if __name__ == "__main__":

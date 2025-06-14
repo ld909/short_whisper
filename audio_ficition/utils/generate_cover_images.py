@@ -8,23 +8,28 @@
 1. 读取封面提示词文件（来自 generate_cover_prompts.py 的输出）
 2. 调用 Leonardo AI 模型生成图片
 3. 将生成的图片保存到指定目录
+4. 支持多个主题：scifi、thriller、horror、fantasy、romance
 
 输入:
-- 封面提示词文件: /Volumes/dhl/audio/scifi/cover_prompts/[故事索引].txt
+- Intel Mac: /Volumes/dhl/audio/{theme}/cover_prompts/[故事索引].txt
+- Apple Silicon: /Users/donghaoliu/Documents/audio/{theme}/cover_prompts/[故事索引].txt
 
 输出:
-- 封面图片文件: /Volumes/dhl/audio/scifi/cover_img_small/[故事索引].png
+- Intel Mac: /Volumes/dhl/audio/{theme}/cover_img_small/[故事索引].png
+- Apple Silicon: /Users/donghaoliu/Documents/audio/{theme}/cover_img_small/[故事索引].png
 
 使用方法:
-1. 基本使用: python generate_cover_images.py (生成所有提示词的图片)
-2. 强制重新生成: python generate_cover_images.py -f
-3. 指定故事索引范围: python generate_cover_images.py --start 1 --end 10
-4. 指定生成数量: python generate_cover_images.py --count 5 (生成前5个需要的图片)
+1. 基本使用: python generate_cover_images.py (生成所有主题的图片)
+2. 指定主题: python generate_cover_images.py --theme scifi
+3. 强制重新生成: python generate_cover_images.py -f --theme thriller
+4. 指定故事索引范围: python generate_cover_images.py --theme horror --start 1 --end 10
+5. 指定生成数量: python generate_cover_images.py --theme fantasy --count 5
 
 注意:
 - 使用 Leonardo AI API 生成图片
 - 脚本支持断点续传，中断后可从上次停止的位置继续处理
 - 生成的图片为 PNG 格式
+- 默认处理所有主题，可用 --theme 参数指定单个主题
 """
 
 import os
@@ -37,9 +42,50 @@ import re
 import requests
 import json
 import random
+import platform
 from tqdm import tqdm
 from PIL import Image
 from io import BytesIO
+
+
+def get_system_info():
+    """获取系统信息，判断芯片类型"""
+    system = platform.system()
+    machine = platform.machine()
+
+    if system == "Darwin":  # macOS
+        if machine == "x86_64":
+            return "intel_mac"
+        elif machine == "arm64":
+            return "apple_silicon"
+
+    return "unknown"
+
+
+def get_base_path():
+    """根据系统类型获取基础路径"""
+    system_type = get_system_info()
+
+    if system_type == "intel_mac":
+        return "/Volumes/dhl/audio"
+    elif system_type == "apple_silicon":
+        return "/Users/donghaoliu/Documents/audio"
+    else:
+        print(f"⚠️ 未知系统类型: {system_type}")
+        # 默认使用Apple Silicon路径
+        return "/Users/donghaoliu/Documents/audio"
+
+
+def get_theme_paths(theme):
+    """获取指定主题的路径"""
+    base_path = get_base_path()
+
+    paths = {
+        "prompt_dir": os.path.join(base_path, theme, "cover_prompts"),
+        "image_dir": os.path.join(base_path, theme, "cover_img_small"),
+    }
+
+    return paths
 
 
 def setup_leonardo_client():
@@ -220,9 +266,10 @@ def generate_image_with_leonardo(config, prompt, story_index, max_retries=3):
                 return None
 
 
-def get_existing_prompts():
+def get_existing_prompts(theme):
     """获取已生成的封面提示词文件列表"""
-    prompt_dir = "/Volumes/dhl/audio/scifi/cover_prompts"
+    paths = get_theme_paths(theme)
+    prompt_dir = paths["prompt_dir"]
 
     if not os.path.exists(prompt_dir):
         print(f"提示词目录不存在: {prompt_dir}")
@@ -233,6 +280,9 @@ def get_existing_prompts():
 
     for file_path in prompt_files:
         basename = os.path.basename(file_path)
+        # 排除以点开头的文件（如.DS_Store等）
+        if basename.startswith("."):
+            continue
         match = re.match(r"(\d+)\.txt", basename)
         if match:
             story_index = int(match.group(1))
@@ -247,9 +297,10 @@ def get_existing_prompts():
     return prompts
 
 
-def get_existing_images():
+def get_existing_images(theme):
     """获取已生成的封面图片列表"""
-    image_dir = "/Volumes/dhl/audio/scifi/cover_img_small"
+    paths = get_theme_paths(theme)
+    image_dir = paths["image_dir"]
 
     if not os.path.exists(image_dir):
         os.makedirs(image_dir, exist_ok=True)
@@ -270,9 +321,10 @@ def get_existing_images():
     return existing_indices
 
 
-def save_image(story_index, image_bytes):
+def save_image(theme, story_index, image_bytes):
     """保存图片到文件"""
-    image_dir = "/Volumes/dhl/audio/scifi/cover_img_small"
+    paths = get_theme_paths(theme)
+    image_dir = paths["image_dir"]
 
     # 检查并创建目录
     try:
@@ -308,17 +360,22 @@ def save_image(story_index, image_bytes):
         return False
 
 
-def process_prompts(config, force=False, start_index=None, end_index=None, count=None):
-    """处理所有提示词，生成封面图片"""
+def process_theme(
+    config, theme, force=False, start_index=None, end_index=None, count=None
+):
+    """处理单个主题的所有提示词，生成封面图片"""
+    print(f"\n🎨 开始处理主题: {theme}")
+    print("=" * 50)
+
     # 获取所有已存在的提示词
-    prompts = get_existing_prompts()
+    prompts = get_existing_prompts(theme)
 
     if not prompts:
-        print("未找到任何提示词文件")
-        return
+        print(f"❌ 主题 {theme} 未找到任何提示词文件")
+        return 0, 0
 
     # 获取已存在的封面图片
-    existing_images = get_existing_images()
+    existing_images = get_existing_images(theme)
 
     # 过滤需要处理的提示词
     prompts_to_process = {}
@@ -350,10 +407,10 @@ def process_prompts(config, force=False, start_index=None, end_index=None, count
                 prompts_to_process[story_index] = content
 
     if not prompts_to_process:
-        print("所有指定范围内的故事都已有封面图片")
-        return
+        print(f"✅ 主题 {theme} 所有指定范围内的故事都已有封面图片")
+        return 0, 0
 
-    print(f"\n=== 📊 封面图片生成分析 ===")
+    print(f"\n=== 📊 主题 {theme} 封面图片生成分析 ===")
     print(f"总提示词数量: {len(prompts)}")
     print(f"已有封面图片: {len(existing_images)}")
     print(f"需要处理的提示词: {len(prompts_to_process)}")
@@ -368,11 +425,11 @@ def process_prompts(config, force=False, start_index=None, end_index=None, count
     failure_count = 0
 
     # 处理每个提示词
-    with tqdm(total=len(prompts_to_process), desc="生成封面图片进度") as pbar:
+    with tqdm(total=len(prompts_to_process), desc=f"生成 {theme} 封面图片进度") as pbar:
         for story_index in sorted(prompts_to_process.keys()):
             prompt = prompts_to_process[story_index]
 
-            print(f"\n=== 处理故事 {story_index} ===")
+            print(f"\n=== 处理主题 {theme} 故事 {story_index} ===")
             print(
                 f"提示词内容: {prompt[:100]}..."
                 if len(prompt) > 100
@@ -384,34 +441,88 @@ def process_prompts(config, force=False, start_index=None, end_index=None, count
 
             if image_bytes:
                 # 保存图片
-                if save_image(story_index, image_bytes):
+                if save_image(theme, story_index, image_bytes):
                     success_count += 1
-                    print(f"✅ 故事 {story_index} 封面图片生成成功")
+                    print(f"✅ 主题 {theme} 故事 {story_index} 封面图片生成成功")
                 else:
                     failure_count += 1
-                    print(f"❌ 故事 {story_index} 封面图片保存失败")
+                    print(f"❌ 主题 {theme} 故事 {story_index} 封面图片保存失败")
             else:
                 failure_count += 1
-                print(f"❌ 故事 {story_index} 封面图片生成失败")
+                print(f"❌ 主题 {theme} 故事 {story_index} 封面图片生成失败")
 
             pbar.update(1)
 
             # 短暂延迟，避免API请求过快
             time.sleep(2)
 
-    # 输出最终统计
-    print(f"\n=== 📈 处理完成统计 ===")
+    # 输出主题统计
+    print(f"\n=== 📈 主题 {theme} 处理完成统计 ===")
     print(f"✅ 成功生成: {success_count}/{len(prompts_to_process)} 个封面图片")
     print(f"❌ 生成失败: {failure_count}/{len(prompts_to_process)} 个封面图片")
-    print(f"📊 成功率: {success_count/len(prompts_to_process)*100:.1f}%")
+    if len(prompts_to_process) > 0:
+        print(f"📊 成功率: {success_count/len(prompts_to_process)*100:.1f}%")
+
+    return success_count, failure_count
+
+
+def process_prompts(
+    config, themes=None, force=False, start_index=None, end_index=None, count=None
+):
+    """处理所有主题的提示词，生成封面图片"""
+    # 支持的主题列表
+    available_themes = ["scifi", "thriller", "horror", "fantasy", "romance"]
+
+    # 如果没有指定主题，处理所有主题
+    if not themes:
+        themes = available_themes
+    else:
+        # 验证指定的主题是否有效
+        invalid_themes = [theme for theme in themes if theme not in available_themes]
+        if invalid_themes:
+            print(f"❌ 错误：不支持的主题: {invalid_themes}")
+            print(f"支持的主题: {available_themes}")
+            return
+
+    print(f"🎯 将处理以下主题: {themes}")
+
+    # 显示系统信息
+    system_type = get_system_info()
+    base_path = get_base_path()
+    print(f"🖥️ 系统类型: {system_type}")
+    print(f"📁 基础路径: {base_path}")
+
+    total_success = 0
+    total_failure = 0
+
+    # 处理每个主题
+    for theme in themes:
+        success, failure = process_theme(
+            config, theme, force, start_index, end_index, count
+        )
+        total_success += success
+        total_failure += failure
+
+    # 输出总体统计
+    print(f"\n=== 🎉 所有主题处理完成统计 ===")
+    print(f"✅ 总成功生成: {total_success} 个封面图片")
+    print(f"❌ 总生成失败: {total_failure} 个封面图片")
+    if total_success + total_failure > 0:
+        print(f"📊 总成功率: {total_success/(total_success + total_failure)*100:.1f}%")
 
 
 def main():
     """主函数"""
     # 创建命令行参数解析器
-    parser = argparse.ArgumentParser(description="根据封面提示词生成科幻故事封面图片")
+    parser = argparse.ArgumentParser(description="根据封面提示词生成多主题故事封面图片")
 
     # 添加命令行参数
+    parser.add_argument(
+        "--theme",
+        type=str,
+        choices=["scifi", "thriller", "horror", "fantasy", "romance"],
+        help="指定要处理的主题（不指定则处理所有主题）",
+    )
     parser.add_argument(
         "-f",
         "--force",
@@ -455,14 +566,17 @@ def main():
         print("❌ 错误：--count 参数不能与 --start 或 --end 参数同时使用")
         return
 
-    print("🖼️ 科幻故事封面图片生成器")
+    print("🖼️ 多主题故事封面图片生成器")
     print("=" * 50)
 
     # 设置 Leonardo AI 客户端
     config = setup_leonardo_client()
 
+    # 确定要处理的主题
+    themes = [args.theme] if args.theme else None
+
     # 处理提示词，生成图片
-    process_prompts(config, args.force, args.start, args.end, args.count)
+    process_prompts(config, themes, args.force, args.start, args.end, args.count)
 
     print("\n🎉 封面图片生成任务完成!")
 
