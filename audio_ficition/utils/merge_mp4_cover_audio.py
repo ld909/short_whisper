@@ -32,14 +32,14 @@
 - 静态图像缓存: /tmp/cover_video_cache/[图片哈希]_[分辨率].mp4
 
 使用方法:
-1. 基本使用: python combine_video_with_cover.py
+1. 基本使用（默认启用快速+缓存优化）: python combine_video_with_cover.py
 2. 强制重新处理: python combine_video_with_cover.py -f
 3. 指定故事索引范围: python combine_video_with_cover.py --start 1 --end 10
 4. 只处理指定故事: python combine_video_with_cover.py --story 5
 5. 16:9模式输出（推荐YouTube）: python combine_video_with_cover.py --16-9
-6. 快速模式（最大速度）: python combine_video_with_cover.py --16-9 --fast
-8. 缓存优化模式: python combine_video_with_cover.py --cache-optimize
-9. 组合使用: python combine_video_with_cover.py --16-9 --fast --cache-optimize -f --start 1 --end 10
+6. 禁用快速模式: python combine_video_with_cover.py --no-fast
+7. 禁用缓存优化: python combine_video_with_cover.py --no-cache-optimize
+8. 组合使用: python combine_video_with_cover.py --16-9 -f --start 1 --end 10
 
 缓存优化特点:
 - 🚀 只生成1秒基础静态视频片段，使用FFmpeg循环扩展到目标时长
@@ -222,6 +222,20 @@ def create_base_static_video(
                 image_filter = f"scale={target_width}:{target_height}"
 
         # 🚀 优化：生成1秒基础静态视频，使用更快的编码设置
+        # 根据编码器类型选择合适的预设
+        if "nvenc" in hw_options["encoder"]:
+            # NVENC编码器使用fast预设
+            cache_preset = "fast"
+        elif "qsv" in hw_options["encoder"]:
+            # QSV编码器使用fast预设
+            cache_preset = "fast"
+        elif "amf" in hw_options["encoder"]:
+            # AMF编码器使用fast预设
+            cache_preset = "fast"
+        else:
+            # 软件编码器使用ultrafast预设
+            cache_preset = "ultrafast"
+
         cmd = (
             [
                 "ffmpeg",
@@ -234,7 +248,7 @@ def create_base_static_video(
                 "-c:v",
                 hw_options["encoder"],
                 "-preset",
-                "ultrafast",  # 使用最快preset，因为只有1秒
+                cache_preset,  # 使用适合当前编码器的预设
             ]
             + hw_options["extra_args"]
             + [
@@ -1861,15 +1875,18 @@ def combine_video_with_cover(
 
             if cover_duration <= 0:
                 print(f"⚠️  视频时长已足够，不需要添加封面图片")
-                # 直接使用视频片段，调整时长到目标时长
+                # 🎵 直接添加音频到视频片段
+                print(f"🎵 添加音频到视频片段...")
                 final_cmd = [
                     "ffmpeg",
-                    "-i",
-                    temp_video_file,
-                    "-t",
-                    str(target_duration),
-                    "-c",
-                    "copy",
+                    "-i", temp_video_file,    # 视频文件
+                    "-i", audio_file,         # 音频文件
+                    "-c:v", "copy",           # 复制视频流
+                    "-c:a", "aac",            # 音频编码为AAC
+                    "-map", "0:v:0",          # 映射视频流
+                    "-map", "1:a:0",          # 映射音频流
+                    "-t", str(audio_duration), # 🔧 修复：以音频时长为准
+                    "-avoid_negative_ts", "make_zero",
                     "-y",
                     output_file,
                 ]
@@ -1937,15 +1954,65 @@ def combine_video_with_cover(
                     "-c",
                     "copy",
                     "-y",
-                    output_file,
                 ]
 
-            result = subprocess.run(
-                final_cmd, capture_output=True, text=True, timeout=600
-            )
-            if result.returncode != 0:
-                print(f"❌ 最终视频生成失败: {result.stderr}")
-                return False
+                            # 判断是否需要生成临时无声视频
+            if cover_duration <= 0:
+                # 直接执行命令（已包含音频处理）
+                result = subprocess.run(
+                    final_cmd, capture_output=True, text=True, timeout=600
+                )
+                if result.returncode != 0:
+                    print(f"❌ 视频音频合并失败: {result.stderr}")
+                    return False
+                
+                # 跳过后续的音频处理步骤
+                audio_processing_needed = False
+            else:
+                # 先生成无音频的临时视频
+                temp_silent_video = output_file + "_silent_temp.mp4"
+                result = subprocess.run(
+                    final_cmd + [temp_silent_video], capture_output=True, text=True, timeout=600
+                )
+                if result.returncode != 0:
+                    print(f"❌ 视频片段合并失败: {result.stderr}")
+                    return False
+                
+                audio_processing_needed = True
+
+            # 🎵 第四步：添加音频轨道（关键修复）- 仅在需要时执行
+            if audio_processing_needed:
+                print(f"🎵 第四步：添加音频轨道...")
+                
+                # 使用FFmpeg将音频添加到视频中，以音频时长为准
+                audio_cmd = [
+                    "ffmpeg",
+                    "-i", temp_silent_video,  # 无声视频
+                    "-i", audio_file,         # 音频文件
+                    "-c:v", "copy",           # 复制视频流，不重新编码
+                    "-c:a", "aac",            # 音频编码为AAC
+                    "-map", "0:v:0",          # 映射视频流
+                    "-map", "1:a:0",          # 映射音频流
+                    "-t", str(audio_duration), # 🔧 修复：以音频时长为准
+                    "-avoid_negative_ts", "make_zero",  # 避免时间戳问题
+                    "-y",                     # 覆盖输出文件
+                    output_file
+                ]
+                
+                audio_result = subprocess.run(
+                    audio_cmd, capture_output=True, text=True, timeout=600
+                )
+                
+                # 清理临时无声视频文件
+                try:
+                    if os.path.exists(temp_silent_video):
+                        os.unlink(temp_silent_video)
+                except Exception:
+                    pass
+                
+                if audio_result.returncode != 0:
+                    print(f"❌ 添加音频失败: {audio_result.stderr}")
+                    return False
 
             # 验证输出文件
             if os.path.exists(output_file):
@@ -1953,11 +2020,24 @@ def combine_video_with_cover(
                 final_info = get_video_info(output_file)
                 if final_info:
                     actual_duration = final_info["duration"]
-                    print(f"✅ 视频生成成功: {output_file}")
+                    print(f"✅ 视频生成成功（含音频）: {output_file}")
                     print(f"📊 文件大小: {file_size / 1024 / 1024:.2f} MB")
                     print(
                         f"⏱️  实际时长: {actual_duration:.2f}秒 (目标: {target_duration:.2f}秒)"
                     )
+                    print(f"🎵 音频时长: {audio_duration:.2f}秒")
+                    
+                    # 验证音频流是否存在
+                    audio_check_cmd = [
+                        "ffprobe", "-v", "quiet", "-select_streams", "a", 
+                        "-show_entries", "stream=codec_name", "-of", "csv=p=0", output_file
+                    ]
+                    audio_check = subprocess.run(audio_check_cmd, capture_output=True, text=True)
+                    if audio_check.returncode == 0 and audio_check.stdout.strip():
+                        print(f"✅ 音频轨道验证成功: {audio_check.stdout.strip()}")
+                    else:
+                        print(f"⚠️  音频轨道验证失败")
+                    
                     return True
                 else:
                     print(f"❌ 生成的视频文件无效")
@@ -2041,7 +2121,14 @@ def main():
     parser.add_argument(
         "--fast",
         action="store_true",
-        help="快速模式 - 使用最快编码设置，略微降低质量但大幅提升速度",
+        default=True,
+        help="快速模式 - 使用最快编码设置，略微降低质量但大幅提升速度（默认启用）",
+    )
+    parser.add_argument(
+        "--no-fast",
+        action="store_false",
+        dest="fast",
+        help="禁用快速模式",
     )
     parser.add_argument(
         "--opencv",
@@ -2053,13 +2140,19 @@ def main():
     parser.add_argument(
         "--cache-optimize",
         action="store_true",
-        help="缓存优化模式 - 预生成静态图像缓存，大幅提升处理速度",
+        default=True,
+        help="缓存优化模式 - 预生成静态图像缓存，大幅提升处理速度（默认启用）",
+    )
+    parser.add_argument(
+        "--no-cache-optimize",
+        action="store_false",
+        dest="cache_optimize",
+        help="禁用缓存优化模式",
     )
     parser.add_argument(
         "--theme",
-        default="scifi",
         choices=["scifi", "thriller", "horror", "fantasy", "romance"],
-        help="指定要处理的主题（默认：scifi）"
+        help="指定要处理的主题（不指定则处理所有主题）"
     )
 
     args = parser.parse_args()
@@ -2077,6 +2170,14 @@ def main():
     print("=" * 50)
     print(f"🖥️  当前操作系统: {platform.system()}")
 
+    # 确定要处理的主题列表
+    if args.theme:
+        themes_to_process = [args.theme]
+        print(f"🎯 处理指定主题: {args.theme}")
+    else:
+        themes_to_process = ["scifi", "thriller", "horror", "fantasy", "romance"]
+        print(f"🌟 处理所有主题: {', '.join(themes_to_process)}")
+
     if args.force_16_9:
         print("🎯 16:9模式已启用 - 输出YouTube友好的16:9比例视频")
         print("   - 智能裁剪/缩放以最大化保持画质")
@@ -2092,19 +2193,21 @@ def main():
     else:
         print("💻 FFmpeg模式 - 安装opencv-python可启用更快的处理模式")
 
-    # 初始化缓存（如果启用）
+    # 初始化缓存（默认启用）
     if args.cache_optimize:
-        print("🚀 缓存优化模式已启用")
+        print("🚀 缓存优化模式已启用（默认）")
         init_cache_dir()
         # 清理过期缓存
         cleanup_cache()
+    else:
+        print("💾 缓存优化模式已禁用")
 
     # 检查依赖
     hw_options = check_dependencies()
 
-    # 应用快速模式设置
+    # 应用快速模式设置（默认启用）
     if args.fast:
-        print("🚀 快速模式已启用 - 最大化编码速度")
+        print("🚀 快速模式已启用（默认）- 最大化编码速度")
         if hw_options["encoder"] == "libx264":
             hw_options["preset"] = "ultrafast"
             hw_options["extra_args"] = ["-crf", "23"]  # 稍微降低质量
@@ -2127,215 +2230,311 @@ def main():
         print(
             f"⚡ 快速编码设置: {hw_options['encoder']} (preset: {hw_options['preset']})"
         )
+    else:
+        print("🐌 快速模式已禁用 - 使用标准编码设置")
 
-    # 获取路径配置
-    paths = get_paths(args.theme)
-    print(f"📁 高清封面目录: {paths['cover_img_dir']}")
-    print(f"📁 MP4源文件目录: {paths['mp4_source_dir']}")
-    print(f"📁 音频文件目录: {paths['audio_merge_dir']}")
-    print(f"📁 输出目录: {paths['output_dir']}")
-
-    # 扫描故事文件
-    print(f"\n🔍 扫描故事文件...")
-    story_info = get_story_files(paths)
-
-    if not story_info:
-        print("❌ 未找到任何故事文件")
-        return
-
-    print(f"📊 找到 {len(story_info)} 个故事")
-
-    # 过滤指定故事
-    if args.story:
-        if args.story in story_info:
-            story_info = {args.story: story_info[args.story]}
-            print(f"🎯 只处理故事: {args.story}")
-        else:
-            print(f"❌ 未找到指定的故事: {args.story}")
-            return
-
-    # 检查文件完整性
-    complete_stories = {}
-    missing_files = []
-
-    for story_index, files in story_info.items():
-        # 应用索引范围过滤
-        try:
-            story_num = int(story_index)
-            if args.start is not None and story_num < args.start:
-                continue
-            if args.end is not None and story_num > args.end:
-                continue
-        except ValueError:
-            continue
-
-        has_cover = "cover_image" in files
-        has_mp4 = "source_mp4" in files
-        has_audio = "audio_file" in files
-
-        if has_cover and has_mp4 and has_audio:
-            complete_stories[story_index] = files
-            print(f"✅ 故事 {story_index}: 文件完整 (封面图+视频片段+音频)")
-        else:
-            missing = []
-            if not has_cover:
-                missing.append("封面图")
-            if not has_mp4:
-                missing.append("视频片段")
-            if not has_audio:
-                missing.append("音频文件")
-            print(f"❌ 故事 {story_index}: 缺少 {', '.join(missing)}")
-            missing_files.append(story_index)
-
-    if not complete_stories:
-        print("❌ 没有文件完整的故事可以处理")
-        return
-
-    # 扫描已存在的组合视频
-    existing_combined = set()
-    if not args.force:
-        existing_combined = get_existing_combined_videos(paths["output_dir"])
-
-    # 确定需要处理的故事
-    stories_to_process = {}
-    for story_index, files in complete_stories.items():
-        if args.force or story_index not in existing_combined:
-            stories_to_process[story_index] = files
-
-    # 统计信息
-    stats = {
-        "total_stories": len(story_info),
-        "complete_stories": len(complete_stories),
-        "completed_combines": len(existing_combined & set(complete_stories.keys())),
-        "pending_combines": len(stories_to_process),
-        "missing_files": missing_files,
+    # 全局统计信息
+    global_stats = {
+        "themes_processed": 0,
+        "total_stories": 0,
+        "total_complete": 0,
+        "total_completed_combines": 0,
+        "total_pending": 0,
+        "total_session_successful": 0,
+        "total_session_failed": 0,
+        "theme_results": {}
     }
 
-    print(f"\n📈 处理统计:")
-    print(f"   总故事数: {stats['total_stories']}")
-    print(f"   文件完整: {stats['complete_stories']}")
-    print(f"   已完成组合: {stats['completed_combines']}")
-    print(f"   待处理: {stats['pending_combines']}")
-    print(f"   文件不完整: {len(stats['missing_files'])}")
-
-    if stats["pending_combines"] == 0:
-        print(f"\n🎉 所有文件完整的故事都已完成组合！")
-        return
-
-    # 确保输出目录存在
-    os.makedirs(paths["output_dir"], exist_ok=True)
-
-    # 🚀 预生成缓存（如果启用缓存优化）
-    if args.cache_optimize and CACHE_ENABLED and stories_to_process:
-        pregenerate_cache_for_stories(stories_to_process, hw_options, args.force_16_9)
-
-    # 开始处理
-    print(f"\n🔄 开始视频组合处理...")
-    print(f"📝 本次将处理 {stats['pending_combines']} 个故事")
-
-    session_stats = {"successful": 0, "failed": 0}
-
-    try:
-        start_time = time.time()
-
-        with tqdm(total=stats["pending_combines"], desc="视频组合进度") as pbar:
-            for i, (story_index, files) in enumerate(
-                sorted(stories_to_process.items(), key=lambda x: int(x[0])), 1
-            ):
-                print(
-                    f"\n=== 处理第 {i}/{stats['pending_combines']} 个故事: {story_index} ==="
-                )
-
-                # 输出文件路径
-                output_file = os.path.join(paths["output_dir"], f"{story_index}.mp4")
-
-                print(f"📝 封面图片: {os.path.basename(files['cover_image'])}")
-                print(f"📝 视频片段: {os.path.basename(files['source_mp4'])}")
-                print(f"📝 音频文件: {os.path.basename(files['audio_file'])}")
-                print(f"📝 输出文件: {output_file}")
-
-                # 执行组合 - 选择处理模式
-                if hasattr(args, "use_opencv") and args.use_opencv and HAS_OPENCV:
-                    # 使用OpenCV模式
-                    success = combine_video_with_cover_opencv(
-                        [files["source_mp4"]],
-                        files["cover_image"],
-                        files["audio_file"],
-                        output_file,
-                        args.extra_duration,
-                        args.force_16_9,
-                    )
-                else:
-                    # 使用FFmpeg模式
-                    success = combine_video_with_cover(
-                        [files["source_mp4"]],
-                        files["cover_image"],
-                        files["audio_file"],
-                        output_file,
-                        args.extra_duration,
-                        args.force_16_9,
-                        hw_options,
-                        args.cache_optimize,  # 传递缓存优化参数
-                    )
-
-                if success:
-                    session_stats["successful"] += 1
-                    print(f"✅ 故事 {story_index} 视频组合成功")
-                else:
-                    session_stats["failed"] += 1
-                    print(f"❌ 故事 {story_index} 视频组合失败")
-
-                pbar.update(1)
-
-                # 处理间隔
-                if i < stats["pending_combines"]:
-                    time.sleep(1)
-
-        end_time = time.time()
-        total_time = end_time - start_time
-
-        # 保存进度日志
-        save_progress_log(paths["output_dir"], stats, session_stats)
-
-        # 结果统计
-        print(f"\n=== 🎉 组合完成 ===")
-        print(f"✅ 本次成功组合: {session_stats['successful']} 个故事")
-        print(f"❌ 本次组合失败: {session_stats['failed']} 个故事")
-        print(f"⏭️  之前已完成: {stats['completed_combines']} 个故事")
-        print(
-            f"📊 总体完成: {stats['completed_combines'] + session_stats['successful']}/{stats['complete_stories']} "
-            f"({(stats['completed_combines'] + session_stats['successful'])/stats['complete_stories']*100:.1f}%)"
-        )
-        print(f"⏱️  本次耗时: {total_time:.1f} 秒 ({total_time/60:.1f} 分钟)")
-
-        if session_stats["successful"] > 0:
-            avg_time = total_time / session_stats["successful"]
-            print(f"📊 平均每个故事: {avg_time:.1f} 秒")
-
-        if stats["pending_combines"] > 0:
-            success_rate = session_stats["successful"] / stats["pending_combines"] * 100
-            print(f"📊 本次成功率: {success_rate:.1f}%")
-
+    # 循环处理每个主题
+    for theme_index, theme in enumerate(themes_to_process, 1):
+        print(f"\n{'='*60}")
+        print(f"🎨 处理主题 [{theme_index}/{len(themes_to_process)}]: {theme.upper()}")
+        print(f"{'='*60}")
+        
+        # 获取当前主题的路径配置
+        paths = get_paths(theme)
+        print(f"📁 高清封面目录: {paths['cover_img_dir']}")
+        print(f"📁 MP4源文件目录: {paths['mp4_source_dir']}")
+        print(f"📁 音频文件目录: {paths['audio_merge_dir']}")
         print(f"📁 输出目录: {paths['output_dir']}")
 
-        # 提醒处理不完整的故事
-        if stats["missing_files"]:
-            print(f"\n⚠️  有 {len(stats['missing_files'])} 个故事文件不完整，无法组合")
-            print(f"   不完整的故事索引: {', '.join(stats['missing_files'])}")
+        # 扫描故事文件
+        print(f"\n🔍 扫描 {theme} 主题故事文件...")
+        story_info = get_story_files(paths)
 
-        if session_stats["failed"] > 0:
+        if not story_info:
+            print(f"❌ {theme} 主题未找到任何故事文件")
+            global_stats["theme_results"][theme] = {
+                "status": "empty",
+                "total_stories": 0,
+                "successful": 0,
+                "failed": 0
+            }
+            continue
+
+        print(f"📊 {theme} 主题找到 {len(story_info)} 个故事")
+
+        # 过滤指定故事
+        if args.story:
+            if args.story in story_info:
+                story_info = {args.story: story_info[args.story]}
+                print(f"🎯 只处理故事: {args.story}")
+            else:
+                print(f"❌ {theme} 主题未找到指定的故事: {args.story}")
+                continue
+
+        # 检查文件完整性
+        complete_stories = {}
+        missing_files = []
+
+        for story_index, files in story_info.items():
+            # 应用索引范围过滤
+            try:
+                story_num = int(story_index)
+                if args.start is not None and story_num < args.start:
+                    continue
+                if args.end is not None and story_num > args.end:
+                    continue
+            except ValueError:
+                continue
+
+            has_cover = "cover_image" in files
+            has_mp4 = "source_mp4" in files
+            has_audio = "audio_file" in files
+
+            if has_cover and has_mp4 and has_audio:
+                complete_stories[story_index] = files
+                print(f"✅ {theme} 故事 {story_index}: 文件完整 (封面图+视频片段+音频)")
+            else:
+                missing = []
+                if not has_cover:
+                    missing.append("封面图")
+                if not has_mp4:
+                    missing.append("视频片段")
+                if not has_audio:
+                    missing.append("音频文件")
+                print(f"❌ {theme} 故事 {story_index}: 缺少 {', '.join(missing)}")
+                missing_files.append(story_index)
+
+        if not complete_stories:
+            print(f"❌ {theme} 主题没有文件完整的故事可以处理")
+            global_stats["theme_results"][theme] = {
+                "status": "no_complete",
+                "total_stories": len(story_info),
+                "successful": 0,
+                "failed": 0
+            }
+            continue
+
+        # 扫描已存在的组合视频
+        existing_combined = set()
+        if not args.force:
+            existing_combined = get_existing_combined_videos(paths["output_dir"])
+
+        # 确定需要处理的故事
+        stories_to_process = {}
+        for story_index, files in complete_stories.items():
+            if args.force or story_index not in existing_combined:
+                stories_to_process[story_index] = files
+
+        # 统计信息
+        theme_stats = {
+            "total_stories": len(story_info),
+            "complete_stories": len(complete_stories),
+            "completed_combines": len(existing_combined & set(complete_stories.keys())),
+            "pending_combines": len(stories_to_process),
+            "missing_files": missing_files,
+        }
+
+        print(f"\n📈 {theme} 主题处理统计:")
+        print(f"   总故事数: {theme_stats['total_stories']}")
+        print(f"   文件完整: {theme_stats['complete_stories']}")
+        print(f"   已完成组合: {theme_stats['completed_combines']}")
+        print(f"   待处理: {theme_stats['pending_combines']}")
+        print(f"   文件不完整: {len(theme_stats['missing_files'])}")
+
+        # 更新全局统计
+        global_stats["total_stories"] += theme_stats["total_stories"]
+        global_stats["total_complete"] += theme_stats["complete_stories"]
+        global_stats["total_completed_combines"] += theme_stats["completed_combines"]
+        global_stats["total_pending"] += theme_stats["pending_combines"]
+
+        if theme_stats["pending_combines"] == 0:
+            print(f"\n🎉 {theme} 主题所有文件完整的故事都已完成组合！")
+            global_stats["theme_results"][theme] = {
+                "status": "completed",
+                "total_stories": theme_stats["total_stories"],
+                "successful": 0,
+                "failed": 0
+            }
+            continue
+
+        # 确保输出目录存在
+        os.makedirs(paths["output_dir"], exist_ok=True)
+
+        # 🚀 预生成缓存（如果启用缓存优化）
+        if args.cache_optimize and CACHE_ENABLED and stories_to_process:
+            pregenerate_cache_for_stories(stories_to_process, hw_options, args.force_16_9)
+
+        # 开始处理当前主题
+        print(f"\n🔄 开始 {theme} 主题视频组合处理...")
+        print(f"📝 本次将处理 {theme_stats['pending_combines']} 个故事")
+
+        theme_session_stats = {"successful": 0, "failed": 0}
+
+        try:
+            theme_start_time = time.time()
+
+            with tqdm(total=theme_stats["pending_combines"], desc=f"{theme}主题组合进度") as pbar:
+                for i, (story_index, files) in enumerate(
+                    sorted(stories_to_process.items(), key=lambda x: int(x[0])), 1
+                ):
+                    print(
+                        f"\n=== {theme} 主题 - 处理第 {i}/{theme_stats['pending_combines']} 个故事: {story_index} ==="
+                    )
+
+                    # 输出文件路径
+                    output_file = os.path.join(paths["output_dir"], f"{story_index}.mp4")
+
+                    print(f"📝 封面图片: {os.path.basename(files['cover_image'])}")
+                    print(f"📝 视频片段: {os.path.basename(files['source_mp4'])}")
+                    print(f"📝 音频文件: {os.path.basename(files['audio_file'])}")
+                    print(f"📝 输出文件: {output_file}")
+
+                    # 执行组合 - 选择处理模式
+                    if hasattr(args, "use_opencv") and args.use_opencv and HAS_OPENCV:
+                        # 使用OpenCV模式
+                        success = combine_video_with_cover_opencv(
+                            [files["source_mp4"]],
+                            files["cover_image"],
+                            files["audio_file"],
+                            output_file,
+                            args.extra_duration,
+                            args.force_16_9,
+                        )
+                    else:
+                        # 使用FFmpeg模式
+                        success = combine_video_with_cover(
+                            [files["source_mp4"]],
+                            files["cover_image"],
+                            files["audio_file"],
+                            output_file,
+                            args.extra_duration,
+                            args.force_16_9,
+                            hw_options,
+                            args.cache_optimize,  # 传递缓存优化参数
+                        )
+
+                    if success:
+                        theme_session_stats["successful"] += 1
+                        print(f"✅ {theme} 故事 {story_index} 视频组合成功")
+                    else:
+                        theme_session_stats["failed"] += 1
+                        print(f"❌ {theme} 故事 {story_index} 视频组合失败")
+
+                    pbar.update(1)
+
+                    # 处理间隔
+                    if i < theme_stats["pending_combines"]:
+                        time.sleep(1)
+
+            theme_end_time = time.time()
+            theme_total_time = theme_end_time - theme_start_time
+
+            # 保存当前主题的进度日志
+            save_progress_log(paths["output_dir"], theme_stats, theme_session_stats)
+
+            # 当前主题结果统计
+            print(f"\n=== 🎉 {theme} 主题组合完成 ===")
+            print(f"✅ 本次成功组合: {theme_session_stats['successful']} 个故事")
+            print(f"❌ 本次组合失败: {theme_session_stats['failed']} 个故事")
+            print(f"⏭️  之前已完成: {theme_stats['completed_combines']} 个故事")
             print(
-                f"\n⚠️  有 {session_stats['failed']} 个故事组合失败，可以重新运行程序重试"
+                f"📊 该主题完成: {theme_stats['completed_combines'] + theme_session_stats['successful']}/{theme_stats['complete_stories']} "
+                f"({(theme_stats['completed_combines'] + theme_session_stats['successful'])/theme_stats['complete_stories']*100:.1f}%)"
             )
+            print(f"⏱️  该主题耗时: {theme_total_time:.1f} 秒 ({theme_total_time/60:.1f} 分钟)")
 
-    except KeyboardInterrupt:
-        print(f"\n⚠️  用户中断了程序执行")
-        print(f"✅ 已成功组合: {session_stats['successful']} 个故事")
-        print(f"❌ 组合失败: {session_stats['failed']} 个故事")
-    except Exception as e:
-        print(f"\n❌ 程序执行出错: {e}")
-        print(f"✅ 已成功组合: {session_stats['successful']} 个故事")
-        print(f"❌ 组合失败: {session_stats['failed']} 个故事")
+            if theme_session_stats["successful"] > 0:
+                avg_time = theme_total_time / theme_session_stats["successful"]
+                print(f"📊 平均每个故事: {avg_time:.1f} 秒")
+
+            if theme_stats["pending_combines"] > 0:
+                success_rate = theme_session_stats["successful"] / theme_stats["pending_combines"] * 100
+                print(f"📊 该主题成功率: {success_rate:.1f}%")
+
+            print(f"📁 输出目录: {paths['output_dir']}")
+
+            # 更新全局统计
+            global_stats["total_session_successful"] += theme_session_stats["successful"]
+            global_stats["total_session_failed"] += theme_session_stats["failed"]
+            global_stats["themes_processed"] += 1
+            global_stats["theme_results"][theme] = {
+                "status": "processed",
+                "total_stories": theme_stats["total_stories"],
+                "successful": theme_session_stats["successful"],
+                "failed": theme_session_stats["failed"],
+                "time": theme_total_time
+            }
+
+        except KeyboardInterrupt:
+            print(f"\n⚠️  用户中断了 {theme} 主题的程序执行")
+            print(f"✅ {theme} 已成功组合: {theme_session_stats['successful']} 个故事")
+            print(f"❌ {theme} 组合失败: {theme_session_stats['failed']} 个故事")
+            
+            # 更新部分统计
+            global_stats["total_session_successful"] += theme_session_stats["successful"]
+            global_stats["total_session_failed"] += theme_session_stats["failed"]
+            global_stats["theme_results"][theme] = {
+                "status": "interrupted",
+                "total_stories": theme_stats["total_stories"],
+                "successful": theme_session_stats["successful"],
+                "failed": theme_session_stats["failed"]
+            }
+            break
+        except Exception as e:
+            print(f"\n❌ {theme} 主题程序执行出错: {e}")
+            print(f"✅ {theme} 已成功组合: {theme_session_stats['successful']} 个故事")
+            print(f"❌ {theme} 组合失败: {theme_session_stats['failed']} 个故事")
+            
+            # 更新部分统计
+            global_stats["total_session_successful"] += theme_session_stats["successful"]
+            global_stats["total_session_failed"] += theme_session_stats["failed"]
+            global_stats["theme_results"][theme] = {
+                "status": "error",
+                "total_stories": theme_stats["total_stories"],
+                "successful": theme_session_stats["successful"],
+                "failed": theme_session_stats["failed"]
+            }
+            continue
+
+    # 最终全局结果汇总
+    print(f"\n{'='*60}")
+    print(f"🏆 全局处理结果汇总")
+    print(f"{'='*60}")
+    print(f"🎨 处理主题数: {len(themes_to_process)}")
+    print(f"📊 总故事数: {global_stats['total_stories']}")
+    print(f"✅ 总成功组合: {global_stats['total_session_successful']} 个故事")
+    print(f"❌ 总组合失败: {global_stats['total_session_failed']} 个故事")
+    
+    if global_stats["total_session_successful"] + global_stats["total_session_failed"] > 0:
+        overall_success_rate = global_stats["total_session_successful"] / (global_stats["total_session_successful"] + global_stats["total_session_failed"]) * 100
+        print(f"📊 总体成功率: {overall_success_rate:.1f}%")
+
+    # 各主题详细结果
+    print(f"\n📋 各主题详细结果:")
+    for theme in themes_to_process:
+        if theme in global_stats["theme_results"]:
+            result = global_stats["theme_results"][theme]
+            status_emoji = {
+                "empty": "📭",
+                "no_complete": "⚠️",
+                "completed": "✅",
+                "processed": "🎯",
+                "interrupted": "⚠️",
+                "error": "❌"
+            }
+            print(f"   {status_emoji.get(result['status'], '❓')} {theme}: 成功{result['successful']}个, 失败{result['failed']}个")
 
 
 if __name__ == "__main__":

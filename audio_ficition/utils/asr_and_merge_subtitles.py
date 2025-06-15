@@ -7,11 +7,15 @@ ASR识别和字幕合并脚本
 功能说明:
 1. 使用 nvidia/parakeet-tdt-0.6b-v2 模型对 mp3 clip 进行 ASR 识别
 2. 生成 word level 和 segment level 的字幕文件
-3. 通过 padding 时间戳的方式合并不同 clip 的字幕
-4. 支持断点续传，避免重复处理
-5. 智能跳过数据不一致的故事，只处理完整的故事
-6. 只在 Ubuntu 系统下运行
-7. 支持多个主题: scifi, thriller, horror, fantasy, romance
+3. 在合并字幕前检查SRT文件与文本块的数量和索引对齐情况
+4. 通过 padding 时间戳的方式合并不同 clip 的字幕
+5. 支持断点续传，避免重复处理
+6. 智能跳过数据不一致的故事，只处理完整的故事
+7. 只在 Ubuntu 系统下运行
+8. 支持多个主题: scifi, thriller, horror, fantasy, romance
+9. 默认处理所有主题，自动跳过已有字幕文件
+10. 动态检查已有字幕文件，只处理需要的部分
+11. 共享ASR模型，提高多主题处理效率
 
 路径说明:
 输入:
@@ -23,12 +27,14 @@ ASR识别和字幕合并脚本
 - 合并字幕: /mnt/dhl/audio/{theme}/srt_merge/[故事索引].srt
 
 使用方法:
-1. 基本使用: python asr_and_merge_subtitles.py --theme scifi
-2. 强制重新处理: python asr_and_merge_subtitles.py --theme scifi -f
-3. 指定故事范围: python asr_and_merge_subtitles.py --theme scifi --start 1 --end 10
-4. 只处理指定故事: python asr_and_merge_subtitles.py --theme scifi --story 5
-5. 预览模式: python asr_and_merge_subtitles.py --theme scifi --preview
-6. 跳过一致性检查: python asr_and_merge_subtitles.py --theme scifi --skip-consistency-check
+1. 处理所有主题(默认): python asr_and_merge_subtitles.py
+2. 处理指定主题: python asr_and_merge_subtitles.py --theme scifi
+3. 强制重新处理: python asr_and_merge_subtitles.py -f
+4. 指定故事范围: python asr_and_merge_subtitles.py --start 1 --end 10
+5. 只处理指定故事: python asr_and_merge_subtitles.py --story 5
+6. 预览模式: python asr_and_merge_subtitles.py --preview
+7. 跳过一致性检查: python asr_and_merge_subtitles.py --skip-consistency-check
+8. 组合使用: python asr_and_merge_subtitles.py --theme horror -f --start 10 --end 20
 
 注意:
 - 需要GPU支持和NeMo ASR环境
@@ -437,12 +443,13 @@ def save_srt_file(content: str, output_path: str) -> bool:
         return False
 
 
-def transcribe_audio_clip(asr_model, audio_file: str, story_index: str, clip_index: str, force: bool = False) -> bool:
+def transcribe_audio_clip(asr_model, audio_file: str, story_index: str, clip_index: str, 
+                         word_level_srt_dir: str, seg_level_srt_dir: str, force: bool = False) -> bool:
     """对单个音频片段进行ASR识别并保存字幕"""
     
     # 检查输出文件是否已存在
-    word_srt_path = os.path.join(WORD_LEVEL_SRT_DIR, story_index, f"{clip_index}.srt")
-    seg_srt_path = os.path.join(SEG_LEVEL_SRT_DIR, story_index, f"{clip_index}.srt")
+    word_srt_path = os.path.join(word_level_srt_dir, story_index, f"{clip_index}.srt")
+    seg_srt_path = os.path.join(seg_level_srt_dir, story_index, f"{clip_index}.srt")
     
     if not force and os.path.exists(word_srt_path) and os.path.exists(seg_srt_path):
         print(f"⏭️  跳过已存在的字幕: 故事 {story_index}, 片段 {clip_index}")
@@ -571,7 +578,7 @@ def get_story_clips(input_dir: str) -> Dict[str, List[str]]:
     story_clips = {}
     
     if not os.path.exists(input_dir):
-        print(f"❌ 输入目录不存在: {input_dir}")
+        # 不打印错误信息，返回空字典
         return story_clips
     
     # 遍历所有故事目录
@@ -609,23 +616,160 @@ def get_story_clips(input_dir: str) -> Dict[str, List[str]]:
     return story_clips
 
 
-def merge_story_subtitles(story_index: str, force: bool = False) -> bool:
+def check_srt_chunk_alignment(story_index: str, text_chunks_dir: str, word_level_srt_dir: str, seg_level_srt_dir: str) -> Tuple[bool, Dict]:
+    """
+    检查SRT字幕文件与文本块的数量和索引是否完全对齐
+    
+    Args:
+        story_index (str): 故事索引
+        text_chunks_dir (str): 文本块目录路径
+        word_level_srt_dir (str): Word level SRT目录路径
+        seg_level_srt_dir (str): Segment level SRT目录路径
+        
+    Returns:
+        Tuple[bool, Dict]: (是否对齐, 详细信息)
+    """
+    
+    # 获取文本块信息
+    story_chunks_dir = os.path.join(text_chunks_dir, story_index)
+    chunks_indices = set()
+    chunks_count = 0
+    
+    if os.path.exists(story_chunks_dir):
+        txt_files = glob.glob(os.path.join(story_chunks_dir, "*.txt"))
+        for txt_file in txt_files:
+            filename = os.path.basename(txt_file)
+            if not filename.startswith(".") and not filename.startswith("._") and filename.endswith(".txt"):
+                file_index = filename[:-4]  # 去掉 .txt
+                chunks_indices.add(file_index)
+        chunks_count = len(chunks_indices)
+    
+    # 获取Word level SRT信息
+    story_word_dir = os.path.join(word_level_srt_dir, story_index)
+    word_srt_indices = set()
+    word_srt_count = 0
+    
+    if os.path.exists(story_word_dir):
+        word_srt_files = glob.glob(os.path.join(story_word_dir, "*.srt"))
+        for srt_file in word_srt_files:
+            filename = os.path.basename(srt_file)
+            if not filename.startswith(".") and filename.endswith(".srt"):
+                file_index = filename[:-4]  # 去掉 .srt
+                word_srt_indices.add(file_index)
+        word_srt_count = len(word_srt_indices)
+    
+    # 获取Segment level SRT信息
+    story_seg_dir = os.path.join(seg_level_srt_dir, story_index)
+    seg_srt_indices = set()
+    seg_srt_count = 0
+    
+    if os.path.exists(story_seg_dir):
+        seg_srt_files = glob.glob(os.path.join(story_seg_dir, "*.srt"))
+        for srt_file in seg_srt_files:
+            filename = os.path.basename(srt_file)
+            if not filename.startswith(".") and filename.endswith(".srt"):
+                file_index = filename[:-4]  # 去掉 .srt
+                seg_srt_indices.add(file_index)
+        seg_srt_count = len(seg_srt_indices)
+    
+    # 检查对齐情况
+    alignment_ok = True
+    issues = []
+    
+    # 检查数量一致性
+    if chunks_count != word_srt_count:
+        alignment_ok = False
+        issues.append(f"文本块数量({chunks_count}) != Word SRT数量({word_srt_count})")
+    
+    if chunks_count != seg_srt_count:
+        alignment_ok = False
+        issues.append(f"文本块数量({chunks_count}) != Segment SRT数量({seg_srt_count})")
+    
+    if word_srt_count != seg_srt_count:
+        alignment_ok = False
+        issues.append(f"Word SRT数量({word_srt_count}) != Segment SRT数量({seg_srt_count})")
+    
+    # 检查索引一致性
+    if chunks_indices != word_srt_indices:
+        alignment_ok = False
+        missing_word = chunks_indices - word_srt_indices
+        extra_word = word_srt_indices - chunks_indices
+        if missing_word:
+            issues.append(f"缺少Word SRT索引: {sorted(missing_word, key=lambda x: int(x) if x.isdigit() else 0)}")
+        if extra_word:
+            issues.append(f"多余Word SRT索引: {sorted(extra_word, key=lambda x: int(x) if x.isdigit() else 0)}")
+    
+    if chunks_indices != seg_srt_indices:
+        alignment_ok = False
+        missing_seg = chunks_indices - seg_srt_indices
+        extra_seg = seg_srt_indices - chunks_indices
+        if missing_seg:
+            issues.append(f"缺少Segment SRT索引: {sorted(missing_seg, key=lambda x: int(x) if x.isdigit() else 0)}")
+        if extra_seg:
+            issues.append(f"多余Segment SRT索引: {sorted(extra_seg, key=lambda x: int(x) if x.isdigit() else 0)}")
+    
+    check_info = {
+        "chunks_count": chunks_count,
+        "word_srt_count": word_srt_count,
+        "seg_srt_count": seg_srt_count,
+        "chunks_indices": sorted(chunks_indices, key=lambda x: int(x) if x.isdigit() else 0),
+        "word_srt_indices": sorted(word_srt_indices, key=lambda x: int(x) if x.isdigit() else 0),
+        "seg_srt_indices": sorted(seg_srt_indices, key=lambda x: int(x) if x.isdigit() else 0),
+        "issues": issues
+    }
+    
+    return alignment_ok, check_info
+
+
+def merge_story_subtitles(story_index: str, input_dir: str, word_level_srt_dir: str, 
+                         seg_level_srt_dir: str, merge_srt_dir: str, text_chunks_dir: str, force: bool = False) -> bool:
     """合并单个故事的所有字幕片段"""
     
     print(f"🔗 合并故事 {story_index} 的字幕...")
     
     # 检查输出文件是否已存在
-    word_output_path = os.path.join(MERGE_SRT_DIR, f"{story_index}_word.srt")
-    seg_output_path = os.path.join(MERGE_SRT_DIR, f"{story_index}_segment.srt")
+    word_output_path = os.path.join(merge_srt_dir, f"{story_index}_word.srt")
+    seg_output_path = os.path.join(merge_srt_dir, f"{story_index}_segment.srt")
     
     if not force and os.path.exists(word_output_path) and os.path.exists(seg_output_path):
         print(f"⏭️  跳过已存在的合并字幕: 故事 {story_index}")
         return True
     
     try:
+        # 🔍 检查SRT文件与文本块的对齐情况
+        print(f"🔍 检查故事 {story_index} 的SRT文件与文本块对齐情况...")
+        alignment_ok, check_info = check_srt_chunk_alignment(story_index, text_chunks_dir, word_level_srt_dir, seg_level_srt_dir)
+        
+        if not alignment_ok:
+            print(f"❌ 故事 {story_index} SRT文件与文本块不对齐，跳过合并")
+            print(f"   文本块数量: {check_info['chunks_count']}")
+            print(f"   Word SRT数量: {check_info['word_srt_count']}")
+            print(f"   Segment SRT数量: {check_info['seg_srt_count']}")
+            print(f"   对齐问题:")
+            for issue in check_info['issues']:
+                print(f"     - {issue}")
+            
+            if check_info['chunks_indices']:
+                chunks_indices_str = ', '.join(check_info['chunks_indices'])
+                print(f"   文本块索引: {chunks_indices_str}")
+            if check_info['word_srt_indices']:
+                word_indices_str = ', '.join(check_info['word_srt_indices'])
+                print(f"   Word SRT索引: {word_indices_str}")
+            if check_info['seg_srt_indices']:
+                seg_indices_str = ', '.join(check_info['seg_srt_indices'])
+                print(f"   Segment SRT索引: {seg_indices_str}")
+            
+            print(f"💡 请确保所有chunk的SRT字幕都已正确生成后再重试合并")
+            return False
+        
+        print(f"✅ 故事 {story_index} SRT文件与文本块完全对齐")
+        print(f"   对齐数量: {check_info['chunks_count']} 个文件")
+        indices_str = ', '.join(check_info['chunks_indices'])
+        print(f"   对齐索引: {indices_str}")
+        
         # 获取该故事的所有片段
-        story_word_dir = os.path.join(WORD_LEVEL_SRT_DIR, story_index)
-        story_seg_dir = os.path.join(SEG_LEVEL_SRT_DIR, story_index)
+        story_word_dir = os.path.join(word_level_srt_dir, story_index)
+        story_seg_dir = os.path.join(seg_level_srt_dir, story_index)
         
         if not os.path.exists(story_word_dir) or not os.path.exists(story_seg_dir):
             print(f"❌ 故事 {story_index} 的字幕目录不存在")
@@ -660,7 +804,7 @@ def merge_story_subtitles(story_index: str, force: bool = False) -> bool:
             clip_index = os.path.basename(srt_file).split(".")[0]
             
             # 获取对应音频文件的时长
-            audio_file = os.path.join(INPUT_DIR, story_index, f"{clip_index}.mp3")
+            audio_file = os.path.join(input_dir, story_index, f"{clip_index}.mp3")
             duration = get_audio_duration(audio_file)
             
             if duration is None:
@@ -694,7 +838,7 @@ def merge_story_subtitles(story_index: str, force: bool = False) -> bool:
             clip_index = os.path.basename(srt_file).split(".")[0]
             
             # 获取对应音频文件的时长
-            audio_file = os.path.join(INPUT_DIR, story_index, f"{clip_index}.mp3")
+            audio_file = os.path.join(input_dir, story_index, f"{clip_index}.mp3")
             duration = get_audio_duration(audio_file)
             
             if duration is None:
@@ -774,10 +918,10 @@ def scan_existing_files(word_dir: str, seg_dir: str, merge_dir: str) -> Dict:
     return existing
 
 
-def save_progress_log(stats: Dict):
+def save_progress_log(stats: Dict, merge_srt_dir: str):
     """保存进度日志"""
     try:
-        log_file = os.path.join(MERGE_SRT_DIR, "asr_progress.json")
+        log_file = os.path.join(merge_srt_dir, "asr_progress.json")
         
         log_data = {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -794,42 +938,29 @@ def save_progress_log(stats: Dict):
         print(f"⚠️  保存进度日志失败: {e}")
 
 
-def main():
-    """主函数"""
-    parser = argparse.ArgumentParser(
-        description="ASR识别和字幕合并器 - 对mp3 clip进行ASR识别并合并字幕"
-    )
-    
-    parser.add_argument("-f", "--force", action="store_true", help="强制重新处理，忽略已有文件")
-    parser.add_argument("--start", type=int, help="指定开始处理的故事索引")
-    parser.add_argument("--end", type=int, help="指定结束处理的故事索引")  
-    parser.add_argument("--story", help="只处理指定的故事索引")
-    parser.add_argument("--preview", action="store_true", help="预览模式，只显示会处理哪些文件")
-    parser.add_argument("--theme", required=True, choices=SUPPORTED_THEMES, help=f"指定要处理的主题 ({', '.join(SUPPORTED_THEMES)})")
-    parser.add_argument("--skip-consistency-check", action="store_true", help="跳过文本块和音频文件的一致性检查（慎用）")
-    
-    args = parser.parse_args()
+def process_single_theme(theme: str, args, asr_model=None):
+    """处理单个主题的ASR识别和字幕合并"""
+    print(f"\n{'='*60}")
+    print(f"🎭 开始处理主题: {theme}")
+    print(f"{'='*60}")
     
     # 获取主题相关路径
     try:
-        paths = get_theme_paths(args.theme)
-        INPUT_DIR = paths["input_dir"]
-        TEXT_CHUNKS_DIR = paths["text_chunks_dir"]
-        WORD_LEVEL_SRT_DIR = paths["word_level_srt_dir"]
-        SEG_LEVEL_SRT_DIR = paths["seg_level_srt_dir"]
-        MERGE_SRT_DIR = paths["merge_srt_dir"]
+        paths = get_theme_paths(theme)
+        input_dir = paths["input_dir"]
+        text_chunks_dir = paths["text_chunks_dir"]
+        word_level_srt_dir = paths["word_level_srt_dir"]
+        seg_level_srt_dir = paths["seg_level_srt_dir"]
+        merge_srt_dir = paths["merge_srt_dir"]
     except ValueError as e:
         print(f"❌ {e}")
-        return
+        return {"success": False, "error": str(e)}
     
-    print("🎤 ASR识别和字幕合并器")
-    print("=" * 50)
-    print(f"🎭 处理主题: {args.theme}")
-    print(f"📁 输入目录: {INPUT_DIR}")
-    print(f"📁 文本块目录: {TEXT_CHUNKS_DIR}")
-    print(f"📁 Word level 输出: {WORD_LEVEL_SRT_DIR}")
-    print(f"📁 Segment level 输出: {SEG_LEVEL_SRT_DIR}")
-    print(f"📁 合并字幕输出: {MERGE_SRT_DIR}")
+    print(f"📁 输入目录: {input_dir}")
+    print(f"📁 文本块目录: {text_chunks_dir}")
+    print(f"📁 Word level 输出: {word_level_srt_dir}")
+    print(f"📁 Segment level 输出: {seg_level_srt_dir}")
+    print(f"📁 合并字幕输出: {merge_srt_dir}")
     
     # 安全检查：验证文本块和音频文件数量一致性
     valid_stories = set()  # 通过安全检查的故事集合
@@ -838,11 +969,11 @@ def main():
         print(f"\n⚠️  已跳过一致性检查（用户指定 --skip-consistency-check）")
         print(f"🚨 注意：可能会处理不完整的数据，请确保您知道在做什么")
         # 跳过检查时，假设所有故事都有效
-        story_clips_temp = get_story_clips(args.input_dir)
+        story_clips_temp = get_story_clips(input_dir)
         valid_stories = set(story_clips_temp.keys())
     else:
         print(f"\n🛡️  执行安全检查...")
-        consistency_ok, check_details = check_chunks_audio_consistency(TEXT_CHUNKS_DIR, args.input_dir)
+        consistency_ok, check_details = check_chunks_audio_consistency(text_chunks_dir, input_dir)
         
         # 提取通过检查的故事
         consistent_stories = [item['story'] for item in check_details['consistent_stories']]
@@ -866,48 +997,16 @@ def main():
             print(f"   ❌ 数据不一致跳过: {inconsistent_count} 个故事")
             
             if len(valid_stories) == 0:
-                print(f"\n❌ 没有任何故事通过安全检查！")
-                print(f"💡 请先确保以下操作完成且结果一致：")
-                print(f"   1. chunk_stories.py 已正确分割所有故事")
-                print(f"   2. synthesize_audio.py 已为所有文本块生成音频文件")
-                print(f"   3. 两个目录中的文件数量完全匹配")
-                print(f"\n⏹️  程序已停止，请修复数据不一致问题后再次运行")
-                return
-            
-            # 详细输出跳过的故事信息
-            print(f"\n📋 跳过的故事详情:")
-            
-            if check_details['missing_chunks_stories']:
-                missing_chunks_stories = [item['story'] for item in check_details['missing_chunks_stories']]
-                print(f"   缺少文本块 ({len(missing_chunks_stories)} 个): {', '.join(missing_chunks_stories)}")
-            
-            if check_details['missing_audio_stories']:
-                missing_audio_stories = [item['story'] for item in check_details['missing_audio_stories']]
-                print(f"   缺少音频文件 ({len(missing_audio_stories)} 个): {', '.join(missing_audio_stories)}")
-            
-            if check_details['mismatched_count_stories']:
-                mismatched_count_stories = [item['story'] for item in check_details['mismatched_count_stories']]
-                print(f"   文件数量不匹配 ({len(mismatched_count_stories)} 个): {', '.join(mismatched_count_stories)}")
-            
-            if check_details['mismatched_indices_stories']:
-                mismatched_indices_stories = [item['story'] for item in check_details['mismatched_indices_stories']]
-                print(f"   文件索引不匹配 ({len(mismatched_indices_stories)} 个): {', '.join(mismatched_indices_stories)}")
-            
-            if len(valid_stories) > 0:
-                valid_stories_list = sorted(valid_stories, key=lambda x: int(x) if x.isdigit() else 0)
-                print(f"\n✅ 将处理的故事 ({len(valid_stories)} 个): {', '.join(valid_stories_list[:10])}")
-                if len(valid_stories) > 10:
-                    print(f"    ... 还有 {len(valid_stories) - 10} 个故事")
-                
-                print(f"\n💡 提示：被跳过的故事可以在修复数据问题后重新运行此脚本进行处理")
+                print(f"\n❌ 主题 {theme} 没有任何故事通过安全检查！")
+                return {"success": False, "error": "no_valid_stories"}
     
     # 获取所有故事的音频片段
     print(f"\n🔍 扫描音频片段...")
-    all_story_clips = get_story_clips(args.input_dir)
+    all_story_clips = get_story_clips(input_dir)
     
     if not all_story_clips:
-        print("❌ 未找到任何音频片段文件")
-        return
+        print(f"❌ 主题 {theme} 未找到任何音频片段文件")
+        return {"success": False, "error": "no_audio_clips"}
     
     # 只保留通过安全检查的故事
     story_clips = {}
@@ -916,8 +1015,8 @@ def main():
             story_clips[story_index] = clips
     
     if not story_clips:
-        print("❌ 没有通过安全检查的故事包含音频片段文件")
-        return
+        print(f"❌ 主题 {theme} 没有通过安全检查的故事包含音频片段文件")
+        return {"success": False, "error": "no_valid_clips"}
     
     skipped_stories = set(all_story_clips.keys()) - set(story_clips.keys())
     print(f"📊 音频片段扫描结果:")
@@ -933,8 +1032,8 @@ def main():
             story_clips = {args.story: story_clips[args.story]}
             print(f"🎯 只处理故事: {args.story}")
         else:
-            print(f"❌ 未找到指定的故事: {args.story}")
-            return
+            print(f"❌ 主题 {theme} 未找到指定的故事: {args.story}")
+            return {"success": False, "error": f"story_not_found: {args.story}"}
     
     # 应用索引范围过滤
     if args.start is not None or args.end is not None:
@@ -953,11 +1052,11 @@ def main():
         print(f"🎯 范围过滤后剩余 {len(story_clips)} 个故事")
     
     if not story_clips:
-        print("❌ 根据指定条件未找到匹配的故事")
-        return
+        print(f"❌ 主题 {theme} 根据指定条件未找到匹配的故事")
+        return {"success": False, "error": "no_matching_stories"}
     
     # 扫描已存在的文件
-    existing = scan_existing_files(WORD_LEVEL_SRT_DIR, SEG_LEVEL_SRT_DIR, MERGE_SRT_DIR)
+    existing = scan_existing_files(word_level_srt_dir, seg_level_srt_dir, merge_srt_dir)
     
     # 统计需要处理的任务
     clips_to_process = []
@@ -987,6 +1086,7 @@ def main():
     
     # 统计信息
     stats = {
+        "theme": theme,
         "total_stories_found": len(all_story_clips),
         "total_stories_valid": len(story_clips),
         "total_stories_skipped": len(all_story_clips) - len(story_clips),
@@ -1019,14 +1119,14 @@ def main():
             print(f"       ... 还有 {len(clips_to_process) - 20} 个片段")
         
         print(f"\n📋 需要合并字幕的故事: {', '.join(stories_to_merge)}")
-        return
+        return {"success": True, "preview": True, "stats": stats}
     
     if stats['clips_to_process'] == 0 and stats['stories_to_merge'] == 0:
-        print(f"\n🎉 所有任务都已完成！")
-        return
+        print(f"\n🎉 主题 {theme} 所有任务都已完成！")
+        return {"success": True, "completed": True, "stats": stats}
     
     # 确保输出目录存在
-    for output_dir in [WORD_LEVEL_SRT_DIR, SEG_LEVEL_SRT_DIR, MERGE_SRT_DIR]:
+    for output_dir in [word_level_srt_dir, seg_level_srt_dir, merge_srt_dir]:
         os.makedirs(output_dir, exist_ok=True)
     
     # 开始处理
@@ -1044,18 +1144,21 @@ def main():
         if clips_to_process:
             print(f"\n🎤 第一阶段：ASR识别 ({len(clips_to_process)} 个片段)")
             
-            # 加载ASR模型
-            asr_model = load_asr_model()
-            if asr_model is None:
-                print("❌ ASR模型加载失败，无法继续")
-                return
+            # 如果没有提供ASR模型，加载模型
+            need_to_load_model = asr_model is None
+            if need_to_load_model:
+                asr_model = load_asr_model()
+                if asr_model is None:
+                    print(f"❌ 主题 {theme} ASR模型加载失败，无法继续")
+                    return {"success": False, "error": "model_load_failed"}
             
-            with tqdm(total=len(clips_to_process), desc="ASR识别进度") as pbar:
+            with tqdm(total=len(clips_to_process), desc=f"[{theme}] ASR识别进度") as pbar:
                 for i, (story_index, clip_index, clip_file) in enumerate(clips_to_process, 1):
                     print(f"\n--- 处理第 {i}/{len(clips_to_process)} 个片段 ---")
                     
                     success = transcribe_audio_clip(
-                        asr_model, clip_file, story_index, clip_index, args.force
+                        asr_model, clip_file, story_index, clip_index, 
+                        word_level_srt_dir, seg_level_srt_dir, args.force
                     )
                     
                     if success:
@@ -1073,11 +1176,14 @@ def main():
         if stories_to_merge:
             print(f"\n🔗 第二阶段：合并字幕 ({len(stories_to_merge)} 个故事)")
             
-            with tqdm(total=len(stories_to_merge), desc="字幕合并进度") as pbar:
+            with tqdm(total=len(stories_to_merge), desc=f"[{theme}] 字幕合并进度") as pbar:
                 for i, story_index in enumerate(sorted(stories_to_merge, key=int), 1):
                     print(f"\n--- 合并第 {i}/{len(stories_to_merge)} 个故事: {story_index} ---")
                     
-                    success = merge_story_subtitles(story_index, args.force)
+                    success = merge_story_subtitles(
+                        story_index, input_dir, word_level_srt_dir, 
+                        seg_level_srt_dir, merge_srt_dir, text_chunks_dir, args.force
+                    )
                     
                     if success:
                         session_stats["successful_merge"] += 1
@@ -1103,10 +1209,10 @@ def main():
             "total_time_seconds": total_time
         }
         
-        save_progress_log(final_stats)
+        save_progress_log(final_stats, merge_srt_dir)
         
         # 结果统计
-        print(f"\n=== 🎉 处理完成 ===")
+        print(f"\n=== 🎉 主题 {theme} 处理完成 ===")
         print(f"📊 故事处理统计:")
         print(f"   扫描到故事: {final_stats['total_stories_found']} 个")
         print(f"   处理的故事: {final_stats['total_stories_valid']} 个")
@@ -1117,7 +1223,7 @@ def main():
         print(f"   ❌ ASR识别失败: {session_stats['failed_asr']} 个片段")
         print(f"   ✅ 字幕合并成功: {session_stats['successful_merge']} 个故事")
         print(f"   ❌ 字幕合并失败: {session_stats['failed_merge']} 个故事")
-        print(f"⏱️  总耗时: {total_time:.1f} 秒 ({total_time/60:.1f} 分钟)")
+        print(f"⏱️  耗时: {total_time:.1f} 秒 ({total_time/60:.1f} 分钟)")
         
         if session_stats["successful_asr"] > 0:
             avg_asr_time = total_time / (session_stats["successful_asr"] + session_stats["successful_merge"])
@@ -1129,12 +1235,12 @@ def main():
         
         if total_processed > 0:
             success_rate = total_successful / total_processed * 100
-            print(f"📊 总体成功率: {success_rate:.1f}%")
+            print(f"📊 成功率: {success_rate:.1f}%")
         
         print(f"📁 字幕文件已保存到:")
-        print(f"   Word level: {WORD_LEVEL_SRT_DIR}")
-        print(f"   Segment level: {SEG_LEVEL_SRT_DIR}")
-        print(f"   合并字幕: {MERGE_SRT_DIR}")
+        print(f"   Word level: {word_level_srt_dir}")
+        print(f"   Segment level: {seg_level_srt_dir}")
+        print(f"   合并字幕: {merge_srt_dir}")
         
         if total_failed > 0:
             print(f"\n⚠️  有 {total_failed} 个任务处理失败，可以重新运行程序重试")
@@ -1144,25 +1250,198 @@ def main():
         if final_stats['total_stories_skipped'] > 0:
             print(f"\n💡 跳过了 {final_stats['total_stories_skipped']} 个数据不一致的故事")
             print(f"   修复这些故事的数据问题后，可以重新运行此脚本进行处理")
+        
+        return {
+            "success": True, 
+            "stats": final_stats,
+            "session_stats": session_stats,
+            "asr_model": asr_model  # 返回模型供其他主题使用
+        }
+    
+    except KeyboardInterrupt:
+        print(f"\n⚠️  用户中断了主题 {theme} 的程序执行")
+        return {"success": False, "error": "interrupted", "session_stats": session_stats}
+    except Exception as e:
+        print(f"\n❌ 主题 {theme} 程序执行出错: {e}")
+        return {"success": False, "error": str(e), "session_stats": session_stats}
+
+
+def main():
+    """主函数"""
+    parser = argparse.ArgumentParser(
+        description="ASR识别和字幕合并器 - 对mp3 clip进行ASR识别并合并字幕"
+    )
+    
+    parser.add_argument("-f", "--force", action="store_true", help="强制重新处理，忽略已有文件")
+    parser.add_argument("--start", type=int, help="指定开始处理的故事索引")
+    parser.add_argument("--end", type=int, help="指定结束处理的故事索引")  
+    parser.add_argument("--story", help="只处理指定的故事索引")
+    parser.add_argument("--preview", action="store_true", help="预览模式，只显示会处理哪些文件")
+    parser.add_argument("--theme", choices=SUPPORTED_THEMES, help=f"指定要处理的主题，默认处理所有主题 ({', '.join(SUPPORTED_THEMES)})")
+    parser.add_argument("--skip-consistency-check", action="store_true", help="跳过文本块和音频文件的一致性检查（慎用）")
+    
+    args = parser.parse_args()
+    
+    print("🎤 ASR识别和字幕合并器")
+    print("=" * 50)
+    
+    # 确定要处理的主题列表
+    if args.theme:
+        themes_to_process = [args.theme]
+        print(f"🎭 处理指定主题: {args.theme}")
+    else:
+        themes_to_process = SUPPORTED_THEMES
+        print(f"🎭 处理所有主题: {', '.join(themes_to_process)}")
+    
+    print(f"📊 共计 {len(themes_to_process)} 个主题需要处理")
+    
+    # 全局统计信息
+    global_stats = {
+        "total_themes": len(themes_to_process),
+        "successful_themes": 0,
+        "failed_themes": 0,
+        "skipped_themes": 0,
+        "total_asr_success": 0,
+        "total_asr_failed": 0,
+        "total_merge_success": 0,
+        "total_merge_failed": 0,
+        "theme_results": {}
+    }
+    
+    # 共享ASR模型（避免重复加载）
+    shared_asr_model = None
+    
+    try:
+        overall_start_time = time.time()
+        
+        for i, theme in enumerate(themes_to_process, 1):
+            print(f"\n{'🚀'*3} 开始处理主题 {i}/{len(themes_to_process)}: {theme} {'🚀'*3}")
+            
+            try:
+                result = process_single_theme(theme, args, shared_asr_model)
+                
+                if result["success"]:
+                    global_stats["successful_themes"] += 1
+                    
+                    # 更新共享模型
+                    if "asr_model" in result:
+                        shared_asr_model = result["asr_model"]
+                    
+                    # 累加统计信息
+                    if "session_stats" in result:
+                        session_stats = result["session_stats"]
+                        global_stats["total_asr_success"] += session_stats.get("successful_asr", 0)
+                        global_stats["total_asr_failed"] += session_stats.get("failed_asr", 0)
+                        global_stats["total_merge_success"] += session_stats.get("successful_merge", 0)
+                        global_stats["total_merge_failed"] += session_stats.get("failed_merge", 0)
+                    
+                    if result.get("preview"):
+                        print(f"✅ 主题 {theme} 预览完成")
+                    elif result.get("completed"):
+                        print(f"✅ 主题 {theme} 所有任务已完成，无需处理")
+                        global_stats["skipped_themes"] += 1
+                    else:
+                        print(f"✅ 主题 {theme} 处理成功")
+                else:
+                    global_stats["failed_themes"] += 1
+                    error_msg = result.get("error", "未知错误")
+                    
+                    if error_msg in ["no_valid_stories", "no_audio_clips", "no_valid_clips", "no_matching_stories"]:
+                        print(f"⏭️  主题 {theme} 跳过: {error_msg}")
+                        global_stats["skipped_themes"] += 1
+                        global_stats["failed_themes"] -= 1  # 调整计数，跳过不算失败
+                    else:
+                        print(f"❌ 主题 {theme} 处理失败: {error_msg}")
+                
+                global_stats["theme_results"][theme] = result
+                
+            except Exception as e:
+                print(f"❌ 主题 {theme} 处理过程中发生异常: {e}")
+                global_stats["failed_themes"] += 1
+                global_stats["theme_results"][theme] = {"success": False, "error": str(e)}
+        
+        overall_end_time = time.time()
+        overall_time = overall_end_time - overall_start_time
+        
+        # 输出全局统计结果
+        print(f"\n{'='*80}")
+        print(f"🎊 所有主题处理完成！")
+        print(f"{'='*80}")
+        
+        print(f"📊 主题处理统计:")
+        print(f"   总主题数: {global_stats['total_themes']}")
+        print(f"   ✅ 成功处理: {global_stats['successful_themes']}")
+        print(f"   ⏭️  跳过主题: {global_stats['skipped_themes']} (无需处理或无数据)")
+        print(f"   ❌ 失败处理: {global_stats['failed_themes']}")
+        
+        print(f"📊 任务执行汇总:")
+        print(f"   ✅ ASR识别成功: {global_stats['total_asr_success']} 个片段")
+        print(f"   ❌ ASR识别失败: {global_stats['total_asr_failed']} 个片段")
+        print(f"   ✅ 字幕合并成功: {global_stats['total_merge_success']} 个故事")
+        print(f"   ❌ 字幕合并失败: {global_stats['total_merge_failed']} 个故事")
+        
+        print(f"⏱️  总耗时: {overall_time:.1f} 秒 ({overall_time/60:.1f} 分钟)")
+        
+        # 详细的主题结果
+        print(f"\n📋 各主题详细结果:")
+        for theme, result in global_stats["theme_results"].items():
+            if result["success"]:
+                if result.get("preview"):
+                    print(f"   📋 {theme}: 预览模式")
+                elif result.get("completed"):
+                    print(f"   ✅ {theme}: 已完成，无需处理")
+                else:
+                    stats = result.get("stats", {})
+                    session_stats = result.get("session_stats", {})
+                    total_processed = session_stats.get("successful_asr", 0) + session_stats.get("successful_merge", 0)
+                    print(f"   ✅ {theme}: 成功处理 {total_processed} 个任务")
+            else:
+                error = result.get("error", "未知错误")
+                if error in ["no_valid_stories", "no_audio_clips", "no_valid_clips", "no_matching_stories"]:
+                    print(f"   ⏭️  {theme}: 跳过 ({error})")
+                else:
+                    print(f"   ❌ {theme}: 失败 ({error})")
+        
+        # 计算成功率
+        processed_themes = global_stats['successful_themes'] + global_stats['failed_themes']
+        if processed_themes > 0:
+            success_rate = global_stats['successful_themes'] / processed_themes * 100
+            print(f"\n📊 主题处理成功率: {success_rate:.1f}%")
+        
+        total_tasks = (global_stats['total_asr_success'] + global_stats['total_asr_failed'] + 
+                      global_stats['total_merge_success'] + global_stats['total_merge_failed'])
+        total_successful_tasks = global_stats['total_asr_success'] + global_stats['total_merge_success']
+        
+        if total_tasks > 0:
+            task_success_rate = total_successful_tasks / total_tasks * 100
+            print(f"📊 任务执行成功率: {task_success_rate:.1f}%")
+        
+        if args.preview:
+            print(f"\n💡 预览模式已完成，如需实际处理请移除 --preview 参数")
+        
+        if global_stats['failed_themes'] > 0:
+            print(f"\n⚠️  有 {global_stats['failed_themes']} 个主题处理失败，可以重新运行程序重试")
+        
+        if global_stats['total_asr_failed'] > 0 or global_stats['total_merge_failed'] > 0:
+            failed_tasks = global_stats['total_asr_failed'] + global_stats['total_merge_failed']
+            print(f"\n⚠️  有 {failed_tasks} 个任务处理失败，可以重新运行程序重试")
     
     except KeyboardInterrupt:
         print(f"\n⚠️  用户中断了程序执行")
         print(f"📊 中断前的处理结果:")
-        print(f"   ✅ ASR识别成功: {session_stats['successful_asr']} 个")
-        print(f"   ❌ ASR识别失败: {session_stats['failed_asr']} 个")
-        print(f"   ✅ 字幕合并成功: {session_stats['successful_merge']} 个")
-        print(f"   ❌ 字幕合并失败: {session_stats['failed_merge']} 个")
-        if stats['total_stories_skipped'] > 0:
-            print(f"   ⏭️  跳过故事: {stats['total_stories_skipped']} 个 (数据不一致)")
+        print(f"   ✅ 成功处理主题: {global_stats['successful_themes']}")
+        print(f"   ⏭️  跳过主题: {global_stats['skipped_themes']}")
+        print(f"   ❌ 失败处理主题: {global_stats['failed_themes']}")
+        print(f"   📊 任务统计: ASR成功{global_stats['total_asr_success']}，ASR失败{global_stats['total_asr_failed']}，合并成功{global_stats['total_merge_success']}，合并失败{global_stats['total_merge_failed']}")
     except Exception as e:
         print(f"\n❌ 程序执行出错: {e}")
         print(f"📊 错误前的处理结果:")
-        print(f"   ✅ ASR识别成功: {session_stats['successful_asr']} 个")
-        print(f"   ❌ ASR识别失败: {session_stats['failed_asr']} 个")
-        print(f"   ✅ 字幕合并成功: {session_stats['successful_merge']} 个")
-        print(f"   ❌ 字幕合并失败: {session_stats['failed_merge']} 个")
-        if stats['total_stories_skipped'] > 0:
-            print(f"   ⏭️  跳过故事: {stats['total_stories_skipped']} 个 (数据不一致)")
+        print(f"   ✅ 成功处理主题: {global_stats['successful_themes']}")
+        print(f"   ⏭️  跳过主题: {global_stats['skipped_themes']}")
+        print(f"   ❌ 失败处理主题: {global_stats['failed_themes']}")
+        print(f"   📊 任务统计: ASR成功{global_stats['total_asr_success']}，ASR失败{global_stats['total_asr_failed']}，合并成功{global_stats['total_merge_success']}，合并失败{global_stats['total_merge_failed']}")
+
+
 
 
 if __name__ == "__main__":

@@ -153,7 +153,7 @@ def get_default_paths(system_type):
 
 def split_story_into_chunks(content, max_chars=3000):
     """
-    将故事内容分割成指定最大字符数的块，尽量让每个块长度相等
+    将故事内容分割成指定最大字符数的块，严格遵守字符数限制
 
     Args:
         content (str): 故事内容
@@ -166,47 +166,72 @@ def split_story_into_chunks(content, max_chars=3000):
     if not content:
         return []
 
-    total_chars = len(content)
-
-    # 计算需要多少个块
-    estimated_chunks = max(1, (total_chars + max_chars - 1) // max_chars)
-
-    # 计算理想的每个块大小（除了最后一个）
-    ideal_chunk_size = min(max_chars, total_chars // estimated_chunks)
-
     chunks = []
     lines = content.split("\n")
     current_chunk = []
     current_char_count = 0
 
     for line in lines:
-        line_with_newline = line + "\n" if line != lines[-1] else line
-        line_char_count = len(line_with_newline)
+        line = line.strip()
+        if not line:  # 跳过空行
+            continue
+            
+        # 如果单行就超过限制，需要分割这一行
+        if len(line) > max_chars:
+            # 先保存当前块（如果有内容）
+            if current_chunk:
+                chunk_text = "\n".join(current_chunk).strip()
+                if chunk_text:
+                    chunks.append(chunk_text)
+                current_chunk = []
+                current_char_count = 0
+            
+            # 分割长行
+            while len(line) > max_chars:
+                # 尝试在句号、感叹号、问号处分割
+                split_pos = max_chars
+                for punct in ['。', '！', '？', '.', '!', '?']:
+                    pos = line.rfind(punct, 0, max_chars)
+                    if pos > max_chars * 0.7:  # 至少要有70%的长度
+                        split_pos = pos + 1
+                        break
+                
+                # 如果没找到合适的标点，就在空格处分割
+                if split_pos == max_chars:
+                    space_pos = line.rfind(' ', 0, max_chars)
+                    if space_pos > max_chars * 0.7:
+                        split_pos = space_pos
+                
+                chunk_part = line[:split_pos].strip()
+                if chunk_part:
+                    chunks.append(chunk_part)
+                line = line[split_pos:].strip()
+            
+            # 处理剩余部分
+            if line:
+                current_chunk = [line]
+                current_char_count = len(line)
+            continue
 
-        # 检查是否应该开始新的块
-        should_start_new_chunk = False
+        # 检查加入这一行是否会超过限制
+        line_length = len(line)
+        if current_char_count > 0:
+            # 需要考虑换行符的长度
+            needed_length = current_char_count + 1 + line_length  # +1 for newline
+        else:
+            needed_length = line_length
 
-        if current_char_count + line_char_count > max_chars:
-            # 超过最大限制，必须开始新块
-            should_start_new_chunk = True
-        elif len(chunks) < estimated_chunks - 1:
-            # 还没到最后一个块，检查是否接近理想大小
-            if current_char_count + line_char_count >= ideal_chunk_size:
-                should_start_new_chunk = True
-
-        if should_start_new_chunk and current_chunk:
-            # 保存当前块
+        if needed_length > max_chars and current_chunk:
+            # 超过限制，保存当前块并开始新块
             chunk_text = "\n".join(current_chunk).strip()
             if chunk_text:
                 chunks.append(chunk_text)
-
-            # 开始新的块
             current_chunk = [line]
-            current_char_count = len(line)
+            current_char_count = line_length
         else:
-            # 继续当前块
+            # 可以加入当前块
             current_chunk.append(line)
-            current_char_count += line_char_count
+            current_char_count = needed_length
 
     # 处理最后一个块
     if current_chunk:

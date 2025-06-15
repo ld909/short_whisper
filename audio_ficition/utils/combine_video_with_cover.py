@@ -1983,7 +1983,14 @@ def main():
     parser.add_argument(
         "--fast",
         action="store_true",
-        help="快速模式 - 使用最快编码设置，略微降低质量但大幅提升速度",
+        default=True,
+        help="快速模式 - 使用最快编码设置，略微降低质量但大幅提升速度（默认启用）",
+    )
+    parser.add_argument(
+        "--no-fast",
+        action="store_false",
+        dest="fast",
+        help="禁用快速模式",
     )
     parser.add_argument(
         "--opencv",
@@ -1995,7 +2002,14 @@ def main():
     parser.add_argument(
         "--cache-optimize",
         action="store_true",
-        help="缓存优化模式 - 预生成静态图像缓存，大幅提升处理速度",
+        default=True,
+        help="缓存优化模式 - 预生成静态图像缓存，大幅提升处理速度（默认启用）",
+    )
+    parser.add_argument(
+        "--no-cache-optimize",
+        action="store_false",
+        dest="cache_optimize",
+        help="禁用缓存优化模式",
     )
     parser.add_argument(
         "--ultra-fast",
@@ -2051,19 +2065,21 @@ def main():
         print("💻 FFmpeg模式 - 安装opencv-python可启用更快的处理模式")
         print("   💡 推荐使用 --ultra-fast 获得最佳性能")
 
-    # 初始化缓存（如果启用）
+    # 初始化缓存（默认启用）
     if args.cache_optimize:
-        print("🚀 缓存优化模式已启用")
+        print("🚀 缓存优化模式已启用（默认）")
         init_cache_dir()
         # 清理过期缓存
         cleanup_cache()
+    else:
+        print("💾 缓存优化模式已禁用")
 
     # 检查依赖
     hw_options = check_dependencies()
 
-    # 应用快速模式设置
+    # 应用快速模式设置（默认启用）
     if args.fast:
-        print("🚀 快速模式已启用 - 最大化编码速度")
+        print("🚀 快速模式已启用（默认）- 最大化编码速度")
         if hw_options["encoder"] == "libx264":
             hw_options["preset"] = "ultrafast"
             hw_options["extra_args"] = ["-crf", "23"]  # 稍微降低质量
@@ -2086,6 +2102,8 @@ def main():
         print(
             f"⚡ 快速编码设置: {hw_options['encoder']} (preset: {hw_options['preset']})"
         )
+    else:
+        print("🐌 快速模式已禁用 - 使用标准编码设置")
 
     # 获取路径配置
     paths = get_paths()
@@ -2237,8 +2255,8 @@ def main():
                         args.force_16_9,
                     )
                 else:
-                    # 使用标准FFmpeg模式
-                    success = combine_video_with_cover(
+                    # 使用优化FFmpeg模式（默认）
+                    success = combine_video_with_cover_optimized(
                         [files["source_mp4"]],
                         files["cover_image"],
                         files["audio_file"],
