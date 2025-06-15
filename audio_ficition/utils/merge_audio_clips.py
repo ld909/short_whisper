@@ -1,10 +1,121 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-音频片段合并脚本
-将 synthesize_audio.py 生成的音频片段按故事合并为完整的故事音频文件
-支持断点续传功能，自动检测操作系统选择合适的输出路径
-支持多个主题：scifi, thriller, horror, fantasy, romance
+音频片段合并脚本 (merge_audio_clips.py)
+====================================
+
+功能说明
+-------
+此脚本用于将 synthesize_audio.py 生成的音频片段按故事合并为完整的故事音频文件。
+支持多个主题（scifi, thriller, horror, fantasy, romance）的批量处理，
+并提供断点续传功能，自动检测操作系统选择合适的输出路径。
+
+主要特性：
+- 支持多主题批量处理
+- 断点续传功能
+- 自动检测操作系统
+- 智能文件验证
+- 详细的进度显示
+- 支持预览模式
+- 支持强制重新生成
+
+系统要求
+-------
+- 操作系统：Ubuntu/Linux
+- 依赖工具：ffmpeg
+- Python 3.6+
+
+安装依赖
+-------
+1. 确保已安装 ffmpeg：
+   ```bash
+   sudo apt-get update
+   sudo apt-get install ffmpeg
+   ```
+
+2. 安装 Python 依赖：
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+使用方法
+-------
+基本用法：
+```bash
+python merge_audio_clips.py [选项]
+```
+
+命令行参数：
+--theme THEME      指定要处理的主题，可选值：scifi, thriller, horror, fantasy, romance, all
+                   默认值：all（处理所有主题）
+
+--input-dir DIR    自定义输入目录路径
+                   默认：根据操作系统和主题自动选择
+
+--output-dir DIR   自定义输出目录路径
+                   默认：根据操作系统和主题自动选择
+
+--story STORY      只处理指定故事索引（可选）
+
+--preview          预览模式，只显示会处理哪些故事，不实际处理
+
+--force-regenerate 强制重新生成所有文件，忽略已存在的文件
+
+--resume           断点续传模式，跳过已存在的有效音频文件（默认：True）
+
+使用示例
+-------
+1. 处理所有主题：
+   ```bash
+   python merge_audio_clips.py
+   ```
+
+2. 只处理科幻主题：
+   ```bash
+   python merge_audio_clips.py --theme scifi
+   ```
+
+3. 预览模式（不实际处理）：
+   ```bash
+   python merge_audio_clips.py --theme thriller --preview
+   ```
+
+4. 强制重新生成特定故事：
+   ```bash
+   python merge_audio_clips.py --theme horror --story 1 --force-regenerate
+   ```
+
+5. 使用自定义目录：
+   ```bash
+   python merge_audio_clips.py --theme fantasy --input-dir /path/to/input --output-dir /path/to/output
+   ```
+
+输出说明
+-------
+- 合并后的音频文件将保存在 /mnt/dhl/audio/{theme}/mp3_merge/{story_index}/ 目录下
+- 每个故事目录下会生成一个 story.mp3 文件
+- 脚本会显示详细的处理进度和统计信息
+- 支持断点续传功能，如果处理过程中断，下次运行时会自动跳过已完成的文件
+- 动态检查已生成的MP3文件有效性，自动跳过已存在的有效文件
+
+注意事项
+-------
+1. 确保有足够的磁盘空间存储合并后的音频文件
+2. 建议先使用 --preview 模式查看将要处理的内容
+3. 如果遇到问题，可以查看详细的错误输出信息
+4. 合并大文件可能需要较长时间，请耐心等待
+
+作者
+----
+[作者信息]
+
+版本历史
+-------
+- v1.0.0 (2024-03-xx): 初始版本
+  - 支持多主题处理
+  - 实现断点续传功能
+  - 添加预览模式
+  - 支持自定义输入输出目录
 """
 
 import os
@@ -24,24 +135,51 @@ SUPPORTED_THEMES = ["scifi", "thriller", "horror", "fantasy", "romance"]
 # 输入目录：根据操作系统和主题自动选择
 def get_input_dir(theme):
     """根据操作系统和主题返回合适的输入目录"""
-    if platform.system() == "Darwin":  # macOS
-        return f"/Volumes/dhl/audio/{theme}/mp3_clips"
-    else:  # Linux 和其他系统
-        return f"/media/dhl/audio/{theme}/mp3_clips"
+    if platform.system() == "Linux":  # Ubuntu
+        return f"/home/dhl/Documents/audio/mp3_clips/{theme}"
+    else:  # 其他系统
+        print("❌ 此脚本只能在Ubuntu系统上运行！")
+        print(f"🖥️  当前系统: {platform.system()}")
+        exit(1)
 
 
 # 输出目录：根据操作系统和主题自动选择
 def get_output_dir(theme):
     """根据操作系统和主题返回合适的输出目录"""
-    if platform.system() == "Darwin":  # macOS
-        return f"/Volumes/dhl/audio/{theme}/mp3_merge"
-    else:  # Linux 和其他系统
-        return f"/media/dhl/audio/{theme}/mp3_merge"
+    if platform.system() == "Linux":  # Ubuntu
+        return f"/mnt/dhl/audio/{theme}/mp3_merge"
+    else:  # 其他系统
+        print("❌ 此脚本只能在Ubuntu系统上运行！")
+        print(f"🖥️  当前系统: {platform.system()}")
+        exit(1)
 
 
 # 合并后的文件名
 OUTPUT_FILENAME = "story.mp3"
 # ===================================
+
+
+def check_ubuntu_system():
+    """
+    检查是否为Ubuntu系统
+    
+    Returns:
+        bool: 是否为Ubuntu系统
+    """
+    try:
+        # 检查系统类型
+        if platform.system() != "Linux":
+            return False
+        
+        # 检查是否为Ubuntu
+        with open('/etc/os-release', 'r') as f:
+            content = f.read()
+            if 'Ubuntu' in content or 'ubuntu' in content:
+                return True
+        
+        return False
+    except:
+        return False
 
 
 def get_story_directories(input_dir):
@@ -598,6 +736,14 @@ def process_theme(
 
 def main():
     """主函数"""
+    # 首先检查是否为Ubuntu系统
+    if not check_ubuntu_system():
+        print("❌ 此脚本只能在Ubuntu系统上运行！")
+        print(f"🖥️  当前系统: {platform.system()}")
+        exit(1)
+    
+    print("✅ Ubuntu系统检测通过")
+    
     parser = argparse.ArgumentParser(
         description="音频片段合并器 - 将音频片段合并为完整故事（支持多主题和断点续传）"
     )

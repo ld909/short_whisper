@@ -739,22 +739,26 @@ def combine_video_with_cover_opencv(
         return False
 
 
-def get_paths():
-    """根据操作系统返回适当的路径"""
+def get_paths(theme: str = "scifi"):
+    """根据操作系统和主题返回适当的路径
+    
+    Args:
+        theme: 主题名称，支持 scifi, thriller, horror, fantasy, romance
+    """
     system = platform.system()
     if system == "Darwin":  # macOS
         return {
-            "cover_img_dir": "/Volumes/dhl/audio/scifi/cover_img_large",
-            "mp4_source_dir": "/Volumes/dhl/audio/scifi/mp4_upscaled",
-            "audio_merge_dir": "/Volumes/dhl/audio/scifi/mp3_merge",
-            "output_dir": "/Volumes/dhl/audio/scifi/mp4_full_silent",  # 🔧 修复：macOS使用/Volumes路径
+            "cover_img_dir": f"/Volumes/dhl/audio/{theme}/cover_img_large",
+            "mp4_source_dir": f"/Volumes/dhl/audio/{theme}/mp4_upscaled",
+            "audio_merge_dir": f"/Volumes/dhl/audio/{theme}/mp3_merge",
+            "output_dir": f"/Volumes/dhl/audio/{theme}/mp4_full_silent",
         }
     else:  # 默认为Linux/Ubuntu
         return {
-            "cover_img_dir": "/media/dhl/audio/scifi/cover_img_large",
-            "mp4_source_dir": "/media/dhl/audio/scifi/mp4_upscaled",
-            "audio_merge_dir": "/media/dhl/audio/scifi/mp3_merge",
-            "output_dir": "/mnt/dhl/audio/scifi/mp4_full_silent",
+            "cover_img_dir": f"/media/dhl/audio/{theme}/cover_img_large",
+            "mp4_source_dir": f"/media/dhl/audio/{theme}/mp4_upscaled",
+            "audio_merge_dir": f"/media/dhl/audio/{theme}/mp3_merge",
+            "output_dir": f"/mnt/dhl/audio/{theme}/mp4_full_silent",
         }
 
 
@@ -2051,6 +2055,12 @@ def main():
         action="store_true",
         help="缓存优化模式 - 预生成静态图像缓存，大幅提升处理速度",
     )
+    parser.add_argument(
+        "--theme",
+        default="scifi",
+        choices=["scifi", "thriller", "horror", "fantasy", "romance"],
+        help="指定要处理的主题（默认：scifi）"
+    )
 
     args = parser.parse_args()
 
@@ -2119,7 +2129,7 @@ def main():
         )
 
     # 获取路径配置
-    paths = get_paths()
+    paths = get_paths(args.theme)
     print(f"📁 高清封面目录: {paths['cover_img_dir']}")
     print(f"📁 MP4源文件目录: {paths['mp4_source_dir']}")
     print(f"📁 音频文件目录: {paths['audio_merge_dir']}")

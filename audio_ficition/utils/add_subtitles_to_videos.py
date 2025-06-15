@@ -87,21 +87,21 @@ from tqdm import tqdm
 from typing import Dict, List, Optional, Tuple
 
 
-def get_paths():
-    """根据操作系统返回适当的路径"""
+def get_paths(theme="scifi"):
+    """根据操作系统和主题返回适当的路径"""
     system = platform.system()
     if system == "Darwin":  # macOS
         return {
-            "input_video_dir": "/Volumes/dhl/audio/scifi/mp4_full_audio",  # 🔧 修复：实际输出目录是 mp4_full_audio
-            "subtitle_dir": "/Volumes/dhl/audio/scifi/srt_merge",
-            "output_dir": "/Volumes/dhl/audio/scifi/mp4_with_subtitles",
+            "input_video_dir": f"/Volumes/dhl/audio/{theme}/mp4_full_audio",  # 🔧 修复：实际输出目录是 mp4_full_audio
+            "subtitle_dir": f"/Volumes/dhl/audio/{theme}/srt_merge",
+            "output_dir": f"/Volumes/dhl/audio/{theme}/mp4_with_subtitles",
             "font_dir": "font/en/",
         }
     else:  # 默认为Linux/Ubuntu
         return {
-            "input_video_dir": "/mnt/dhl/audio/scifi/mp4_full_audio",  # 🔧 修复：实际输出目录是 mp4_full_audio
-            "subtitle_dir": "/mnt/dhl/audio/scifi/srt_merge",
-            "output_dir": "/mnt/dhl/audio/scifi/mp4_with_subtitles",
+            "input_video_dir": f"/mnt/dhl/audio/{theme}/mp4_full_audio",  # 🔧 修复：实际输出目录是 mp4_full_audio
+            "subtitle_dir": f"/mnt/dhl/audio/{theme}/srt_merge",
+            "output_dir": f"/mnt/dhl/audio/{theme}/mp4_with_subtitles",
             "font_dir": "font/en/",
         }
 
@@ -1229,63 +1229,6 @@ def get_story_files(paths: Dict) -> Dict:
     return story_info
 
 
-def get_existing_output_videos(output_dir: str, fast_mode: bool = False) -> set:
-    """获取已存在的输出视频文件"""
-    existing_videos = set()
-
-    if not os.path.exists(output_dir):
-        return existing_videos
-
-    for video_file in glob.glob(os.path.join(output_dir, "*.mp4")):
-        basename = os.path.basename(video_file)
-        # 排除以点开头的文件
-        if basename.startswith("."):
-            continue
-
-        match = re.match(r"(\d+)\.mp4", basename)
-        if match:
-            story_index = match.group(1)
-            # 快速模式 - 跳过文件大小验证
-            if fast_mode:
-                existing_videos.add(story_index)
-            else:
-                # 简单验证文件是否有效（大小大于1MB）
-                try:
-                    file_size = os.path.getsize(video_file)
-                    if file_size > 1024 * 1024:  # 大于1MB
-                        existing_videos.add(story_index)
-                except Exception:
-                    pass
-
-    return existing_videos
-
-
-def save_progress_log(output_dir: str, stats: Dict, session_stats: Dict):
-    """保存处理进度日志"""
-    try:
-        log_file = os.path.join(output_dir, "subtitle_progress.json")
-
-        log_data = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "total_stories": stats["total_stories"],
-            "complete_stories": stats["complete_stories"],
-            "completed_subtitles": stats["completed_subtitles"]
-            + session_stats["successful"],
-            "pending_subtitles": stats["pending_subtitles"]
-            - session_stats["successful"]
-            - session_stats["failed"],
-            "session_successful": session_stats["successful"],
-            "session_failed": session_stats["failed"],
-            "missing_files": stats["missing_files"],
-        }
-
-        with open(log_file, "w", encoding="utf-8") as f:
-            json.dump(log_data, f, indent=2, ensure_ascii=False)
-
-    except Exception as e:
-        pass  # 静默失败
-
-
 def main():
     """主函数 - GPU优化并行处理版"""
     parser = argparse.ArgumentParser(description="视频字幕添加器 - GPU优化并行处理版")
@@ -1297,6 +1240,12 @@ def main():
     parser.add_argument("--start", type=int, help="指定开始处理的故事索引")
     parser.add_argument("--end", type=int, help="指定结束处理的故事索引")
     parser.add_argument("--story", help="只处理指定的故事索引")
+    parser.add_argument(
+        "--theme",
+        default="scifi",
+        choices=["scifi", "thriller", "horror", "fantasy", "romance"],
+        help="指定主题 (默认: scifi)",
+    )
 
     # 字体和样式参数
     parser.add_argument("--font-size", type=int, default=50, help="字体大小（默认50）")
@@ -1361,6 +1310,7 @@ def main():
     print("🚀 视频字幕添加器 - GPU优化并行处理版")
     print("=" * 60)
     print(f"🖥️  操作系统: {platform.system()}")
+    print(f"🎭 主题: {args.theme}")
 
     # 检查依赖
     if not args.fast_mode and not check_ffmpeg():
@@ -1486,7 +1436,7 @@ def main():
     print(f"🎨 字体粗细: {args.font_weight}")
 
     # 获取路径配置
-    paths = get_paths()
+    paths = get_paths(args.theme)
     if not args.fast_mode:
         print(f"📁 输入视频: {paths['input_video_dir']}")
         print(f"📁 字幕文件: {paths['subtitle_dir']}")

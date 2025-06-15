@@ -11,24 +11,27 @@
 3. 自动轮询查询任务状态和结果
 4. 下载处理后的高清视频到指定目录
 5. 支持断点续传，避免重复处理
+6. 支持多个主题：scifi、thriller、horror、fantasy、romance
 
 输入:
-- macOS: /Volumes/dhl/audio/scifi/starting_mp4/
-- Ubuntu: /media/dhl/audio/scifi/starting_mp4/
+- macOS: /Volumes/dhl/audio/{theme}/starting_mp4/
+- Ubuntu: /media/dhl/audio/{theme}/starting_mp4/
 
 输出:
-- macOS: /Volumes/dhl/audio/scifi/mp4_upscaled/story_index.mp4
-- Ubuntu: /media/dhl/audio/scifi/mp4_upscaled/story_index.mp4
+- macOS: /Volumes/dhl/audio/{theme}/mp4_upscaled/story_index.mp4
+- Ubuntu: /media/dhl/audio/{theme}/mp4_upscaled/story_index.mp4
 
 使用方法:
-1. 基本使用: python upscale_video.py
-2. 指定比特率: python upscale_video.py --bitrate 10
-3. 强制重新处理: python upscale_video.py --force
-4. 指定处理范围: python upscale_video.py --start 1 --end 10
+1. 默认处理所有主题: python upscale_video.py
+2. 处理指定主题: python upscale_video.py --theme scifi
+3. 指定比特率: python upscale_video.py --theme thriller --bitrate 10
+4. 强制重新处理: python upscale_video.py --theme horror --force
+5. 指定处理范围: python upscale_video.py --theme fantasy --start 1 --end 10
+6. 处理所有主题（显式指定）: python upscale_video.py --theme all
 
 处理流程:
 1. 检测操作系统并选择相应的媒体路径
-2. 扫描starting_mp4目录中的所有MP4文件
+2. 扫描指定主题starting_mp4目录中的所有MP4文件
 3. 检查是否已存在超分后的文件（断点续传）
 4. 提交异步任务到阿里云视频增强服务
 5. 获取任务ID，开始轮询查询
@@ -43,6 +46,7 @@
 - 每10秒查询一次任务状态
 - 自动跳过点开头的系统文件
 - 自动检测操作系统并使用相应的媒体挂载路径
+- 支持的主题：scifi、thriller、horror、fantasy、romance
 """
 
 import os
@@ -432,30 +436,31 @@ def get_base_media_path():
         return "/media/dhl"
 
 
-def get_input_directory():
+def get_input_directory(theme: str):
     """获取输入目录路径"""
     base_path = get_base_media_path()
-    return os.path.join(base_path, "audio", "scifi", "starting_mp4")
+    return os.path.join(base_path, "audio", theme, "starting_mp4")
 
 
-def get_output_directory():
+def get_output_directory(theme: str):
     """获取输出目录路径"""
     base_path = get_base_media_path()
-    return os.path.join(base_path, "audio", "scifi", "mp4_upscaled")
+    return os.path.join(base_path, "audio", theme, "mp4_upscaled")
 
 
-def get_input_videos(start_index: Optional[int] = None, end_index: Optional[int] = None) -> List[Tuple[str, int]]:
+def get_input_videos(theme: str, start_index: Optional[int] = None, end_index: Optional[int] = None) -> List[Tuple[str, int]]:
     """
     获取需要处理的输入视频文件列表
     
     Args:
+        theme: 主题名称
         start_index: 开始索引（可选）
         end_index: 结束索引（可选）
     
     Returns:
         (文件路径, 故事索引) 的列表
     """
-    input_dir = get_input_directory()
+    input_dir = get_input_directory(theme)
     
     if not os.path.exists(input_dir):
         print(f"❌ 输入目录不存在: {input_dir}")
@@ -497,14 +502,17 @@ def get_input_videos(start_index: Optional[int] = None, end_index: Optional[int]
     return valid_files
 
 
-def get_existing_upscaled_videos() -> set:
+def get_existing_upscaled_videos(theme: str) -> set:
     """
     获取已存在的超分后视频文件索引集合
+    
+    Args:
+        theme: 主题名称
     
     Returns:
         已存在文件的故事索引集合
     """
-    output_dir = get_output_directory()
+    output_dir = get_output_directory(theme)
     
     if not os.path.exists(output_dir):
         return set()
@@ -529,22 +537,24 @@ def get_existing_upscaled_videos() -> set:
     return existing_indices
 
 
-def generate_output_path(story_index: int) -> str:
+def generate_output_path(theme: str, story_index: int) -> str:
     """
     生成输出文件路径
     
     Args:
+        theme: 主题名称
         story_index: 故事索引
     
     Returns:
         输出文件的完整路径
     """
-    output_dir = get_output_directory()
+    output_dir = get_output_directory(theme)
     os.makedirs(output_dir, exist_ok=True)
     return os.path.join(output_dir, f"{story_index}.mp4")
 
 
 def process_videos_batch(
+    theme: str,
     bit_rate: int = 5, 
     force: bool = False, 
     start_index: Optional[int] = None, 
@@ -554,6 +564,7 @@ def process_videos_batch(
     批量处理视频超分的主要函数
     
     Args:
+        theme: 主题名称
         bit_rate: 视频比特率
         force: 是否强制重新处理
         start_index: 开始索引
@@ -564,14 +575,14 @@ def process_videos_batch(
     """
     
     # 获取需要处理的视频列表
-    input_videos = get_input_videos(start_index, end_index)
+    input_videos = get_input_videos(theme, start_index, end_index)
     
     if not input_videos:
         print("❌ 未找到需要处理的视频文件")
         return False
     
     # 获取已存在的超分视频
-    existing_videos = get_existing_upscaled_videos()
+    existing_videos = get_existing_upscaled_videos(theme)
     
     # 过滤需要处理的视频
     videos_to_process = []
@@ -586,6 +597,7 @@ def process_videos_batch(
         return True
     
     print(f"\n=== 📊 批量超分处理统计 ===")
+    print(f"📚 主题: {theme}")
     print(f"总视频数量: {len(input_videos)}")
     print(f"已处理数量: {len(existing_videos)}")
     print(f"需要处理: {len(videos_to_process)}")
@@ -607,13 +619,13 @@ def process_videos_batch(
     failure_count = 0
     
     # 批量处理视频
-    with tqdm(total=len(videos_to_process), desc="批量超分进度") as pbar:
+    with tqdm(total=len(videos_to_process), desc=f"批量超分进度({theme})") as pbar:
         for video_path, story_index in videos_to_process:
-            print(f"\n=== 处理故事 {story_index} ===")
+            print(f"\n=== 处理 {theme} 主题故事 {story_index} ===")
             print(f"输入文件: {video_path}")
             
             # 生成输出路径
-            output_path = generate_output_path(story_index)
+            output_path = generate_output_path(theme, story_index)
             print(f"输出文件: {output_path}")
             
             # 检查输入文件
@@ -640,13 +652,13 @@ def process_videos_batch(
                 # 下载处理后的视频
                 if download_video(result_url, output_path):
                     success_count += 1
-                    print(f"✅ 故事 {story_index} 超分处理成功")
+                    print(f"✅ {theme} 主题故事 {story_index} 超分处理成功")
                 else:
                     failure_count += 1
-                    print(f"❌ 故事 {story_index} 视频下载失败")
+                    print(f"❌ {theme} 主题故事 {story_index} 视频下载失败")
             else:
                 failure_count += 1
-                print(f"❌ 故事 {story_index} 超分处理失败")
+                print(f"❌ {theme} 主题故事 {story_index} 超分处理失败")
             
             pbar.update(1)
             
@@ -655,12 +667,60 @@ def process_videos_batch(
                 time.sleep(2)
     
     # 输出最终统计
-    print(f"\n=== 📈 批量超分完成统计 ===")
+    print(f"\n=== 📈 {theme} 主题批量超分完成统计 ===")
     print(f"✅ 成功处理: {success_count}/{len(videos_to_process)} 个视频")
     print(f"❌ 处理失败: {failure_count}/{len(videos_to_process)} 个视频")
     print(f"📊 成功率: {success_count/len(videos_to_process)*100:.1f}%")
     
     return success_count > 0
+
+
+def process_all_themes(
+    bit_rate: int = 5, 
+    force: bool = False, 
+    start_index: Optional[int] = None, 
+    end_index: Optional[int] = None
+) -> bool:
+    """
+    处理所有主题的视频超分
+    
+    Args:
+        bit_rate: 视频比特率
+        force: 是否强制重新处理
+        start_index: 开始索引
+        end_index: 结束索引
+    
+    Returns:
+        处理成功返回True，失败返回False
+    """
+    all_themes = ["scifi", "thriller", "horror", "fantasy", "romance"]
+    overall_success = True
+    
+    print(f"\n🌟 开始处理所有主题的视频超分...")
+    print(f"📚 主题列表: {', '.join(all_themes)}")
+    print("=" * 60)
+    
+    for i, theme in enumerate(all_themes, 1):
+        print(f"\n🎬 [{i}/{len(all_themes)}] 正在处理主题: {theme.upper()}")
+        print("-" * 40)
+        
+        theme_success = process_videos_batch(theme, bit_rate, force, start_index, end_index)
+        
+        if not theme_success:
+            overall_success = False
+            print(f"❌ 主题 {theme} 处理失败")
+        else:
+            print(f"✅ 主题 {theme} 处理完成")
+        
+        # 主题间添加延迟
+        if i < len(all_themes):
+            print(f"⏳ 等待5秒后处理下一个主题...")
+            time.sleep(5)
+    
+    print(f"\n🏁 所有主题处理完成!")
+    print("=" * 60)
+    
+    return overall_success
 
 
 def main():
@@ -669,6 +729,13 @@ def main():
     parser = argparse.ArgumentParser(description="批量对视频进行超分辨率处理")
 
     # 添加命令行参数
+    parser.add_argument(
+        "--theme",
+        type=str,
+        default="all",
+        choices=["scifi", "thriller", "horror", "fantasy", "romance", "all"],
+        help="选择主题（默认: all，处理所有主题）：scifi, thriller, horror, fantasy, romance, all",
+    )
     parser.add_argument(
         "--bitrate",
         type=int,
@@ -709,19 +776,37 @@ def main():
     # 显示系统信息和路径
     system_name = platform.system()
     print(f"🖥️ 检测到操作系统: {system_name}")
-    print(f"📂 输入目录: {get_input_directory()}")
-    print(f"📁 输出目录: {get_output_directory()}")
-    print()
-
-    # 批量处理视频超分
-    success = process_videos_batch(args.bitrate, args.force, args.start, args.end)
-
-    if success:
-        print("\n🎉 批量视频超分处理任务完成!")
-        sys.exit(0)
+    
+    # 根据theme参数决定处理方式
+    if args.theme == "all":
+        print("🌟 模式: 处理所有主题")
+        print("📚 支持的主题: scifi, thriller, horror, fantasy, romance")
+        print()
+        
+        # 处理所有主题
+        success = process_all_themes(args.bitrate, args.force, args.start, args.end)
+        
+        if success:
+            print(f"\n🎉 所有主题批量视频超分处理任务完成!")
+            sys.exit(0)
+        else:
+            print(f"\n❌ 部分主题批量视频超分处理任务失败!")
+            sys.exit(1)
     else:
-        print("\n❌ 批量视频超分处理任务失败!")
-        sys.exit(1)
+        print(f"📚 处理主题: {args.theme}")
+        print(f"📂 输入目录: {get_input_directory(args.theme)}")
+        print(f"📁 输出目录: {get_output_directory(args.theme)}")
+        print()
+
+        # 批量处理指定主题的视频超分
+        success = process_videos_batch(args.theme, args.bitrate, args.force, args.start, args.end)
+
+        if success:
+            print(f"\n🎉 {args.theme} 主题批量视频超分处理任务完成!")
+            sys.exit(0)
+        else:
+            print(f"\n❌ {args.theme} 主题批量视频超分处理任务失败!")
+            sys.exit(1)
 
 
 if __name__ == "__main__":

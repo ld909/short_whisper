@@ -11,23 +11,24 @@ ASR识别和字幕合并脚本
 4. 支持断点续传，避免重复处理
 5. 智能跳过数据不一致的故事，只处理完整的故事
 6. 只在 Ubuntu 系统下运行
+7. 支持多个主题: scifi, thriller, horror, fantasy, romance
 
 路径说明:
 输入:
-- MP3 clip: /media/dhl/audio/scifi/mp3_clips/[故事索引]/[块索引].mp3
+- MP3 clip: /media/dhl/audio/{theme}/mp3_clips/[故事索引]/[块索引].mp3
 
 输出:
-- Word level 字幕: /mnt/dhl/audio/scifi/word_level_srt/[故事索引]/[块索引].srt
-- Segment level 字幕: /mnt/dhl/audio/scifi/seg_level_srt/[故事索引]/[块索引].srt
-- 合并字幕: /mnt/dhl/audio/scifi/srt_merge/[故事索引].srt
+- Word level 字幕: /mnt/dhl/audio/{theme}/word_level_srt/[故事索引]/[块索引].srt
+- Segment level 字幕: /mnt/dhl/audio/{theme}/seg_level_srt/[故事索引]/[块索引].srt
+- 合并字幕: /mnt/dhl/audio/{theme}/srt_merge/[故事索引].srt
 
 使用方法:
-1. 基本使用: python asr_and_merge_subtitles.py
-2. 强制重新处理: python asr_and_merge_subtitles.py -f
-3. 指定故事范围: python asr_and_merge_subtitles.py --start 1 --end 10
-4. 只处理指定故事: python asr_and_merge_subtitles.py --story 5
-5. 预览模式: python asr_and_merge_subtitles.py --preview
-6. 跳过一致性检查: python asr_and_merge_subtitles.py --skip-consistency-check
+1. 基本使用: python asr_and_merge_subtitles.py --theme scifi
+2. 强制重新处理: python asr_and_merge_subtitles.py --theme scifi -f
+3. 指定故事范围: python asr_and_merge_subtitles.py --theme scifi --start 1 --end 10
+4. 只处理指定故事: python asr_and_merge_subtitles.py --theme scifi --story 5
+5. 预览模式: python asr_and_merge_subtitles.py --theme scifi --preview
+6. 跳过一致性检查: python asr_and_merge_subtitles.py --theme scifi --skip-consistency-check
 
 注意:
 - 需要GPU支持和NeMo ASR环境
@@ -67,16 +68,22 @@ except ImportError as e:
     sys.exit(1)
 
 # ============ 配置参数 ============
-# 输入目录：mp3 clip 文件目录
-INPUT_DIR = "/media/dhl/audio/scifi/mp3_clips"
+# 支持的主题列表
+SUPPORTED_THEMES = ["scifi", "thriller", "horror", "fantasy", "romance"]
 
-# 文本块目录：用于安全检查的文本块目录
-TEXT_CHUNKS_DIR = "/mnt/dhl/audio/scifi/story_chunks"
-
-# 输出目录
-WORD_LEVEL_SRT_DIR = "/mnt/dhl/audio/scifi/word_level_srt"
-SEG_LEVEL_SRT_DIR = "/mnt/dhl/audio/scifi/seg_level_srt"
-MERGE_SRT_DIR = "/mnt/dhl/audio/scifi/srt_merge"
+# 根据主题获取路径
+def get_theme_paths(theme: str) -> Dict[str, str]:
+    """根据主题获取相关路径"""
+    if theme not in SUPPORTED_THEMES:
+        raise ValueError(f"不支持的主题: {theme}，支持的主题: {', '.join(SUPPORTED_THEMES)}")
+    
+    return {
+        "input_dir": f"/media/dhl/audio/{theme}/mp3_clips",
+        "text_chunks_dir": f"/mnt/dhl/audio/{theme}/story_chunks",
+        "word_level_srt_dir": f"/mnt/dhl/audio/{theme}/word_level_srt",
+        "seg_level_srt_dir": f"/mnt/dhl/audio/{theme}/seg_level_srt",
+        "merge_srt_dir": f"/mnt/dhl/audio/{theme}/srt_merge"
+    }
 
 # ASR 模型
 ASR_MODEL_NAME = "nvidia/parakeet-tdt-0.6b-v2"
@@ -798,14 +805,27 @@ def main():
     parser.add_argument("--end", type=int, help="指定结束处理的故事索引")  
     parser.add_argument("--story", help="只处理指定的故事索引")
     parser.add_argument("--preview", action="store_true", help="预览模式，只显示会处理哪些文件")
-    parser.add_argument("--input-dir", default=INPUT_DIR, help=f"输入目录路径 (默认: {INPUT_DIR})")
+    parser.add_argument("--theme", required=True, choices=SUPPORTED_THEMES, help=f"指定要处理的主题 ({', '.join(SUPPORTED_THEMES)})")
     parser.add_argument("--skip-consistency-check", action="store_true", help="跳过文本块和音频文件的一致性检查（慎用）")
     
     args = parser.parse_args()
     
+    # 获取主题相关路径
+    try:
+        paths = get_theme_paths(args.theme)
+        INPUT_DIR = paths["input_dir"]
+        TEXT_CHUNKS_DIR = paths["text_chunks_dir"]
+        WORD_LEVEL_SRT_DIR = paths["word_level_srt_dir"]
+        SEG_LEVEL_SRT_DIR = paths["seg_level_srt_dir"]
+        MERGE_SRT_DIR = paths["merge_srt_dir"]
+    except ValueError as e:
+        print(f"❌ {e}")
+        return
+    
     print("🎤 ASR识别和字幕合并器")
     print("=" * 50)
-    print(f"📁 输入目录: {args.input_dir}")
+    print(f"🎭 处理主题: {args.theme}")
+    print(f"📁 输入目录: {INPUT_DIR}")
     print(f"📁 文本块目录: {TEXT_CHUNKS_DIR}")
     print(f"📁 Word level 输出: {WORD_LEVEL_SRT_DIR}")
     print(f"📁 Segment level 输出: {SEG_LEVEL_SRT_DIR}")
