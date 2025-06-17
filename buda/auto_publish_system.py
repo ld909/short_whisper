@@ -392,13 +392,19 @@ class AutoPublishSystem:
         if os.path.exists(desc_path):
             try:
                 with open(desc_path, "r", encoding="utf-8") as f:
-                    content["description"] = f.read().strip()
+                    base_description = f.read().strip()
+                    # 根据语言添加对应的标签
+                    content["description"] = self.add_language_tags(base_description)
             except Exception as e:
                 print(f"读取描述文件出错: {e}")
-                content["description"] = "精彩内容，敬请观看！"  # 默认描述
+                content["description"] = self.add_language_tags(
+                    "精彩内容，敬请观看！"
+                )  # 默认描述
         else:
             print(f"警告: 描述文件不存在: {desc_path}")
-            content["description"] = "精彩内容，敬请观看！"  # 默认描述
+            content["description"] = self.add_language_tags(
+                "精彩内容，敬请观看！"
+            )  # 默认描述
 
         # 检查封面文件
         if not os.path.exists(thumbnail_path):
@@ -408,6 +414,33 @@ class AutoPublishSystem:
             print(f"找到封面文件: {thumbnail_path}")
 
         return content
+
+    def add_language_tags(self, base_description):
+        """根据语言类型为描述添加对应的标签
+
+        Args:
+            base_description: 基础描述文本
+
+        Returns:
+            str: 添加标签后的完整描述
+        """
+        # 基础描述 + 两行换行
+        description_with_tags = base_description + "\n\n"
+
+        if self.language == "en":
+            # 英文佛学标签
+            tags = "#Buddhism #Dharma #Mindfulness #Meditation #Karma #SpiritualAwakening #Zen #BuddhistWisdom #Enlightenment #LifeLessons"
+            description_with_tags += f"英文学佛 (English Buddhism)：\n{tags}"
+        elif self.language == "ko":
+            # 韩文佛学标签
+            tags = "#불교 #명상 #마음챙김 #불법 #깨달음 #카르마 #지혜 #힐링 #인생수업 #불교이야기"
+            description_with_tags += f"对韩文佛学 (Korean Buddhism)：\n{tags}"
+        else:
+            # 其他语言暂时不添加标签
+            return base_description
+
+        print(f"📝 已为{self.language}语言添加相应标签")
+        return description_with_tags
 
     def get_adspower_info(self):
         """连接AdsPower浏览器"""
