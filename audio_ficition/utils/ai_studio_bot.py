@@ -533,6 +533,43 @@ def get_next_story_index_for_theme(theme):
         return next_index
 
 
+def get_next_story_index_for_theme_with_allocated(theme, allocated_indices):
+    """获取主题的下一个可用故事索引（考虑已分配的索引）
+
+    Args:
+        theme: 主题名称
+        allocated_indices: 当前规划中已分配的索引集合
+
+    Returns:
+        int: 下一个可用的故事索引
+    """
+    theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
+    story_dir_path = get_theme_story_path_prefix(theme)
+
+    # 确保目录存在
+    os.makedirs(story_dir_path, exist_ok=True)
+
+    # 获取已存在的故事索引
+    existing_indices = get_existing_stories(story_dir_path)
+
+    # 合并已存在和已分配的索引
+    occupied_indices = existing_indices | allocated_indices
+
+    if not occupied_indices:
+        return 1
+
+    # 找出缺失的最小索引（优先填补空缺）
+    max_occupied = max(occupied_indices)
+
+    # 查找空缺（从1开始）
+    for i in range(1, max_occupied + 1):
+        if i not in occupied_indices:
+            return i
+
+    # 如果没有空缺，返回最大值+1
+    return max_occupied + 1
+
+
 def get_next_available_param_file_for_theme(theme, used_param_files):
     """获取主题的下一个可用参数文件"""
     available_files = get_available_story_param_files(theme)
@@ -661,14 +698,18 @@ def prepare_multi_theme_generation(themes, num_per_theme):
     # 生成轮次计划
     generation_plan = []
     used_param_files = {theme: set() for theme in themes}
+    # 添加：跟踪每个主题已分配的索引，确保不重复
+    theme_allocated_indices = {theme: set() for theme in themes}
 
     for round_num in range(num_per_theme):
         print(f"\n=== 📋 规划第 {round_num + 1} 轮生成 ===")
         round_plan = []
 
         for theme in themes:
-            # 获取下一个故事索引
-            next_index = get_next_story_index_for_theme(theme)
+            # 获取下一个故事索引 - 考虑已分配的索引
+            next_index = get_next_story_index_for_theme_with_allocated(
+                theme, theme_allocated_indices[theme]
+            )
 
             # 获取下一个可用参数文件
             next_param_file = get_next_available_param_file_for_theme(
@@ -691,6 +732,8 @@ def prepare_multi_theme_generation(themes, num_per_theme):
                     }
                     round_plan.append(story_data)
                     used_param_files[theme].add(next_param_file)
+                    # 记录已分配的索引
+                    theme_allocated_indices[theme].add(next_index)
 
                     theme_name = SUPPORTED_THEMES[theme]["name"]
                     print(

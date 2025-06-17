@@ -101,7 +101,7 @@ def setup_leonardo_client():
     config = {
         "api_key": api_key,
         "base_url": "https://cloud.leonardo.ai/api/rest/v1",
-        "model_id": "05ce0082-2d80-4a2d-8653-4d1c85e2418e",
+        "model_id": "de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3",
         "headers": {
             "accept": "application/json",
             "authorization": f"Bearer {api_key}",

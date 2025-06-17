@@ -8,14 +8,14 @@
 2. 使用 AdsPower + Playwright 浏览器自动化
 3. 支持PDF文件上传到 AI Studio（先点击Insert assets按钮，等待激活后上传）
 4. 发送书籍信息到 AI Studio 生成讲稿总结（发送前按两次ESC确保按钮可见）
-5. 支持断点续传，自动检查已生成的总结
+5. 每次启动动态检查已生成的总结（不依赖进度文件）
 6. 保存总结到 /Volumes/dhl/audio/books/en/summary/[uuid].txt
 
 使用方法：
 python generate_book_summary.py --count 10          # 生成10个总结
 python generate_book_summary.py --all               # 生成所有可用的总结
 python generate_book_summary.py --ads-id your_id    # 指定浏览器ID
-python generate_book_summary.py --check-resume      # 检查断点续传状态
+python generate_book_summary.py --check-status      # 检查当前状态
 
 注意：脚本会自动检测 book_pdf_downloader.py 输出的PDF文件并上传到AI Studio
 """
@@ -107,7 +107,6 @@ class BookSummaryGenerator:
         # 目录结构
         self.info_dir = os.path.join(self.books_base_path, "info")
         self.summary_dir = os.path.join(self.books_base_path, "summary")
-        self.progress_file = os.path.join(self.books_base_path, "summary_progress.json")
 
         # 创建目录
         os.makedirs(self.summary_dir, exist_ok=True)
@@ -117,19 +116,21 @@ class BookSummaryGenerator:
         self.browser = None
         self.page = None
 
-        # 进度管理
-        self.progress = self.load_progress()
-
         # 生成讲稿的提示词模板
         self.prompt_template = """
 You are a world-class storyteller and a master book marketer for a highly popular YouTube channel specializing in deep, insightful book summaries. Your audience is intelligent, curious, and looking for their next life-changing read. Your mission is to take the provided book content and transform it into a captivating 30-minute audio script. The final script should be so vivid, profound, and compelling that it creates a powerful urge in the listener to purchase and experience the book firsthand. The total word count should be approximately 4500 words to meet the 30-minute target.
 Your analysis and script must be structured according to the following five-part framework.
 Part 1: The Irresistible Hook (Target length: 0 to 45 seconds, approx. 125 words)
-Your absolute first priority is to seize the audience's attention. Do not start with "In this video, I'm going to summarize...". Instead, open with a powerful, thought-provoking question, a startling statement, a short, relatable anecdote, or a profound paradox that cuts to the very heart of the book's central theme. This hook must be universal enough to grab anyone's attention but specific enough that it feels deeply connected to the book's core message. It should make the listener immediately think, "I need to know the answer to that" or "That's something I've felt but could never put into words."
+Your channel is famous for its unpredictable and gripping openings. To maintain this reputation, you must deliberately vary your opening hooks across different book summaries. Avoid falling into a predictable pattern of always asking a question. Your first priority is to seize the audience's attention with an opening that is custom-crafted for the book's unique soul. Choose one of the following approaches:
+A Startling Statement or Statistic: Drop the listener directly into a surprising reality. A bold, counter-intuitive claim that shatters a common belief. For example: "More than half the people listening to this sentence will not achieve their biggest life goal. Today, we're going to talk about the hidden force that's really in control." This creates immediate intrigue.
+A Short, Evocative Anecdote: Paint a miniature story in just a few sentences. Introduce a character, a setting, a moment of tension or realization. For example: "Imagine a lone ship captain, lost in a raging storm, with only a broken compass for guidance. That captain is you, and the storm is your daily life. But what if I told you there's a map..." This creates an instant emotional connection.
+A Profound Paradox: Present a mental puzzle that feels both strange and true. Two seemingly contradictory ideas that the book will unravel. For example: "The very tools we build to connect us are often what make us feel most alone. How is this possible, and what can we do about it?" This appeals to the listener's intellect.
+A Deeply Personal Question: If you must use a question, make it one that forces immediate introspection, not a generic query. For example: "When was the last time you truly, fundamentally changed your mind about something important? Not just your opinion, but your core belief?"
+The goal is to be unforgettable and to make the listener feel that this summary was made with intent and creativity, not from a template.
 Part 2: The Core Problem and the Grand Promise (Target length: 45 seconds to 3 minutes, approx. 500 words)
-After the hook, immediately introduce the central problem, question, or conflict that the book addresses. Why does this book need to exist? What fundamental human struggle, societal issue, or deep curiosity does it speak to? Frame this in a way that the listener feels personally connected to the stakes. Then, introduce the book and its author as the guide or the source of a profound revelation. Present the book's grand promise: What transformation, understanding, or experience does it offer the reader? This section sets the stage and tells the listener why this 30-minute investment will be worthwhile.
+After the hook, immediately introduce the central problem, question, or conflict that the book addresses. Why does this book need to exist? What fundamental human struggle, societal issue, or deep curiosity does it speak to? Frame this in a way that the listener feels the stakes personally. Then, introduce the book and its author as the guide or the source of a profound revelation. Present the book's grand promise: What transformation, understanding, or experience does it offer the reader? This section sets the stage and tells the listener why this 30-minute investment will be a game-changer.
 Part 3: The Heart of the Matter - The Deep Dive (Target length: 3 minutes to 25 minutes, approx. 3300 words)
-This is the core of your summary. Your approach here must adapt to the genre of the book.
+This is the core of your summary, where your gift as a storyteller shines brightest. Your approach here must adapt to the genre of the book.
 For Non-Fiction (Philosophy, Science, Self-Help, History, etc.):
 Identify the 3 to 5 most powerful, foundational ideas or principles from the book. Do not just list them. For each idea, you must:
 First, clearly explain the concept in a simple, engaging way.
@@ -138,36 +139,16 @@ Third, connect this idea directly to the listener's life. Use rhetorical questio
 For Fiction (Novels, Short Stories) and Narrative Non-Fiction:
 Do not simply list plot points. Your goal is to convey the emotional journey and the atmosphere of the book. Trace the central narrative arc, focusing on the protagonist's development, the moral or philosophical dilemmas they face, and the overarching themes. Evoke the book's unique feeling—is it haunting, thrilling, inspiring, heartbreaking? Capture the tone and style of the author's prose. You can hint at major plot developments and the climax to build tension and intrigue, but you must not reveal critical spoilers that would ruin the reading experience. Focus on the "why" behind the events, not just the "what."
 Part 4: The Unique Essence and Marketing Spark (Target length: 25 minutes to 28 minutes, approx. 450 words)
-Now, step into your role as a master marketer. In this section, you must explicitly address why this book is a must-read. Answer these questions directly in your script: What makes this book radically different from any other book in its category? What unique perspective or feeling does it offer that cannot be found elsewhere? Who is this book for? Be specific. Is it for the ambitious entrepreneur, the person healing from loss, the adventurer at heart, the seeker of truth? Equally important, who is this book NOT for? This honesty builds trust. Conclude this part by articulating the single most valuable takeaway a reader will be left with long after they've finished the last page.
+Now, step fully into your role as a master marketer. Be opinionated and direct. In this section, you must explicitly address why this book is a must-read. Answer these questions directly in your script: What makes this book radically different from any other book in its category? What unique perspective or feeling does it offer that cannot be found elsewhere? Who is this book for? Be specific. Is it for the ambitious entrepreneur, the person healing from loss, the adventurer at heart, the seeker of truth? Equally important, who is this book NOT for? This honesty builds trust and authority. Conclude this part by articulating the single most valuable takeaway a reader will be left with long after they've finished the last page.
 Part 5: The Powerful Call to Action (Target length: 28 minutes to 30 minutes, approx. 125 words)
-End with a powerful, inspiring, and urgent conclusion. Do not just say "the link is in the description." Summarize the book's transformative promise one last time, connecting back to the initial hook. Frame the act of buying and reading the book as an essential next step in the listener's journey of growth, understanding, or entertainment. Use compelling language like, "This summary is just the map; reading the book is the journey itself," or "To truly understand this, you have to let the author's words wash over you." Make the listener feel that they are not just buying a book, but investing in a profound experience. Then, you can deliver the final logistical call to action to like, subscribe, and purchase the book.
-
+End with a powerful, inspiring, and urgent conclusion. Do not just say "the link is in the description." Summarize the book's transformative promise one last time, connecting back to the initial hook. Frame the act of buying and reading the book as an essential next step in the listener's journey of growth, understanding, or entertainment. Use compelling language like, "This summary is just the map; reading the book is the journey itself," or "To truly understand this, you have to let the author's words wash over you." Make the listener feel that they are not just buying a book, but investing in a profound experience. Then, and only then, deliver the final logistical call to action to like, subscribe, and purchase the book.
 Return only a single, continuous block of plain text.
 Do not include any stage directions, sound effects, or parenthetical descriptions of tone or music.
 This text must be directly readable by an audio engine without requiring any further modification.
 Make 100% sure the story is long enough to be a full audiobook, which is at least 30 minutes long.
-*   Ensure the total word count reaches at least 4500 words.
-*   Ensure the total word count reaches at least 4500 words.
+Ensure the total word count reaches at least 4500 words.
+Ensure the total word count reaches at least 4500 words.
 """
-
-    def load_progress(self):
-        """加载进度文件"""
-        if os.path.exists(self.progress_file):
-            try:
-                with open(self.progress_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                print(f"⚠️ 加载进度文件失败: {e}")
-
-        return {"completed": [], "failed": [], "total_processed": 0}
-
-    def save_progress(self):
-        """保存进度文件"""
-        try:
-            with open(self.progress_file, "w", encoding="utf-8") as f:
-                json.dump(self.progress, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"⚠️ 保存进度文件失败: {e}")
 
     def load_book_info_list(self):
         """加载所有书籍信息"""
@@ -202,7 +183,7 @@ Make 100% sure the story is long enough to be a full audiobook, which is at leas
         return book_list
 
     def get_existing_summaries(self):
-        """获取已存在的总结"""
+        """获取已存在的总结 - 动态检查实际文件"""
         existing_uuids = set()
 
         if os.path.exists(self.summary_dir):
@@ -220,39 +201,55 @@ Make 100% sure the story is long enough to be a full audiobook, which is at leas
                     try:
                         if os.path.getsize(summary_file) > 1000:
                             existing_uuids.add(uuid_val)
+                            if self.debug:
+                                print(f"✅ 发现有效总结: {uuid_val}")
+                        else:
+                            if self.debug:
+                                print(f"⚠️ 跳过过小的文件: {uuid_val}")
                     except:
-                        pass
+                        if self.debug:
+                            print(f"⚠️ 检查文件失败: {uuid_val}")
 
-        print(f"📊 找到 {len(existing_uuids)} 个已存在的总结")
+        print(f"📊 找到 {len(existing_uuids)} 个已存在的有效总结")
         return existing_uuids
 
     def filter_books_to_process(self, book_list, max_count=None):
-        """筛选需要处理的书籍（断点续传+PDF检查）"""
+        """筛选需要处理的书籍（只依赖实际文件检查）"""
         existing_summaries = self.get_existing_summaries()
-        completed_uuids = set(self.progress.get("completed", []))
 
         # 过滤已完成的书籍和没有PDF的书籍
         books_to_process = []
         books_without_pdf = 0
+        books_already_done = 0
 
         for book in book_list:
             uuid_val = book.get("uuid")
-            if (
-                uuid_val
-                and uuid_val not in existing_summaries
-                and uuid_val not in completed_uuids
-            ):
-                # 检查是否有对应的PDF文件
-                if self.check_pdf_file_exists(book):
-                    books_to_process.append(book)
-                else:
-                    books_without_pdf += 1
+            if not uuid_val:
+                continue
+
+            # 检查是否已存在总结
+            if uuid_val in existing_summaries:
+                books_already_done += 1
+                if self.debug:
+                    print(f"⏭️  跳过已完成: {book.get('title', uuid_val)}")
+                continue
+
+            # 检查是否有对应的PDF文件
+            if self.check_pdf_file_exists(book):
+                books_to_process.append(book)
+                if self.debug:
+                    print(f"🎯 待处理: {book.get('title', uuid_val)}")
+            else:
+                books_without_pdf += 1
+                if self.debug:
+                    print(f"📄 无PDF: {book.get('title', uuid_val)}")
 
         # 限制数量
         if max_count and len(books_to_process) > max_count:
             books_to_process = books_to_process[:max_count]
 
         print(f"🎯 筛选出 {len(books_to_process)} 本书需要生成总结")
+        print(f"✅ 已完成 {books_already_done} 本书的总结")
         if books_without_pdf > 0:
             print(f"⏭️  跳过 {books_without_pdf} 本没有PDF文件的书籍")
         return books_to_process
@@ -318,7 +315,7 @@ Make 100% sure the story is long enough to be a full audiobook, which is at leas
             print(f"⚠️ 清理浏览器资源时出错: {e}")
 
     def wait_for_ai_completion(self):
-        """等待AI运行完成 - 参考ai_studio_bot.py的实现"""
+        """等待AI运行完成 - 支持internal error自动重试"""
         print("🔄 正在等待AI运行完成...")
 
         # 停止按钮选择器
@@ -338,12 +335,21 @@ Make 100% sure the story is long enough to be a full audiobook, which is at leas
             'div:has-text("internal error")',
         ]
 
+        # Rerun按钮选择器
+        rerun_selectors = [
+            'button[name="rerun-button"]',
+            'button[aria-label*="Rerun"]',
+            'button[mattooltip="Rerun"]',
+            "button.rerun-button",
+        ]
+
         # 等待AI开始运行
         self.page.wait_for_timeout(3000)
 
         # 监控运行状态
         check_count = 0
         consecutive_no_stop_button = 0
+        rerun_attempted = False  # 标记是否已经尝试过rerun
 
         while True:
             check_count += 1
@@ -353,8 +359,29 @@ Make 100% sure the story is long enough to be a full audiobook, which is at leas
             for error_selector in error_selectors:
                 try:
                     if self.page.locator(error_selector).count() > 0:
-                        print("❌ 检测到AI生成错误")
-                        raise Exception("AI生成过程中出现internal error")
+                        print("❌ 检测到AI生成错误 (internal error)")
+
+                        if not rerun_attempted:
+                            # 第一次遇到错误，尝试rerun
+                            rerun_attempted = True
+                            if self.try_rerun_on_error():
+                                print("🔄 Rerun成功，继续等待AI完成...")
+                                check_count = 0  # 重置计数器
+                                consecutive_no_stop_button = 0
+                                self.page.wait_for_timeout(5000)  # 等待rerun开始
+                                break  # 跳出错误检查循环，继续监控
+                            else:
+                                print("❌ Rerun失败，跳过该书籍")
+                                raise Exception(
+                                    "AI生成过程中出现internal error且rerun失败"
+                                )
+                        else:
+                            # 已经尝试过rerun但还是失败，直接跳过
+                            print("❌ Rerun后仍然出现错误，跳过该书籍")
+                            raise Exception(
+                                "AI生成过程中出现internal error，rerun后依然失败"
+                            )
+
                 except Exception as e:
                     if "AI生成过程中出现internal error" in str(e):
                         raise e
@@ -382,15 +409,89 @@ Make 100% sure the story is long enough to be a full audiobook, which is at leas
                     print("✅ AI运行完成")
                     break
 
-            # 安全超时
-            if check_count >= 120:  # 约10分钟
-                print("⏰ AI生成超时")
+            # 安全超时 - 如果已经rerun过，给更多时间（10分钟）
+            max_checks = 240 if rerun_attempted else 120  # 20分钟 vs 10分钟
+            if check_count >= max_checks:
+                timeout_msg = "⏰ AI生成超时"
+                if rerun_attempted:
+                    timeout_msg += " (已包含rerun重试时间)"
+                print(timeout_msg)
                 raise Exception("AI生成超时")
 
             time.sleep(5)
 
         # 额外等待确保完成
         time.sleep(3)
+
+    def try_rerun_on_error(self):
+        """当遇到internal error时尝试点击rerun按钮"""
+        print("🔄 尝试点击Rerun按钮重新生成...")
+
+        # Rerun按钮选择器
+        rerun_selectors = [
+            'button[name="rerun-button"]',
+            'button[aria-label*="Rerun"]',
+            'button[mattooltip="Rerun"]',
+            "button.rerun-button",
+            'button:has-text("Rerun")',
+        ]
+
+        try:
+            # 寻找最后一个rerun按钮（最新的错误）
+            rerun_button = None
+            for selector in rerun_selectors:
+                try:
+                    elements = self.page.locator(selector)
+                    if elements.count() > 0:
+                        # 选择最后一个rerun按钮
+                        rerun_button = elements.last
+                        print(
+                            f"✅ 找到Rerun按钮，使用选择器: {selector} (共{elements.count()}个，选择最后一个)"
+                        )
+                        break
+                except:
+                    continue
+
+            if not rerun_button:
+                print("❌ 未找到Rerun按钮")
+                return False
+
+            # 点击rerun按钮
+            print("🔘 点击Rerun按钮...")
+            rerun_button.click()
+            print("✅ 已点击Rerun按钮")
+
+            # 等待一下让重新生成开始
+            self.page.wait_for_timeout(3000)
+
+            # 检查是否成功开始重新生成（检查停止按钮是否出现）
+            stop_selectors = [
+                'rect[class*="stoppable-stop"]',
+                'button[aria-label*="stop"]',
+                'button[aria-label*="Stop"]',
+                '[class*="stop-button"]',
+                '[class*="stoppable"]',
+            ]
+
+            rerun_started = False
+            for selector in stop_selectors:
+                try:
+                    if self.page.locator(selector).count() > 0:
+                        rerun_started = True
+                        print("✅ Rerun成功启动，AI开始重新生成")
+                        break
+                except:
+                    continue
+
+            if rerun_started:
+                return True
+            else:
+                print("⚠️ Rerun可能未成功启动")
+                return False
+
+        except Exception as e:
+            print(f"❌ 点击Rerun按钮失败: {e}")
+            return False
 
     def extract_generated_summary(self):
         """提取生成的总结内容"""
@@ -827,11 +928,6 @@ Make 100% sure the story is long enough to be a full audiobook, which is at leas
                 print(f"✅ 总结已保存: {summary_file}")
                 print(f"   内容长度: {len(content)} 字符")
 
-                # 更新进度
-                self.progress["completed"].append(uuid_val)
-                self.progress["total_processed"] += 1
-                self.save_progress()
-
                 return True
             else:
                 print("❌ 未能提取到生成的内容")
@@ -839,11 +935,6 @@ Make 100% sure the story is long enough to be a full audiobook, which is at leas
 
         except Exception as e:
             print(f"❌ 生成总结失败: {e}")
-            if uuid_val not in self.progress["failed"]:
-                self.progress["failed"].append(
-                    {"uuid": uuid_val, "title": title, "error": str(e)}
-                )
-                self.save_progress()
             return False
 
     def generate_summaries(self, max_count=None):
@@ -887,7 +978,7 @@ Make 100% sure the story is long enough to be a full audiobook, which is at leas
                         time.sleep(wait_time)
 
                 except KeyboardInterrupt:
-                    print("⏹️ 用户中断，正在保存进度...")
+                    print("⏹️ 用户中断，程序停止")
                     break
                 except Exception as e:
                     print(f"❌ 处理书籍时出错: {e}")
@@ -901,9 +992,9 @@ Make 100% sure the story is long enough to be a full audiobook, which is at leas
         finally:
             self.cleanup_browser(http)
 
-    def check_resume_status(self):
-        """检查断点续传状态"""
-        print("📊 断点续传状态检查")
+    def check_current_status(self):
+        """检查当前状态 - 不再依赖进度文件"""
+        print("📊 当前状态检查")
         print(f"📁 基础路径: {self.books_base_path}")
 
         book_list = self.load_book_info_list()
@@ -934,17 +1025,16 @@ Make 100% sure the story is long enough to be a full audiobook, which is at leas
             ):
                 processable_books.append(book)
 
-        print(f"⏳ 可处理数量: {len(processable_books)} (有PDF且未生成总结)")
+        print(f"⏳ 待处理数量: {len(processable_books)} (有PDF且未生成总结)")
 
-        if self.progress.get("failed"):
-            print(f"❌ 失败数量: {len(self.progress['failed'])}")
-            print("失败的书籍:")
-            for failed in self.progress["failed"][:5]:  # 只显示前5个
+        if len(processable_books) > 0:
+            print("\n📋 待处理书籍示例 (前5本):")
+            for i, book in enumerate(processable_books[:5]):
                 print(
-                    f"   - {failed.get('title', 'Unknown')} ({failed.get('uuid', 'No UUID')})"
+                    f"   {i+1}. {book.get('title', 'Unknown')} - {book.get('author', 'Unknown')}"
                 )
-            if len(self.progress["failed"]) > 5:
-                print(f"   ... 还有 {len(self.progress['failed']) - 5} 个")
+            if len(processable_books) > 5:
+                print(f"   ... 还有 {len(processable_books) - 5} 本")
 
 
 def main():
@@ -957,7 +1047,7 @@ def main():
   python generate_book_summary.py --count 10          # 生成10个总结
   python generate_book_summary.py --all               # 生成所有可用的总结  
   python generate_book_summary.py --ads-id your_id    # 指定浏览器ID
-  python generate_book_summary.py --check-resume      # 检查断点续传状态
+  python generate_book_summary.py --check-status      # 检查当前状态
 
 注意：脚本会自动检测并使用 book_pdf_downloader.py 下载的PDF文件
         """,
@@ -970,7 +1060,7 @@ def main():
     )
     parser.add_argument("--debug", "-d", action="store_true", help="启用调试模式")
     parser.add_argument(
-        "--check-resume", action="store_true", help="检查断点续传状态（不执行生成）"
+        "--check-status", action="store_true", help="检查当前状态（不执行生成）"
     )
 
     args = parser.parse_args()
@@ -979,8 +1069,8 @@ def main():
     generator = BookSummaryGenerator(ads_id=args.ads_id, debug=args.debug)
 
     # 检查断点续传状态
-    if args.check_resume:
-        generator.check_resume_status()
+    if args.check_status:
+        generator.check_current_status()
         return
 
     # 确定生成数量

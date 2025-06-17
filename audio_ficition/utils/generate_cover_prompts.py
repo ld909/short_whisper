@@ -1,37 +1,49 @@
 """
-多主题故事封面图片生成提示词工具
+YouTube封面AI绘图提示词生成工具
 
 功能说明:
-此脚本用于根据不同主题故事内容生成文生图的封面页提示词。
-支持的主题：scifi、thriller、horror、fantasy、romance
-脚本使用UNI API，GPT-4.1-mini模型生成：
-1. 体现女主角（外星人，性感年轻，大胸身材，人形面貌，特殊肤色）的魅力
-2. 体现男主角的特征
-3. 根据故事情节设计的背景和场景
-4. 动人且具有吸引力的视觉元素
+此脚本基于故事描述内容，使用Google Gemini 2.5 Flash模型生成专业的YouTube视频封面AI绘图提示词。
+脚本采用病毒式封面设计理念，专注于创造高点击率的视觉元素。
 
-输入:
-- 故事文本内容（来自ai_studio_bot.py的输出）
-- 故事文件路径:
-  * Intel Mac: /Volumes/dhl/audio/{theme}/full_story/[故事索引].txt
-  * Apple Silicon: /Users/donghaoliu/Documents/audio/{theme}/full_story/[故事索引].txt
+核心特性:
+• 支持的主题：scifi（科幻）、thriller（惊悚）、horror（恐怖）、fantasy（奇幻）、romance（浪漫）
+• 采用YouTube封面策略：极端情绪表达、关键戏剧瞬间、简洁有力的视觉语言
+• 模型：Google Gemini 2.5 Flash Preview (gemini-2.5-flash-preview-04-17)
+• 智能系统指令：根据不同主题调整视觉风格和重点元素
+• 生成简洁高效的提示词（3-4句话），避免系统报错
 
-输出:
-- 封面提示词文件:
-  * Intel Mac: /Volumes/dhl/audio/{theme}/cover_prompts/[故事索引].txt
-  * Apple Silicon: /Users/donghaoliu/Documents/audio/{theme}/cover_prompts/[故事索引].txt
+输入源文件:
+• 故事描述文件（由story_description_generator.py生成）
+• 文件路径结构:
+  - Intel Mac: /Volumes/dhl/audio/{theme}/description/{索引}.txt
+  - Apple Silicon: /Users/donghaoliu/Documents/audio/{theme}/description/{索引}.txt
+  - Linux/Ubuntu: /media/dhl/audio/{theme}/description/{索引}.txt
+
+输出目标文件:
+• 封面提示词文件:
+  - Intel Mac: /Volumes/dhl/audio/{theme}/cover_prompts/{索引}.txt
+  - Apple Silicon: /Users/donghaoliu/Documents/audio/{theme}/cover_prompts/{索引}.txt
+  - Linux/Ubuntu: /media/dhl/audio/{theme}/cover_prompts/{索引}.txt
 
 使用方法:
 1. 处理所有主题: python generate_cover_prompts.py
-2. 处理指定主题: python generate_cover_prompts.py --theme scifi
-3. 处理多个主题: python generate_cover_prompts.py --theme scifi thriller
-4. 强制重新生成: python generate_cover_prompts.py --theme scifi -f
-5. 指定故事索引范围: python generate_cover_prompts.py --theme scifi --start 1 --end 10
+2. 指定单个主题: python generate_cover_prompts.py --theme scifi
+3. 指定多个主题: python generate_cover_prompts.py --theme scifi thriller horror
+4. 强制重新生成: python generate_cover_prompts.py --theme fantasy -f
+5. 指定索引范围: python generate_cover_prompts.py --theme romance --start 5 --end 15
+6. 组合参数使用: python generate_cover_prompts.py --theme scifi thriller -f --start 1 --end 20
 
-注意:
-- 需要设置环境变量UNI_API_KEY以提供OpenAI API密钥
-- 脚本支持断点续传，中断后可从上次停止的位置继续处理
-- 支持的主题：scifi、thriller、horror、fantasy、romance
+前置条件:
+• 环境变量UNI_API_KEY: 必须设置有效的API密钥
+• 先决脚本: 需要运行story_description_generator.py生成故事描述文件
+• 网络环境: 需要稳定的网络连接访问Gemini API
+
+特性说明:
+• 断点续传: 支持中断后继续处理，自动跳过已生成的文件
+• 智能重试: API调用失败时自动重试，最多3次
+• 进度显示: 使用tqdm显示处理进度和状态
+• 错误处理: 详细的错误日志和异常处理机制
+• 跨平台: 自动识别Mac芯片类型和操作系统，适配路径结构
 """
 
 import os
@@ -39,7 +51,8 @@ import sys
 import time
 import argparse
 import platform
-from openai import OpenAI
+from google import genai
+from google.genai import types
 import glob
 import re
 from tqdm import tqdm
@@ -79,76 +92,63 @@ def get_base_paths(theme):
         base_path = f"/media/dhl/audio/{theme}"
 
     return {
-        "story_dir": os.path.join(base_path, "full_story"),
+        "description_dir": os.path.join(base_path, "description"),
         "cover_dir": os.path.join(base_path, "cover_prompts"),
     }
 
 
-def setup_openai_client():
-    """设置OpenAI客户端并验证API密钥"""
+def setup_gemini_client():
+    """设置Google Gemini客户端并验证API密钥"""
     api_key = os.environ.get("UNI_API_KEY")
 
     if not api_key:
-        print("错误: 未找到OpenAI API密钥")
+        print("错误: 未找到API密钥")
         print("请设置环境变量UNI_API_KEY")
         print("例如: export UNI_API_KEY='your-api-key'")
         sys.exit(1)
 
     try:
-        # 确保只传入支持的参数
-        client = OpenAI(api_key=api_key, base_url="https://api.uniapi.io/v1")
+        client = genai.Client(
+            http_options=types.HttpOptions(base_url="https://api.uniapi.io/gemini"),
+            api_key=api_key,
+        )
         return client
     except Exception as e:
-        print(f"初始化OpenAI客户端时出错: {e}")
+        print(f"初始化Gemini客户端时出错: {e}")
         print("这可能是由于以下原因:")
-        print("1. OpenAI库版本不兼容，请尝试: pip install openai --upgrade")
+        print("1. Google GenAI库版本不兼容，请尝试: pip install google-genai")
         print("2. API密钥格式不正确")
         print("3. 网络连接问题")
         sys.exit(1)
 
 
-def generate_cover_prompt(client, story_content, story_index, max_retries=3):
-    """使用OpenAI的GPT模型生成封面图片提示词，失败时自动重试"""
-    if not story_content.strip():
-        print(f"警告: 故事 {story_index} 的内容为空，无法生成封面提示词")
+def generate_cover_prompt(client, description_content, story_index, max_retries=3):
+    """使用Google Gemini模型生成封面图片提示词，失败时自动重试"""
+    if not description_content.strip():
+        print(f"警告: 故事 {story_index} 的描述为空，无法生成封面提示词")
         return ""
+
+    budget = 1024  # Thinking budget for Gemini
 
     for attempt in range(max_retries):
         try:
-            system_prompt = """你是一位专业的视觉故事叙述师和 AI 艺术总监，深谙 YouTube 平台的用户心理。你的核心任务是阅读我提供的完整故事（科幻、恐怖、惊悚、奇幻等类型），并为其创作一个能作为 YouTube 视频封面的"文生图"（Text-to-Image）提示词。
-你的输出必须严格遵守以下原则和格式：
-一、核心目标：
-生成的提示词必须旨在创造一个**"高点击率"**的封面。这意味着图像需要具备以下特质：
-视觉冲击力 (抓眼球): 画面要有强烈的戏剧性、动态感或神秘感。使用高对比度的光影、鲜明的色彩或引人注目的构图。
-激发好奇心 (悬念感): 聚焦于故事中最具悬念、最不寻常或最关键的"一瞬间"。只展示问题或危机，不展示答案或结局，引诱观众点击一探究竟。
-高度美学 (好看): 追求电影级的画面质感、专业的艺术风格和精致的细节，让封面看起来高质量、不廉价。
-焦点清晰: 图像必须有一个明确的视觉焦点（一个角色、一个物体或一个奇观），避免画面元素过于杂乱。
-贴合类型: 提示词的风格必须与故事类型（Sci-fi, Horror, Thriller, Fantasy）的经典视觉元素高度一致。
-二、提示词构成要素：
-你的提示词必须像一位导演在给特效团队下达指令。请包含以下部分的关键描述：
-主体与动作 (Subject & Action): 描述画面的核心人物/怪物/物体，以及他们正在做的、或即将发生的关键动作。
-场景与环境 (Setting & Environment): 描绘故事发生的标志性环境，突出其氛围。
-光影与色彩 (Lighting & Color): 这是营造氛围的灵魂。明确指出光线来源（如霓虹灯、手电筒光束、诡异的月光）、色调（如赛博朋克的蓝紫色、恐怖片的阴冷色调）。
-构图与视角 (Composition & Angle): 指定镜头视角，例如"特写镜头(close-up shot)"、"广角镜头(wide-angle shot)"、"从低角度仰视(low-angle shot)"，以增强戏剧性。
-艺术风格与细节 (Art Style & Details): 指定最终图像的风格。例如："照片级真实感(photorealistic)"、"电影感(cinematic)"、"数字绘画(digital painting)"、"概念艺术(concept art)"、"虚幻引擎渲染(unreal engine)"、"8K"、"细节丰富(intricate details)"。
-三、输出格式：
-针对每一个故事，只生成一个最终的提示词。
-这个提示词由 2 到 3 个连贯的描述性句子组成。
-不要对故事进行任何总结或分析。
-不要在提示词前后添加任何解释性文字，如"这是给你的提示词："。
-直接输出最终可用于 AI 绘画工具的提示词文本。
-你的使命是： 运用你的创造力，将文字故事的灵魂，精准地转化为一幅能瞬间捕获观众眼球的视觉杰作。"""
-
-            completion = client.chat.completions.create(
-                model="gpt-4.1-mini",
-                max_tokens=500,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"故事内容：\n\n{story_content}"},
-                ],
-                timeout=30,
+            response = client.models.generate_content(
+                model="gemini-2.5-pro-preview-06-05",
+                contents=f"故事描述：\n\n{description_content}",
+                config=types.GenerateContentConfig(
+                    system_instruction=[
+                        "你是一位顶级的YouTube内容策略专家和病毒式封面设计大师。你的核心任务是，根据我提供的故事描述，创作一个用于AI文生图的、能够生成极具吸引力的YouTube视频封面的提示词。你创作的提示词必须严格遵循以下四大原则，以确保封面能够获得最高点击率：",
+                        "第一，极端情绪与冲突：画面必须捕捉并放大一个极端的情绪，例如极度的震惊、狂喜、恐惧或悲伤。或者，画面要展现一个强烈的视觉冲突，比如巨大与渺小、光明与黑暗、整洁与混乱的强烈对比。",
+                        "第二，聚焦关键瞬间：从故事描述中，精准提炼出最具戏剧张力、悬念最强或最出人意料的一瞬间。这个瞬间应该让观众立刻好奇接下来发生了什么，而不是故事的结局。永远展示问题或过程，而不是答案。",
+                        "第三，视觉语言简洁有力：构图必须简洁，有一个绝对的视觉焦点，通常是一个人物的面部特写或一个关键物体。背景要服务于主体，避免不必要的元素分散注意力。色彩要鲜艳、饱和度高，光线要有戏剧感，比如强烈的逆光、聚光灯效果或神秘的环境光。",
+                        "提示词不能太长，不然系统会报错，建议3-4句话就行了，就足够好了。信息密度增加。直接返回你的提示词，不用多余信息，不用添加其他说明。",
+                    ],
+                    thinking_config=types.ThinkingConfig(
+                        thinking_budget=budget, include_thoughts=True
+                    ),
+                ),
             )
-            result = completion.choices[0].message.content.strip()
+            result = response.text.strip()
             print(f"✅ 已成功生成故事 {story_index} 的封面提示词")
             return result
         except Exception as e:
@@ -163,18 +163,18 @@ def generate_cover_prompt(client, story_content, story_index, max_retries=3):
 
 
 def get_existing_stories(theme):
-    """获取已经生成的故事文件列表"""
+    """获取已经生成的故事描述文件列表"""
     paths = get_base_paths(theme)
-    story_dir = paths["story_dir"]
+    description_dir = paths["description_dir"]
 
-    if not os.path.exists(story_dir):
-        print(f"故事目录不存在: {story_dir}")
+    if not os.path.exists(description_dir):
+        print(f"故事描述目录不存在: {description_dir}")
         return {}
 
-    story_files = glob.glob(os.path.join(story_dir, "*.txt"))
-    stories = {}
+    description_files = glob.glob(os.path.join(description_dir, "*.txt"))
+    descriptions = {}
 
-    for file_path in story_files:
+    for file_path in description_files:
         basename = os.path.basename(file_path)
         # 排除以点开头的文件（如.DS_Store等）
         if basename.startswith("."):
@@ -185,12 +185,12 @@ def get_existing_stories(theme):
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read().strip()
-                if content:  # 只包含有内容的故事
-                    stories[story_index] = content
+                if content:  # 只包含有内容的描述
+                    descriptions[story_index] = content
             except Exception as e:
-                print(f"读取故事文件 {file_path} 时出错: {e}")
+                print(f"读取故事描述文件 {file_path} 时出错: {e}")
 
-    return stories
+    return descriptions
 
 
 def get_existing_cover_prompts(theme):
@@ -255,47 +255,30 @@ def save_cover_prompt(theme, story_index, prompt_content):
         return False
 
 
-def get_theme_system_prompt(theme):
-    """根据主题获取相应的系统提示词"""
-    base_prompt = """你是一位专业的视觉故事叙述师和 AI 艺术总监，深谙 YouTube 平台的用户心理。你的核心任务是阅读我提供的完整故事，并为其创作一个能作为 YouTube 视频封面的"文生图"（Text-to-Image）提示词。
-你的输出必须严格遵守以下原则和格式：
-一、核心目标：
-生成的提示词必须旨在创造一个**"高点击率"**的封面。这意味着图像需要具备以下特质：
-视觉冲击力 (抓眼球): 画面要有强烈的戏剧性、动态感或神秘感。使用高对比度的光影、鲜明的色彩或引人注目的构图。
-激发好奇心 (悬念感): 聚焦于故事中最具悬念、最不寻常或最关键的"一瞬间"。只展示问题或危机，不展示答案或结局，引诱观众点击一探究竟。
-高度美学 (好看): 追求电影级的画面质感、专业的艺术风格和精致的细节，让封面看起来高质量、不廉价。
-焦点清晰: 图像必须有一个明确的视觉焦点（一个角色、一个物体或一个奇观），避免画面元素过于杂乱。"""
+def get_theme_system_instruction(theme):
+    """根据主题获取相应的系统指令"""
+    base_instruction = [
+        "你是一位顶级的YouTube内容策略专家和病毒式封面设计大师。你的核心任务是，根据我提供的故事描述，创作一个用于AI文生图的、能够生成极具吸引力的YouTube视频封面的提示词。你创作的提示词必须严格遵循以下原则，以确保封面能够获得最高点击率：",
+        "第一，极端情绪与冲突：画面必须捕捉并放大一个极端的情绪，例如极度的震惊、狂喜、恐惧或悲伤。或者，画面要展现一个强烈的视觉冲突，比如巨大与渺小、光明与黑暗、整洁与混乱的强烈对比。",
+        "第二，聚焦关键瞬间：从故事描述中，精准提炼出最具戏剧张力、悬念最强或最出人意料的一瞬间。这个瞬间应该让观众立刻好奇接下来发生了什么，而不是故事的结局。永远展示问题或过程，而不是答案。",
+        "第三，视觉语言简洁有力：构图必须简洁，有一个绝对的视觉焦点，通常是一个人物的面部特写或一个关键物体。背景要服务于主体，避免不必要的元素分散注意力。色彩要鲜艳、饱和度高，光线要有戏剧感，比如强烈的逆光、聚光灯效果或神秘的环境光。",
+    ]
 
     theme_specific = {
-        "scifi": "贴合科幻类型: 提示词必须包含未来科技、外星元素、太空场景、机器人、高科技装备等科幻视觉元素。体现女主角（外星人，性感年轻，大胸身材，人形面貌，特殊肤色）的魅力。",
-        "thriller": "贴合惊悚类型: 提示词必须包含紧张氛围、悬疑元素、阴暗环境、危险情境等惊悚视觉元素。重点营造紧张和不安的氛围。",
-        "horror": "贴合恐怖类型: 提示词必须包含恐怖氛围、诡异元素、黑暗环境、恐怖生物等恐怖视觉元素。重点营造恐惧和惊悚的氛围。",
-        "fantasy": "贴合奇幻类型: 提示词必须包含魔法元素、奇幻生物、神秘环境、魔法装备等奇幻视觉元素。重点营造神秘和奇幻的氛围。",
-        "romance": "贴合浪漫类型: 提示词必须包含浪漫氛围、优美环境、情感表达、温馨场景等浪漫视觉元素。重点营造温馨和浪漫的氛围。",
+        "scifi": "特别针对科幻主题：重点突出未来科技、外星元素、太空场景等科幻视觉元素，体现女主角（外星人，性感年轻，大胸身材，人形面貌，特殊肤色）的魅力。",
+        "thriller": "特别针对惊悚主题：重点营造紧张氛围、悬疑元素、阴暗环境、危险情境等惊悚视觉元素。",
+        "horror": "特别针对恐怖主题：重点营造恐怖氛围、诡异元素、黑暗环境、恐怖生物等恐怖视觉元素。",
+        "fantasy": "特别针对奇幻主题：重点突出魔法元素、奇幻生物、神秘环境、魔法装备等奇幻视觉元素。",
+        "romance": "特别针对浪漫主题：重点营造浪漫氛围、优美环境、情感表达、温馨场景等浪漫视觉元素。",
     }
 
-    continuation = """
-二、提示词构成要素：
-你的提示词必须像一位导演在给特效团队下达指令。请包含以下部分的关键描述：
-主体与动作 (Subject & Action): 描述画面的核心人物/怪物/物体，以及他们正在做的、或即将发生的关键动作。
-场景与环境 (Setting & Environment): 描绘故事发生的标志性环境，突出其氛围。
-光影与色彩 (Lighting & Color): 这是营造氛围的灵魂。明确指出光线来源、色调搭配。
-构图与视角 (Composition & Angle): 指定镜头视角，例如"特写镜头(close-up shot)"、"广角镜头(wide-angle shot)"、"从低角度仰视(low-angle shot)"，以增强戏剧性。
-艺术风格与细节 (Art Style & Details): 指定最终图像的风格。例如："照片级真实感(photorealistic)"、"电影感(cinematic)"、"数字绘画(digital painting)"、"概念艺术(concept art)"、"虚幻引擎渲染(unreal engine)"、"8K"、"细节丰富(intricate details)"。
-三、输出格式：
-针对每一个故事，只生成一个最终的提示词。
-这个提示词由 2 到 3 个连贯的描述性句子组成。
-不要对故事进行任何总结或分析。
-不要在提示词前后添加任何解释性文字，如"这是给你的提示词："。
-直接输出最终可用于 AI 绘画工具的提示词文本。
-你的使命是： 运用你的创造力，将文字故事的灵魂，精准地转化为一幅能瞬间捕获观众眼球的视觉杰作。"""
-
-    return (
-        base_prompt
-        + "\n"
-        + theme_specific.get(theme, theme_specific["scifi"])
-        + continuation
+    instruction = base_instruction.copy()
+    instruction.append(theme_specific.get(theme, theme_specific["scifi"]))
+    instruction.append(
+        "提示词不能太长，不然系统会报错，建议3-4句话就行了，就足够好了，信息密度增加。直接返回你的提示词，不用多余信息。"
     )
+
+    return instruction
 
 
 def process_stories_for_theme(
@@ -304,20 +287,21 @@ def process_stories_for_theme(
     """处理指定主题的所有故事，生成封面提示词"""
     print(f"\n=== 🎨 开始处理 {theme.upper()} 主题 ===")
 
-    # 获取所有已存在的故事
-    stories = get_existing_stories(theme)
+    # 获取所有已存在的故事描述
+    descriptions = get_existing_stories(theme)
 
-    if not stories:
-        print(f"未找到 {theme} 主题的任何故事文件")
+    if not descriptions:
+        print(f"未找到 {theme} 主题的任何故事描述文件")
+        print(f"请先运行 story_description_generator.py 生成故事描述")
         return {"success": 0, "failure": 0, "total": 0}
 
     # 获取已存在的封面提示词
     existing_prompts = get_existing_cover_prompts(theme)
 
     # 过滤需要处理的故事
-    stories_to_process = {}
+    descriptions_to_process = {}
 
-    for story_index, content in stories.items():
+    for story_index, content in descriptions.items():
         # 应用索引范围过滤
         if start_index is not None and story_index < start_index:
             continue
@@ -326,36 +310,38 @@ def process_stories_for_theme(
 
         # 检查是否需要重新生成
         if force or story_index not in existing_prompts:
-            stories_to_process[story_index] = content
+            descriptions_to_process[story_index] = content
 
-    if not stories_to_process:
+    if not descriptions_to_process:
         print(f"{theme} 主题：所有指定范围内的故事都已有封面提示词")
         return {"success": 0, "failure": 0, "total": 0}
 
     print(f"\n=== 📊 {theme} 主题封面提示词生成分析 ===")
-    print(f"总故事数量: {len(stories)}")
+    print(f"总故事描述数量: {len(descriptions)}")
     print(f"已有封面提示词: {len(existing_prompts)}")
-    print(f"需要处理的故事: {len(stories_to_process)}")
-    print(f"处理的故事索引: {sorted(stories_to_process.keys())}")
+    print(f"需要处理的故事: {len(descriptions_to_process)}")
+    print(f"处理的故事索引: {sorted(descriptions_to_process.keys())}")
 
     # 统计变量
     success_count = 0
     failure_count = 0
 
-    # 获取主题相关的系统提示词
-    system_prompt = get_theme_system_prompt(theme)
+    # 获取主题相关的系统指令
+    system_instruction = get_theme_system_instruction(theme)
 
     # 处理每个故事
-    with tqdm(total=len(stories_to_process), desc=f"生成{theme}封面提示词") as pbar:
-        for story_index in sorted(stories_to_process.keys()):
-            content = stories_to_process[story_index]
+    with tqdm(
+        total=len(descriptions_to_process), desc=f"生成{theme}封面提示词"
+    ) as pbar:
+        for story_index in sorted(descriptions_to_process.keys()):
+            content = descriptions_to_process[story_index]
 
             print(f"\n=== 处理 {theme} 故事 {story_index} ===")
-            print(f"故事内容长度: {len(content)} 字符")
+            print(f"故事描述长度: {len(content)} 字符")
 
             # 生成封面提示词
             prompt = generate_cover_prompt_with_theme(
-                client, content, story_index, system_prompt
+                client, content, story_index, system_instruction
             )
 
             if prompt:
@@ -381,30 +367,33 @@ def process_stories_for_theme(
     return {
         "success": success_count,
         "failure": failure_count,
-        "total": len(stories_to_process),
+        "total": len(descriptions_to_process),
     }
 
 
 def generate_cover_prompt_with_theme(
-    client, story_content, story_index, system_prompt, max_retries=3
+    client, description_content, story_index, system_instruction, max_retries=3
 ):
-    """使用OpenAI的GPT模型生成封面图片提示词，失败时自动重试"""
-    if not story_content.strip():
-        print(f"警告: 故事 {story_index} 的内容为空，无法生成封面提示词")
+    """使用Google Gemini模型生成封面图片提示词，失败时自动重试"""
+    if not description_content.strip():
+        print(f"警告: 故事 {story_index} 的描述为空，无法生成封面提示词")
         return ""
+
+    budget = 1024  # Thinking budget for Gemini
 
     for attempt in range(max_retries):
         try:
-            completion = client.chat.completions.create(
-                model="gpt-4.1-mini",
-                max_tokens=500,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"故事内容：\n\n{story_content}"},
-                ],
-                timeout=30,
+            response = client.models.generate_content(
+                model="gemini-2.5-flash-preview-04-17",
+                contents=f"故事描述：\n\n{description_content}",
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    thinking_config=types.ThinkingConfig(
+                        thinking_budget=budget, include_thoughts=True
+                    ),
+                ),
             )
-            result = completion.choices[0].message.content.strip()
+            result = response.text.strip()
             print(f"✅ 已成功生成故事 {story_index} 的封面提示词")
             return result
         except Exception as e:
@@ -450,7 +439,7 @@ def main():
     """主函数"""
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(
-        description="根据多主题故事内容生成文生图封面提示词"
+        description="根据多主题故事描述生成文生图封面提示词"
     )
 
     # 添加命令行参数
@@ -490,14 +479,15 @@ def main():
             print("❌ 错误：索引必须大于 0")
             return
 
-    print("🎨 多主题故事封面提示词生成器")
+    print("🎨 多主题故事封面提示词生成器 (Google Gemini)")
     print("=" * 50)
     print(f"支持的主题: {', '.join(SUPPORTED_THEMES)}")
     print(f"本次处理的主题: {', '.join(args.theme)}")
+    print("💡 注意：请确保已运行 story_description_generator.py 生成故事描述")
 
-    # 设置OpenAI客户端
-    client = setup_openai_client()
-    print("✅ OpenAI客户端初始化成功")
+    # 设置Gemini客户端
+    client = setup_gemini_client()
+    print("✅ Google Gemini客户端初始化成功")
 
     # 处理故事
     process_stories(client, args.theme, args.force, args.start, args.end)
