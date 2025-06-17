@@ -449,9 +449,9 @@ The output should NOT contain any of the following:
 Ensure the entire output is this kind of uninterrupted plain text, optimized for clear audio rendering.
 Make sure the complete story reaches the target audio length and deeply explores the provided parameters to create a rich and engaging narrative.
 100% ensure the story is long enough to be a complete audiobook of exactly 120 minutes.
-*   Ensure the total word count is at least 180,000 words for 120 minutes.
-*   Ensure the total word count is at least 180,000 words for 120 minutes.
-*   Ensure the total word count is at least 180,000 words for 120 minutes.
+*   Ensure the total word count is at least 14,000 words for 120 minutes.
+*   Ensure the total word count is at least 14,000 words for 120 minutes.
+*   Ensure the total word count is at least 14,000 words for 120 minutes.
 **IMPORTANT:** Use the specified character names throughout the story: Do not change or modify these names during story generation."""
 
 

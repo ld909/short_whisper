@@ -14,9 +14,10 @@ AI Studio 多主题故事生成自动化脚本
 - romance: 爱情故事
 - horror: 恐怖故事
 
-1. 📖 多主题轮流生成
+1. 📖 多主题严格轮流生成
    - 支持同时为多个主题生成故事（默认所有主题）
-   - 轮流生成模式：先为每个主题生成一个故事，然后进入下一轮
+   - 严格轮流生成模式：逐个主题轮流生成，避免单一主题连续生成
+   - 生成顺序示例：科幻故事1 → 奇幻故事1 → 惊悚故事1 → 科幻故事2 → 奇幻故事2...
    - 从multi_theme_story_generator.py的输出读取故事参数
    - 智能索引管理：优先填补缺失的故事索引，然后生成新索引
    - 自动清理 markdown 标记：在发送前彻底清除所有 markdown 格式符号
@@ -24,7 +25,7 @@ AI Studio 多主题故事生成自动化脚本
 2. 🌐 浏览器自动化
    - 通过 AdsPower 浏览器实现多开隔离
    - 使用 Playwright 进行精确的网页操作控制
-   - 支持多窗口并发生成（最多2个窗口同时工作）
+   - 单窗口顺序处理模式：确保严格按照轮流顺序生成
 
 3. 🎯 智能热身机制
    - 首次运行时自动进行AI热身，发送随机问题激活模型
@@ -72,9 +73,14 @@ Apple Silicon Mac (M1/M2/M3) 系统:
   └── ...
 
 使用方法：
-python ai_studio_bot.py --count 5                                    # 所有主题各生成5个故事
-python ai_studio_bot.py --theme scifi fantasy --count 3              # 只为科幻和奇幻各生成3个故事
+python ai_studio_bot.py --count 3                                    # 所有主题各生成3个故事(轮流生成)
+python ai_studio_bot.py --theme scifi fantasy --count 2              # 科幻奇幻轮流各生成2个故事
 python ai_studio_bot.py --theme scifi --count 2 --ads-id your_id     # 指定浏览器ID
+
+轮流生成顺序示例（--count 2 --theme scifi fantasy thriller）：
+1. 科幻故事1 → 2. 奇幻故事1 → 3. 惊悚故事1 → 4. 科幻故事2 → 5. 奇幻故事2 → 6. 惊悚故事2
+
+检查状态：
 python ai_studio_bot.py --check-resume                               # 检查所有主题的断点续传状态
 python ai_studio_bot.py --check-resume --theme scifi thriller        # 检查指定主题的断点续传状态
 
@@ -84,8 +90,8 @@ python ai_studio_bot.py --check-resume --theme scifi thriller        # 检查指
 - multi_theme_story_generator.py：提供故事参数文件
 
 作者：AI Studio 自动化团队
-版本：v4.0
-更新：支持多主题轮流生成、从参数文件读取、新的保存路径结构、断点续传优化
+版本：v4.1
+更新：优化为严格轮流生成模式，避免单一主题连续生成，确保真正的主题轮流
 """
 
 import time
@@ -1617,138 +1623,93 @@ def main():
             else:
                 print("没有需要关闭的之前窗口")
 
-            # 创建需要的窗口数量（最多2个窗口并发）
-            windows = []
-            max_concurrent_windows = min(2, len(stories_to_generate))  # 最多2个窗口并发
+            # 修改为轮流生成模式：只使用一个窗口，严格按照轮流顺序生成
+            print(f"🔄 使用单窗口轮流生成模式，确保严格按主题轮流顺序...")
 
-            print(f"正在创建总共 {max_concurrent_windows} 个工作窗口...")
+            # 只使用一个窗口
+            main_window = new_page
+            print(f"使用主窗口进行轮流故事生成")
 
-            # 第一个窗口使用已创建的空白页面
-            windows.append(new_page)
-            print(f"窗口 1 使用已创建的空白页面")
-
-            # 如果需要更多窗口，再创建
-            for i in range(1, max_concurrent_windows):
-                page = context.new_page()
-                windows.append(page)
-                print(f"已创建窗口 {i+1}")
-
-            # 分批处理故事
+            # 逐一处理每个故事，严格按照轮流顺序
             all_results = []
-            stories_processed = 0
 
             # 全局热身标志，只在第一次运行时进行热身
             global_warmup_done = False
-            # 为每个窗口跟踪是否是第一个故事（用于页面初始化，不包括热身）
-            window_first_story = [True] * len(windows)
+            # 第一个故事标志
+            is_first_story = True
 
-            while stories_processed < len(stories_to_generate):
-                # 确定当前批次要处理的故事
-                current_batch = []
-                for i in range(len(windows)):
-                    if stories_processed + i < len(stories_to_generate):
-                        current_batch.append(stories_to_generate[stories_processed + i])
+            for story_index, story_data in enumerate(stories_to_generate):
+                story_theme = story_data["theme"]
+                theme_name = SUPPORTED_THEMES[story_theme]["name"]
 
                 print(
-                    f"\n=== 开始处理第 {stories_processed//len(windows) + 1} 批，共 {len(current_batch)} 个故事 ==="
+                    f"\n=== 🎯 轮流生成第 {story_index + 1}/{len(stories_to_generate)} 个故事 ==="
+                )
+                print(f"📚 当前主题: {theme_name}({story_theme})")
+                print(f"📄 故事索引: {story_data['index']}")
+                print(
+                    f"📁 保存路径: {story_data['dir_path']}/{story_data['index']}.txt"
                 )
 
-                # 为每个窗口分配故事并处理
-                batch_results = []
-
+                # 切换到主窗口并使其获得焦点
                 try:
-                    for i, window in enumerate(windows):
-                        if i < len(current_batch):
-                            story_data = current_batch[i]
-                            story_theme = story_data["theme"]
-                            theme_name = SUPPORTED_THEMES[story_theme]["name"]
-                            print(
-                                f"\n=== 开始处理窗口 {i+1}，{theme_name}故事 {story_data['index']} ==="
-                            )
+                    main_window.bring_to_front()
+                except Exception as bring_error:
+                    print(f"主窗口已失效，尝试重新创建: {bring_error}")
+                    main_window = context.new_page()
 
-                            # 切换到当前窗口并使其获得焦点
-                            try:
-                                window.bring_to_front()
-                            except Exception as bring_error:
-                                print(f"窗口 {i+1} 已失效，跳过此故事: {bring_error}")
-                                batch_results.append(False)
-                                continue
-
-                            # 处理当前窗口的故事
-                            try:
-                                # 传递是否是第一个故事的标志和是否需要热身
-                                is_first = window_first_story[i]
-                                need_warmup = not global_warmup_done
-                                success = process_window(
-                                    window,
-                                    i + 1,
-                                    story_data,
-                                    story_theme,  # 使用故事数据中的主题
-                                    is_first,
-                                    need_warmup,
-                                )
-
-                                # 更新全局热身状态和窗口状态
-                                if need_warmup:
-                                    global_warmup_done = True
-                                    print(
-                                        f"🎯 全局热身已完成，后续所有故事生成将跳过热身步骤"
-                                    )
-
-                                if is_first:
-                                    window_first_story[i] = False
-                                    print(
-                                        f"窗口 {i+1}: 已完成首次初始化，后续将使用快速切换方式"
-                                    )
-
-                                batch_results.append(success)
-
-                                if success:
-                                    print(
-                                        f"窗口 {i+1}：{theme_name}故事 {story_data['index']} 生成成功！"
-                                    )
-                                else:
-                                    print(
-                                        f"窗口 {i+1}：{theme_name}故事 {story_data['index']} 生成失败！"
-                                    )
-
-                                # 在处理下一个窗口前稍作等待（已在process_window中有20秒等待）
-                                if i < len(current_batch) - 1:
-                                    print(f"等待 2 秒后处理下一个窗口...")
-                                    time.sleep(2)
-
-                            except Exception as e:
-                                # 现在所有错误都在process_window中处理，包括internal error重试
-                                # 这里只记录错误并继续处理下一个故事
-                                print(f"窗口 {i+1}: 处理故事时发生异常: {e}")
-                                batch_results.append(False)
-                                # 继续处理下一个窗口
-
-                    # 更新处理进度
-                    stories_processed += len(current_batch)
-                    all_results.extend(batch_results)
-
-                    # 统计当前批次结果
-                    successful_in_batch = sum(batch_results)
-                    print(f"\n=== 第 {stories_processed//len(windows)} 批处理完成 ===")
-                    print(
-                        f"本批成功: {successful_in_batch}/{len(current_batch)} 个故事"
-                    )
-                    print(
-                        f"总进度: {stories_processed}/{len(stories_to_generate)} 个故事"
+                # 处理当前故事
+                try:
+                    # 传递是否是第一个故事的标志和是否需要热身
+                    need_warmup = not global_warmup_done
+                    success = process_window(
+                        main_window,
+                        1,  # 窗口编号固定为1
+                        story_data,
+                        story_theme,
+                        is_first_story,
+                        need_warmup,
                     )
 
-                    # 如果还有更多故事要处理，稍作等待（每个故事已有20秒等待）
-                    if stories_processed < len(stories_to_generate):
-                        print(f"等待 3 秒后处理下一批...")
-                        time.sleep(3)
+                    # 更新全局热身状态和第一个故事状态
+                    if need_warmup:
+                        global_warmup_done = True
+                        print(f"🎯 全局热身已完成，后续所有故事生成将跳过热身步骤")
+
+                    if is_first_story:
+                        is_first_story = False
+                        print(f"✅ 首个故事处理完成，后续将使用快速切换方式")
+
+                    all_results.append(success)
+
+                    if success:
+                        print(f"🎉 {theme_name}故事 {story_data['index']} 生成成功！")
+                        print(
+                            f"📊 当前进度: {story_index + 1}/{len(stories_to_generate)} ({(story_index + 1)/len(stories_to_generate)*100:.1f}%)"
+                        )
+                    else:
+                        print(f"❌ {theme_name}故事 {story_data['index']} 生成失败！")
+
+                    # 显示轮流生成状态
+                    if story_index + 1 < len(stories_to_generate):
+                        next_story = stories_to_generate[story_index + 1]
+                        next_theme_name = SUPPORTED_THEMES[next_story["theme"]]["name"]
+                        print(
+                            f"🔄 下一个故事: {next_theme_name}({next_story['theme']}) - 故事{next_story['index']}"
+                        )
 
                 except Exception as e:
-                    print(f"处理批次时发生未预期的错误: {e}")
-                    import traceback
+                    # 所有错误都在process_window中处理，包括internal error重试
+                    # 这里只记录错误并继续处理下一个故事
+                    print(f"处理{theme_name}故事 {story_data['index']} 时发生异常: {e}")
+                    all_results.append(False)
+                    print(f"⏭️ 跳过此故事，继续处理下一个...")
 
-                    traceback.print_exc()
-                    break
+                # 每个故事处理完成后的分隔提示
+                if story_index + 1 < len(stories_to_generate):
+                    print(f"{'='*60}")
+                    print(f"⏱️ 故事间隔等待 3 秒...")
+                    time.sleep(3)
 
             # 统计最终结果
             successful_stories = sum(all_results)
@@ -1792,18 +1753,17 @@ def main():
                         f"  {theme_name}({theme}): {success_count}/{total_count} (无数据)"
                     )
 
-            # 关闭所有窗口
-            print("正在关闭所有窗口...")
-            for i, window in enumerate(windows):
-                try:
-                    # 检查窗口是否仍然有效
-                    if not window.is_closed():
-                        window.close()
-                        print(f"已关闭窗口 {i+1}")
-                    else:
-                        print(f"窗口 {i+1} 已经关闭")
-                except Exception as e:
-                    print(f"关闭窗口 {i+1} 时出错: {e}")
+            # 关闭主窗口
+            print("正在关闭主窗口...")
+            try:
+                # 检查窗口是否仍然有效
+                if not main_window.is_closed():
+                    main_window.close()
+                    print("主窗口已关闭")
+                else:
+                    print("主窗口已经关闭")
+            except Exception as e:
+                print(f"关闭主窗口时出错: {e}")
 
             # 断开Playwright连接
             print("正在断开Playwright连接...")
