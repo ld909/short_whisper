@@ -402,7 +402,7 @@ def get_adspower_info(ads_id):
         print("错误: 缺少 urllib3 模块，请安装: pip install urllib3")
         return None, None, None
 
-    open_url = f"http://127.0.0.1:50325/api/v1/browser/start?user_id={ads_id}"
+    open_url = f"http://local.adspower.net:50325/api/v1/browser/start?user_id={ads_id}"
 
     http = urllib3.PoolManager()
 
@@ -1584,7 +1584,7 @@ def main():
         print(f"  📚 {theme_name}({theme}): {story_count_per_theme} 个故事")
     print(f"🌐 使用 AdsPower ID: {ads_id}")
 
-    close_url = f"http://127.0.0.1:50325/api/v1/browser/stop?user_id={ads_id}"
+    close_url = f"http://local.adspower.net:50325/api/v1/browser/stop?user_id={ads_id}"
 
     try:
         # 显示系统信息和保存路径

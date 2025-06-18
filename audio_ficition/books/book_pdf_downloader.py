@@ -23,10 +23,11 @@
    - 情况3：跳过标记为低质量的PDF
    - 情况4：无PDF可用时跳过
 
-4. 💾 文件管理
+4. 💾 简化文件管理
    - 自动保存到指定目录：/Volumes/dhl/audio/books/en/pdf/
-   - 智能检测：每次启动动态检查已下载的文件
+   - 直接命名策略：下载时直接使用UUID.pdf作为文件名，无需重命名
    - 避免重复下载：自动跳过已存在的PDF文件
+   - 安全可靠：避免文件混乱和重命名错误
 
 5. 🔄 错误处理
    - 网络异常自动重试
@@ -79,7 +80,7 @@ def get_base_media_path():
 
 def get_adspower_info(ads_id):
     """连接AdsPower浏览器"""
-    open_url = f"http://127.0.0.1:50325/api/v1/browser/start?user_id={ads_id}"
+    open_url = f"http://local.adspower.net:50325/api/v1/browser/start?user_id={ads_id}"
 
     http = urllib3.PoolManager()
 
@@ -109,7 +110,7 @@ def get_adspower_info(ads_id):
 
 
 class BookPDFDownloader:
-    def __init__(self, ads_id="kq316tr", debug=False):
+    def __init__(self, ads_id="k10i5y1s", debug=False):
         self.ads_id = ads_id
         self.debug = debug
         self.base_media_path = get_base_media_path()
@@ -123,11 +124,12 @@ class BookPDFDownloader:
         Path(self.pdf_dir).mkdir(parents=True, exist_ok=True)
 
         logger.info(f"📁 PDF下载目录: {self.pdf_dir}")
-        logger.info("🔧 重要提醒:")
+        logger.info("🔧 重要说明:")
         logger.info("   1. 确保AdsPower浏览器的下载设置已配置")
         logger.info(f"   2. 推荐设置下载路径为: {self.pdf_dir}")
         logger.info("   3. 建议关闭下载前询问保存位置的设置")
-        logger.info("   4. 程序会自动处理文件命名，无需手动干预")
+        logger.info("   4. 程序会直接下载为UUID.pdf文件名，无需重命名")
+        logger.info("   5. 简化逻辑，避免文件混乱和重命名错误")
 
         # Playwright 相关
         self.playwright = None
@@ -159,11 +161,11 @@ class BookPDFDownloader:
 
             # 获取或创建上下文
             if not self.browser.contexts:
-                # 创建新的上下文并设置下载路径
+                # 创建新的上下文并设置下载行为（不指定文件名）
                 self.context = self.browser.new_context(
                     accept_downloads=True,
                 )
-                # 设置下载路径
+                # 设置下载路径（仅目录，不指定文件名）
                 self.context.set_default_timeout(60000)  # 60秒超时
             else:
                 self.context = self.browser.contexts[0]
@@ -249,9 +251,7 @@ class BookPDFDownloader:
 
             # 关闭AdsPower浏览器
             if self.http:
-                close_url = (
-                    f"http://127.0.0.1:50325/api/v1/browser/stop?user_id={self.ads_id}"
-                )
+                close_url = f"http://local.adspower.net:50325/api/v1/browser/stop?user_id={self.ads_id}"
                 self.http.request("GET", close_url)
                 print("AdsPower浏览器已关闭")
 
@@ -498,86 +498,152 @@ class BookPDFDownloader:
                     continue
                 file_path = os.path.join(self.pdf_dir, filename)
                 if os.path.isfile(file_path):
-                    files_info[filename] = os.path.getmtime(file_path)
+                    files_info[filename] = {
+                        "mtime": os.path.getmtime(file_path),
+                        "size": os.path.getsize(file_path),
+                    }
         return files_info
 
-    def wait_for_new_download(self, uuid_val, initial_files, max_wait=60):
-        """等待新文件下载完成并重命名"""
-        logger.info(f"⏳ 等待下载完成...")
+    def detect_and_rename_new_files(self, uuid_val, initial_files, max_wait=60):
+        """检测新下载的文件并重命名为UUID格式"""
+        logger.info(f"🔍 开始监控新文件下载...")
 
         start_time = time.time()
         target_filename = f"{uuid_val}.pdf"
         target_path = os.path.join(self.pdf_dir, target_filename)
 
-        check_count = 0
+        # 记录稳定检查的文件状态
+        candidate_files = (
+            {}
+        )  # {filename: {'size': size, 'stable_time': time, 'check_count': count}}
+
         while time.time() - start_time < max_wait:
-            time.sleep(2)
-            check_count += 1
+            time.sleep(2)  # 每2秒检查一次
 
-            # 获取当前文件列表
             current_files = self.get_download_directory_files()
+            elapsed = int(time.time() - start_time)
 
-            # 查找新文件
+            # 查找新文件（在初始文件列表中不存在的文件）
             new_files = []
-            for filename, mtime in current_files.items():
+            for filename, file_info in current_files.items():
                 if filename not in initial_files and filename.lower().endswith(".pdf"):
-                    # 确保文件下载完成（大小不再变化）
                     file_path = os.path.join(self.pdf_dir, filename)
                     if os.path.exists(file_path):
-                        file_size = os.path.getsize(file_path)
-                        if file_size > 1000:  # 至少1KB
-                            time.sleep(2)  # 等待2秒确保下载完成
-                            new_size = os.path.getsize(file_path)
-                            if new_size == file_size:  # 文件大小没有变化，说明下载完成
-                                new_files.append((filename, file_path, file_size))
-                                break  # 找到稳定的文件就跳出
+                        new_files.append(
+                            {
+                                "name": filename,
+                                "path": file_path,
+                                "size": file_info["size"],
+                                "mtime": file_info["mtime"],
+                            }
+                        )
 
-            # 调试信息
-            if self.debug and check_count % 5 == 0:
-                elapsed = int(time.time() - start_time)
-                logger.debug(
-                    f"🔍 检查第{check_count}次，已等待{elapsed}秒，发现{len(current_files)}个文件"
-                )
-                if len(current_files) != len(initial_files):
-                    new_file_names = [
-                        f for f in current_files.keys() if f not in initial_files
-                    ]
-                    logger.debug(f"📄 新文件: {new_file_names}")
+            if not new_files:
+                # 每10秒显示一次等待状态
+                if elapsed % 10 == 0 and elapsed > 0:
+                    logger.info(f"⏳ 等待新文件出现...已等待 {elapsed} 秒")
+                continue
 
-            if new_files:
-                # 找到新下载的文件，重命名为目标文件名
-                new_file = new_files[0]  # 取第一个新文件
-                old_filename = new_file[0]
-                old_path = new_file[1]
-                file_size = new_file[2]
+            # 检查新文件的稳定性
+            for new_file in new_files:
+                filename = new_file["name"]
+                file_size = new_file["size"]
+
+                # 文件必须有一定大小才考虑（避免空文件或正在下载的文件）
+                if file_size < 1000:  # 小于1KB
+                    if self.debug:
+                        logger.debug(
+                            f"📄 文件 {filename} 太小({file_size} bytes)，继续等待"
+                        )
+                    continue
+
+                # 检查文件稳定性
+                if filename not in candidate_files:
+                    # 第一次发现这个文件
+                    candidate_files[filename] = {
+                        "size": file_size,
+                        "stable_time": time.time(),
+                        "check_count": 1,
+                    }
+                    logger.info(f"🔍 发现新文件: {filename} ({file_size} bytes)")
+                else:
+                    # 文件之前已发现，检查大小是否稳定
+                    prev_info = candidate_files[filename]
+
+                    if prev_info["size"] == file_size:
+                        # 文件大小没有变化，增加稳定计数
+                        prev_info["check_count"] += 1
+                        stable_duration = time.time() - prev_info["stable_time"]
+
+                        logger.info(
+                            f"📊 文件 {filename} 大小稳定 ({prev_info['check_count']} 次检查, {stable_duration:.1f}秒)"
+                        )
+
+                        # 如果文件已经稳定足够长时间或检查次数足够多，认为下载完成
+                        if stable_duration >= 10 or prev_info["check_count"] >= 5:
+                            # 文件稳定，可以重命名
+                            try:
+                                # 检查目标文件是否已存在
+                                if os.path.exists(target_path):
+                                    logger.info(
+                                        f"🗑️ 目标文件已存在，删除: {target_filename}"
+                                    )
+                                    os.remove(target_path)
+
+                                # 重命名文件
+                                os.rename(new_file["path"], target_path)
+
+                                logger.info(
+                                    f"✅ 文件重命名成功: {filename} -> {target_filename} ({file_size} bytes)"
+                                )
+                                return True, file_size
+
+                            except Exception as e:
+                                logger.error(f"❌ 重命名文件失败: {e}")
+                                # 即使重命名失败，也可以认为下载成功
+                                return True, file_size
+                    else:
+                        # 文件大小发生变化，重置稳定时间
+                        prev_info["size"] = file_size
+                        prev_info["stable_time"] = time.time()
+                        prev_info["check_count"] = 1
+                        logger.info(
+                            f"📄 文件 {filename} 大小变化: {file_size} bytes，重置稳定检查"
+                        )
+
+        # 超时处理
+        logger.warning(f"⏰ 文件检测超时 ({max_wait}秒)")
+
+        # 超时后尝试处理最大的稳定文件
+        if candidate_files:
+            stable_files = []
+            for filename, info in candidate_files.items():
+                if info["check_count"] >= 3:  # 至少稳定3次检查
+                    file_path = os.path.join(self.pdf_dir, filename)
+                    if os.path.exists(file_path):
+                        stable_files.append((filename, file_path, info["size"]))
+
+            if stable_files:
+                # 选择最大的文件
+                largest_file = max(stable_files, key=lambda x: x[2])
+                filename, file_path, file_size = largest_file
 
                 try:
-                    # 如果目标文件已存在，先删除
                     if os.path.exists(target_path):
                         logger.info(f"🗑️ 删除已存在的目标文件: {target_filename}")
                         os.remove(target_path)
 
-                    # 重命名文件
-                    os.rename(old_path, target_path)
-
+                    os.rename(file_path, target_path)
                     logger.info(
-                        f"✅ 文件已重命名: {old_filename} -> {target_filename} ({file_size} bytes)"
+                        f"✅ 超时后重命名成功: {filename} -> {target_filename} ({file_size} bytes)"
                     )
                     return True, file_size
 
                 except Exception as e:
-                    logger.error(f"❌ 重命名文件失败: {e}")
-                    return False, 0
+                    logger.error(f"❌ 超时后重命名失败: {e}")
+                    return True, file_size  # 仍然认为下载成功
 
-        # 超时后的调试信息
-        current_files = self.get_download_directory_files()
-        new_file_names = [f for f in current_files.keys() if f not in initial_files]
-        if new_file_names:
-            logger.warning(f"⚠️ 发现新文件但可能未完成下载: {new_file_names}")
-        else:
-            logger.warning(f"⚠️ 未发现任何新文件")
-
-        logger.warning(f"⏰ 等待下载超时: {max_wait}秒")
+        logger.warning(f"❌ 未找到稳定的新下载文件")
         return False, 0
 
     def _handle_manual_download(self, uuid_val, title, download_info):
@@ -689,8 +755,8 @@ class BookPDFDownloader:
 
             # 如果事件监听器没有捕获到下载，使用备用方法
             if not download_info["completed"]:
-                logger.info(f"🔍 下载事件未捕获，使用备用方法检测...")
-                success, file_size = self.wait_for_new_download(
+                logger.info(f"🔍 下载事件未捕获，使用文件系统检测...")
+                success, file_size = self.detect_and_rename_new_files(
                     uuid_val, initial_files, max_wait=30
                 )
 
@@ -756,159 +822,34 @@ class BookPDFDownloader:
                 # 情况1：直接下载PDF
                 logger.info(f"📥 直接下载PDF: {title}")
 
-                # 记录下载前的文件列表（在点击前记录）
-                initial_files = self.get_download_directory_files()
-                logger.info(f"📁 下载前目录有 {len(initial_files)} 个文件")
-
                 # 点击下载链接
                 logger.info(f"🖱️ 点击下载链接...")
                 direct_link.click()
 
-                # 使用双重检测机制：事件监听器 + 文件系统监测
+                # 简单等待下载完成，事件监听器会直接保存为UUID.pdf
                 max_wait = 60
-                start_time = time.time()
-                check_interval = 2  # 每2秒检查一次
-
                 logger.info(f"⏳ 等待下载完成，最多等待 {max_wait} 秒...")
 
-                while time.time() - start_time < max_wait:
-                    elapsed = int(time.time() - start_time)
-
-                    # 方法1：检查事件监听器
+                # 等待事件监听器完成下载
+                for _ in range(max_wait):
                     if download_info["completed"]:
-                        file_size = (
-                            os.path.getsize(download_info["file_path"])
-                            if download_info["file_path"]
-                            and os.path.exists(download_info["file_path"])
-                            else 0
-                        )
-                        logger.info(
-                            f"✅ PDF事件监听器下载成功: {title} ({file_size} bytes)"
-                        )
-                        return "success", "直接下载PDF成功"
-
-                    # 方法2：检查文件系统（每次都检查）
-                    current_files = self.get_download_directory_files()
-                    new_files = []
-                    for filename, mtime in current_files.items():
-                        if filename not in initial_files and filename.lower().endswith(
-                            ".pdf"
-                        ):
-                            file_path = os.path.join(self.pdf_dir, filename)
-                            if os.path.exists(file_path):
-                                file_size = os.path.getsize(file_path)
-                                if file_size > 1000:  # 至少1KB，说明有实际内容
-                                    new_files.append((filename, file_path, file_size))
-
-                    if new_files:
-                        # 找到新下载的文件，重命名为目标文件名
-                        new_file = new_files[0]  # 取第一个新文件
-                        old_filename = new_file[0]
-                        old_path = new_file[1]
-                        file_size = new_file[2]
-
                         target_filename = f"{uuid_val}.pdf"
                         target_path = os.path.join(self.pdf_dir, target_filename)
 
-                        try:
-                            # 如果目标文件已存在，先删除
-                            if os.path.exists(target_path):
-                                logger.info(
-                                    f"🗑️ 删除已存在的目标文件: {target_filename}"
-                                )
-                                os.remove(target_path)
-
-                            # 重命名文件
-                            os.rename(old_path, target_path)
-                            logger.info(
-                                f"✅ PDF文件系统检测下载成功: {title} ({file_size} bytes)"
-                            )
-                            logger.info(
-                                f"📁 文件已重命名: {old_filename} -> {target_filename}"
-                            )
-                            return "success", "直接下载PDF成功"
-
-                        except Exception as e:
-                            logger.error(f"❌ 重命名文件失败: {e}")
-                            # 即使重命名失败，也尝试使用原文件名
-                            if os.path.exists(old_path):
-                                logger.info(
-                                    f"✅ PDF下载成功（保持原名）: {title} ({file_size} bytes)"
-                                )
-                                logger.info(f"📁 文件位置: {old_path}")
-                                return "success", "直接下载PDF成功"
-
-                    # 检查下载错误
-                    if download_info["error"]:
-                        logger.warning(
-                            f"⚠️ PDF下载失败: {title} - {download_info['error']}"
-                        )
-                        return "failed", f"PDF下载失败: {download_info['error']}"
-
-                    # 每隔几秒显示等待状态
-                    if elapsed % 10 == 0 and elapsed > 0:
-                        logger.info(f"⏳ 仍在等待下载...已等待 {elapsed} 秒")
-
-                    time.sleep(check_interval)
-
-                # 超时后最后检查一次
-                logger.warning(f"⏰ 下载等待超时，进行最后检查...")
-
-                # 最后检查事件监听器
-                if download_info["completed"]:
-                    file_size = (
-                        os.path.getsize(download_info["file_path"])
-                        if download_info["file_path"]
-                        and os.path.exists(download_info["file_path"])
-                        else 0
-                    )
-                    logger.info(f"✅ PDF最后检查下载成功: {title} ({file_size} bytes)")
-                    return "success", "直接下载PDF成功"
-
-                # 最后检查文件系统
-                final_files = self.get_download_directory_files()
-                new_files = []
-                for filename, mtime in final_files.items():
-                    if filename not in initial_files and filename.lower().endswith(
-                        ".pdf"
-                    ):
-                        file_path = os.path.join(self.pdf_dir, filename)
-                        if os.path.exists(file_path):
-                            file_size = os.path.getsize(file_path)
-                            if file_size > 1000:
-                                new_files.append((filename, file_path, file_size))
-
-                if new_files:
-                    # 找到文件但超时了，仍然处理
-                    new_file = new_files[0]
-                    old_filename = new_file[0]
-                    old_path = new_file[1]
-                    file_size = new_file[2]
-
-                    target_filename = f"{uuid_val}.pdf"
-                    target_path = os.path.join(self.pdf_dir, target_filename)
-
-                    try:
                         if os.path.exists(target_path):
-                            os.remove(target_path)
-                        os.rename(old_path, target_path)
-                        logger.info(
-                            f"✅ PDF超时后发现下载成功: {title} ({file_size} bytes)"
-                        )
-                        return "success", "直接下载PDF成功"
-                    except Exception as e:
-                        logger.warning(f"⚠️ 超时后重命名失败: {e}")
-                        if os.path.exists(old_path):
-                            logger.info(
-                                f"✅ PDF下载成功（保持原名）: {title} ({file_size} bytes)"
-                            )
+                            file_size = os.path.getsize(target_path)
+                            logger.info(f"✅ PDF下载成功: {title} ({file_size} bytes)")
                             return "success", "直接下载PDF成功"
+                        else:
+                            logger.warning(f"⚠️ 文件未找到: {target_filename}")
 
-                # 完全失败
+                    if download_info["error"]:
+                        logger.warning(f"⚠️ 下载出错: {download_info['error']}")
+                        break
+
+                    time.sleep(1)
+
                 logger.warning(f"❌ PDF下载失败或超时: {title}")
-                logger.info(
-                    f"🔍 调试信息：初始文件 {len(initial_files)} 个，最终文件 {len(final_files)} 个"
-                )
                 return "failed", "PDF下载失败或超时"
 
             elif option_type == "convert_pdf":
@@ -957,16 +898,15 @@ class BookPDFDownloader:
 
                         # 优先检查是否有自动下载完成
                         if download_info["completed"]:
-                            file_size = (
-                                os.path.getsize(download_info["file_path"])
-                                if download_info["file_path"]
-                                and os.path.exists(download_info["file_path"])
-                                else 0
-                            )
-                            logger.info(
-                                f"✅ PDF自动下载成功: {title} ({file_size} bytes)"
-                            )
-                            return "success", "转换PDF自动下载成功"
+                            target_filename = f"{uuid_val}.pdf"
+                            target_path = os.path.join(self.pdf_dir, target_filename)
+
+                            if os.path.exists(target_path):
+                                file_size = os.path.getsize(target_path)
+                                logger.info(
+                                    f"✅ PDF自动下载成功: {title} ({file_size} bytes)"
+                                )
+                                return "success", "转换PDF自动下载成功"
 
                         # 检查是否有下载错误
                         if download_info["error"]:
@@ -1126,12 +1066,19 @@ class BookPDFDownloader:
 
                                 # 如果事件监听器没有捕获，使用备用方法
                                 if not download_info["completed"]:
-                                    # 记录下载前的文件列表
-                                    initial_files = self.get_download_directory_files()
+                                    logger.info(
+                                        f"🔍 事件监听器未捕获，使用文件系统检测..."
+                                    )
+                                    # 重新获取初始文件列表（因为之前可能有变化）
+                                    current_initial_files = (
+                                        self.get_download_directory_files()
+                                    )
 
                                     # 等待下载完成并重命名
-                                    success, file_size = self.wait_for_new_download(
-                                        uuid_val, initial_files, max_wait=30
+                                    success, file_size = (
+                                        self.detect_and_rename_new_files(
+                                            uuid_val, current_initial_files, max_wait=30
+                                        )
                                     )
 
                                     if success:
@@ -1208,32 +1155,30 @@ class BookPDFDownloader:
             }
 
             def handle_download(download):
-                """处理下载事件"""
+                """处理下载事件 - 直接使用UUID作为文件名下载"""
                 try:
                     if not download_info.get("current_uuid"):
                         logger.warning("📥 检测到下载但无当前UUID，跳过处理")
                         return
 
                     uuid_val = download_info["current_uuid"]
+                    suggested_filename = download.suggested_filename
+                    logger.info(f"📥 检测到下载: {suggested_filename}")
+
+                    # 直接使用UUID作为文件名保存
                     target_filename = f"{uuid_val}.pdf"
                     target_path = os.path.join(self.pdf_dir, target_filename)
 
-                    logger.info(
-                        f"📥 检测到下载: {download.suggested_filename} -> {target_filename}"
-                    )
-
-                    # 等待下载完成
+                    # 等待下载完成，直接保存为UUID.pdf
                     download.save_as(target_path)
 
                     download_info["completed"] = True
                     download_info["file_path"] = target_path
+                    download_info["target_filename"] = target_filename
 
-                    file_size = (
-                        os.path.getsize(target_path)
-                        if os.path.exists(target_path)
-                        else 0
+                    logger.info(
+                        f"✅ 下载完成: {suggested_filename} -> {target_filename}"
                     )
-                    logger.info(f"✅ 下载完成: {target_filename} ({file_size} bytes)")
 
                 except Exception as e:
                     logger.error(f"❌ 下载处理失败: {e}")
@@ -1304,6 +1249,388 @@ class BookPDFDownloader:
             self.cleanup()
 
 
+class BookPDFDownloaderStandalone:
+    """不使用CDP连接的独立下载器，专门解决下载文件问题"""
+
+    def __init__(self, debug=False, headless=False):
+        self.debug = debug
+        self.headless = headless
+        self.base_media_path = get_base_media_path()
+        self.base_path = os.path.join(self.base_media_path, "books", "en")
+
+        # 设置目录结构
+        self.info_dir = os.path.join(self.base_path, "info")
+        self.pdf_dir = os.path.join(self.base_path, "pdf")
+
+        # 创建PDF目录
+        Path(self.pdf_dir).mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"📁 PDF下载目录: {self.pdf_dir}")
+        logger.info("🔧 独立浏览器模式:")
+        logger.info("   1. 使用Playwright启动独立Chrome实例")
+        logger.info("   2. 不依赖AdsPower，避免CDP下载问题")
+        logger.info("   3. 直接指定下载目录，文件会正确保存")
+        logger.info(f"   4. 无头模式: {'是' if headless else '否'}")
+
+        # Playwright 相关
+        self.playwright = None
+        self.browser = None
+        self.context = None
+        self.page = None
+
+        if self.debug:
+            logger.info("🔧 调试模式已启用")
+
+    def setup_browser(self):
+        """设置独立Playwright浏览器"""
+        try:
+            print("正在启动独立Chrome浏览器...")
+            self.playwright = sync_playwright().start()
+
+            # 启动独立的Chrome浏览器，指定下载目录
+            self.browser = self.playwright.chromium.launch(
+                headless=self.headless,
+                downloads_path=self.pdf_dir,  # 直接指定下载目录
+                args=[
+                    "--no-sandbox",
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-extensions",
+                    "--disable-plugins-discovery",
+                    "--disable-default-apps",
+                ],
+            )
+
+            # 创建上下文，设置下载行为
+            self.context = self.browser.new_context(
+                accept_downloads=True,
+                # 可以设置用户代理等
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            )
+
+            # 创建页面
+            self.page = self.context.new_page()
+            self.page.set_default_timeout(60000)  # 60秒超时
+
+            logger.info("✅ 独立浏览器启动成功！")
+            logger.info(f"📁 下载目录已设置为: {self.pdf_dir}")
+
+        except Exception as e:
+            logger.error(f"❌ 启动独立浏览器失败: {e}")
+            raise
+
+    def test_download_setup(self):
+        """测试下载设置"""
+        try:
+            logger.info("🧪 测试独立浏览器下载设置...")
+
+            # 检查目录是否可写
+            test_file = os.path.join(self.pdf_dir, "test_download.txt")
+            try:
+                with open(test_file, "w", encoding="utf-8") as f:
+                    f.write("测试文件")
+                os.remove(test_file)
+                logger.info("✅ 下载目录可写")
+            except Exception as e:
+                logger.error(f"❌ 下载目录不可写: {e}")
+                return False
+
+            logger.info("✅ 独立浏览器下载设置正常")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ 测试下载设置失败: {e}")
+            return False
+
+    def cleanup(self):
+        """清理浏览器资源"""
+        try:
+            if self.page:
+                self.page.close()
+            if self.context:
+                self.context.close()
+            if self.browser:
+                self.browser.close()
+            if self.playwright:
+                self.playwright.stop()
+
+            logger.info("🧹 独立浏览器资源已清理")
+        except Exception as e:
+            logger.error(f"❌ 清理资源时出错: {e}")
+
+    # 复用其他方法
+    def load_book_data(self):
+        """加载书籍数据"""
+        # 复用原有逻辑
+        try:
+            book_data = []
+            if os.path.exists(self.info_dir):
+                for filename in os.listdir(self.info_dir):
+                    if filename.startswith("."):  # 排除Mac的点文件
+                        continue
+                    if filename.endswith(".json"):
+                        uuid_val = filename[:-5]
+                        info_file = os.path.join(self.info_dir, filename)
+
+                        try:
+                            with open(info_file, "r", encoding="utf-8") as f:
+                                book_info = json.load(f)
+
+                            if book_info.get("url") and book_info.get("title"):
+                                book_data.append(
+                                    {
+                                        "uuid": uuid_val,
+                                        "url": book_info["url"],
+                                        "title": book_info.get("title", "Unknown"),
+                                        "author": book_info.get("author", "Unknown"),
+                                    }
+                                )
+                        except Exception as e:
+                            logger.warning(f"⚠️ 读取书籍信息失败 {filename}: {e}")
+                            continue
+
+            logger.info(f"📚 已加载 {len(book_data)} 本书籍信息")
+            return book_data
+
+        except Exception as e:
+            logger.error(f"❌ 加载书籍数据失败: {e}")
+            return []
+
+    def get_existing_pdfs(self):
+        """获取已下载的PDF文件列表"""
+        existing_pdfs = set()
+        if os.path.exists(self.pdf_dir):
+            for filename in os.listdir(self.pdf_dir):
+                if filename.startswith("."):  # 排除Mac的点文件
+                    continue
+                if filename.endswith(".pdf"):
+                    uuid_val = filename[:-4]  # 移除.pdf后缀
+                    existing_pdfs.add(uuid_val)
+
+        logger.info(f"📁 已存在 {len(existing_pdfs)} 个PDF文件")
+        return existing_pdfs
+
+    def filter_books_to_download(self, book_list):
+        """过滤需要下载的书籍"""
+        logger.info("🔍 正在检查下载状态...")
+
+        existing_pdfs = self.get_existing_pdfs()
+        books_to_download = []
+        skipped_count = 0
+
+        for book in book_list:
+            uuid_val = book["uuid"]
+            if uuid_val in existing_pdfs:
+                skipped_count += 1
+                if self.debug:
+                    logger.debug(f"⏭️ 已存在: {book['title']} (UUID: {uuid_val})")
+            else:
+                books_to_download.append(book)
+
+        logger.info(f"📊 检查结果:")
+        logger.info(f"  ✅ 已下载: {skipped_count} 本")
+        logger.info(f"  📥 需要下载: {len(books_to_download)} 本")
+        logger.info(f"  📚 总计: {len(book_list)} 本")
+
+        return books_to_download
+
+    def download_book_pdf_simple(self, book_data):
+        """简化的书籍PDF下载方法"""
+        uuid_val = book_data["uuid"]
+        url = book_data["url"]
+        title = book_data["title"]
+        target_filename = f"{uuid_val}.pdf"
+        target_path = os.path.join(self.pdf_dir, target_filename)
+
+        try:
+            logger.info(f"📖 开始处理: {title} (UUID: {uuid_val})")
+
+            # 访问书籍页面
+            logger.info(f"🔗 访问页面: {url}")
+            self.page.goto(url, wait_until="domcontentloaded", timeout=60000)
+
+            # 等待页面加载
+            time.sleep(3)
+
+            # 查找并点击下载按钮
+            download_button = self.page.locator("#btnCheckOtherFormats")
+            if download_button.count() == 0:
+                logger.warning(f"⚠️ 未找到下载按钮: {title}")
+                return "failed", "未找到下载按钮"
+
+            logger.info(f"🔽 点击下载按钮")
+            download_button.click()
+
+            # 等待下载菜单
+            time.sleep(3)
+
+            # 查找PDF下载链接
+            pdf_link_selectors = [
+                'a.addDownloadedBook:has(b.book-property__extension:text("pdf"))',
+                'a:has(.book-property__extension:text("pdf"))',
+                'a:has(b:text("pdf"))',
+            ]
+
+            pdf_link = None
+            for selector in pdf_link_selectors:
+                try:
+                    links = self.page.locator(selector)
+                    if links.count() > 0:
+                        # 检查是否有低质量标记
+                        for i in range(links.count()):
+                            link = links.nth(i)
+                            low_quality_icon = link.locator("i.low-quality-icon")
+                            if low_quality_icon.count() == 0:
+                                pdf_link = link
+                                break
+                        if pdf_link:
+                            break
+                except:
+                    continue
+
+            if pdf_link:
+                logger.info(f"📥 准备直接下载PDF...")
+
+                # 使用 expect_download 模式捕获下载
+                with self.page.expect_download(timeout=60000) as download_info:
+                    logger.info(f"🖱️ 点击PDF下载链接...")
+                    pdf_link.click()
+
+                download = download_info.value
+
+                logger.info(f"📥 下载事件已捕获: {download.suggested_filename}")
+
+                # 保存文件到目标路径
+                download.save_as(target_path)
+
+                if os.path.exists(target_path):
+                    file_size = os.path.getsize(target_path)
+                    logger.info(f"✅ PDF下载成功: {title} ({file_size} bytes)")
+                    return "success", "PDF下载成功"
+                else:
+                    logger.warning(f"⚠️ 文件保存后未找到: {target_path}")
+                    return "failed", "文件保存后未找到"
+
+            else:
+                # 查找转换选项
+                convert_link = self.page.locator(
+                    'a.converterLink[data-convert_to="pdf"]'
+                )
+                if convert_link.count() > 0:
+                    logger.info(f"🔄 准备转换并下载PDF...")
+
+                    # 使用 expect_download 模式捕获下载
+                    with self.page.expect_download(
+                        timeout=300000
+                    ) as download_info:  # 转换可能需要更长时间
+                        logger.info(f"🖱️ 点击PDF转换选项...")
+                        convert_link.click()
+
+                    download = download_info.value
+
+                    logger.info(
+                        f"📥 转换后下载事件已捕获: {download.suggested_filename}"
+                    )
+
+                    # 保存文件
+                    download.save_as(target_path)
+
+                    if os.path.exists(target_path):
+                        file_size = os.path.getsize(target_path)
+                        logger.info(f"✅ PDF转换下载成功: {title} ({file_size} bytes)")
+                        return "success", "PDF转换下载成功"
+                    else:
+                        logger.warning(f"⚠️ 转换文件保存后未找到: {target_path}")
+                        return "failed", "转换文件保存后未找到"
+
+                else:
+                    logger.info(f"⏭️ 无PDF可用: {title}")
+                    return "skipped", "无PDF格式可用"
+
+        except Exception as e:
+            logger.error(f"❌ 下载失败 {title}: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return "failed", str(e)
+
+    def download_pdfs(self, book_list, max_books=None):
+        """批量下载PDF"""
+        try:
+            # 过滤需要下载的书籍
+            books_to_download = self.filter_books_to_download(book_list)
+
+            # 限制下载数量
+            if max_books and len(books_to_download) > max_books:
+                books_to_download = books_to_download[:max_books]
+                logger.info(f"📝 已限制下载数量为: {max_books} 本")
+
+            if not books_to_download:
+                logger.info("🎉 所有书籍的PDF都已下载完成！")
+                return
+
+            logger.info(f"📥 准备下载 {len(books_to_download)} 本书的PDF")
+
+            # 设置浏览器
+            self.setup_browser()
+
+            # 测试下载设置
+            if not self.test_download_setup():
+                logger.warning("⚠️ 下载设置可能有问题，但继续执行...")
+
+            success_count = 0
+            failed_count = 0
+            skipped_count = 0
+
+            # 使用进度条
+            for i, book_data in enumerate(tqdm(books_to_download, desc="📥 下载PDF")):
+                try:
+                    result, message = self.download_book_pdf_simple(book_data)
+
+                    if result == "success":
+                        success_count += 1
+                        logger.info(f"✅ 成功: {book_data['title']}")
+                    elif result == "skipped":
+                        skipped_count += 1
+                        logger.info(f"⏭️ 跳过: {book_data['title']} - {message}")
+                    else:
+                        failed_count += 1
+                        logger.warning(f"❌ 失败: {book_data['title']} - {message}")
+
+                    # 进度显示
+                    if (i + 1) % 5 == 0:
+                        logger.info(
+                            f"📊 进度: {i + 1}/{len(books_to_download)} (成功:{success_count}, 跳过:{skipped_count}, 失败:{failed_count})"
+                        )
+
+                    # 随机延迟
+                    if i < len(books_to_download) - 1:
+                        wait_time = random.uniform(2, 5)
+                        time.sleep(wait_time)
+
+                except KeyboardInterrupt:
+                    logger.info("⏹️ 用户中断下载...")
+                    break
+                except Exception as e:
+                    logger.error(f"❌ 处理书籍时出错 {book_data['title']}: {e}")
+                    failed_count += 1
+
+            # 最终统计
+            total_processed = success_count + failed_count + skipped_count
+            logger.info(f"\n🎯 独立浏览器下载完成!")
+            logger.info(f"✅ 成功下载: {success_count} 本")
+            logger.info(f"⏭️ 跳过: {skipped_count} 本")
+            logger.info(f"❌ 失败: {failed_count} 本")
+            logger.info(f"📊 总计处理: {total_processed} 本")
+
+            if success_count > 0:
+                logger.info(f"📁 PDF文件保存在: {self.pdf_dir}")
+
+        except Exception as e:
+            logger.error(f"❌ 批量下载出错: {e}")
+        finally:
+            self.cleanup()
+
+
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(
@@ -1311,9 +1638,13 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 使用示例:
-  python book_pdf_downloader.py --count 10
-  python book_pdf_downloader.py --all --ads-id kq316tr
-  python book_pdf_downloader.py --count 5 --debug
+  # 使用AdsPower浏览器(CDP连接，可能有下载问题)
+  python book_pdf_downloader.py --count 10 --ads-id k10i5y1s
+  
+  # 使用独立浏览器(推荐，解决下载问题)
+  python book_pdf_downloader.py --count 10 --standalone
+  python book_pdf_downloader.py --all --standalone --headless
+  python book_pdf_downloader.py --count 5 --standalone --debug
         """,
     )
     parser.add_argument(
@@ -1321,9 +1652,20 @@ def main():
     )
     parser.add_argument("--all", action="store_true", help="下载所有可用的PDF")
     parser.add_argument(
-        "--ads-id", default="kq316tr", help="AdsPower 浏览器ID (默认: kq316tr)"
+        "--ads-id",
+        default="k10i5y1s",
+        help="AdsPower 浏览器ID (默认: k10i5y1s，仅CDP模式使用)",
     )
     parser.add_argument("--debug", "-d", action="store_true", help="启用调试模式")
+    parser.add_argument(
+        "--standalone",
+        "-s",
+        action="store_true",
+        help="使用独立浏览器模式(推荐，解决CDP下载问题)",
+    )
+    parser.add_argument(
+        "--headless", action="store_true", help="无头模式运行(仅独立浏览器模式有效)"
+    )
 
     args = parser.parse_args()
 
@@ -1332,7 +1674,9 @@ def main():
         print("❌ 错误：下载数量必须大于 0")
         return
 
-    ads_id = args.ads_id
+    if args.headless and not args.standalone:
+        print("⚠️ 警告：--headless 仅在 --standalone 模式下有效")
+
     max_books = args.count if not args.all else None
     debug = args.debug
 
@@ -1342,14 +1686,26 @@ def main():
         count_text = f"{args.count} 本" if args.count else "所有"
         print(f"📥 准备下载 {count_text} 书籍的PDF")
 
-    print(f"📱 使用 AdsPower ID: {ads_id}")
-
     if debug:
         print("🔧 调试模式已启用")
 
     try:
-        # 创建下载器
-        downloader = BookPDFDownloader(ads_id=ads_id, debug=debug)
+        if args.standalone:
+            # 使用独立浏览器模式
+            print("🚀 使用独立浏览器模式 (推荐)")
+            print("💡 此模式可解决CDP连接的下载问题")
+
+            downloader = BookPDFDownloaderStandalone(
+                debug=debug, headless=args.headless
+            )
+        else:
+            # 使用CDP连接模式（原有方式）
+            print("🔗 使用AdsPower CDP连接模式")
+            print(f"📱 AdsPower ID: {args.ads_id}")
+            print("⚠️ 注意：此模式可能有下载文件不出现的问题")
+            print("💡 建议使用 --standalone 参数避免下载问题")
+
+            downloader = BookPDFDownloader(ads_id=args.ads_id, debug=debug)
 
         # 加载书籍数据
         book_data = downloader.load_book_data()

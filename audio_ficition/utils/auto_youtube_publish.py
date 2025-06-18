@@ -139,16 +139,59 @@ SUPPORTED_TOPICS = ["scifi", "thriller", "romance", "horror", "fantasy"]
 YOUTUBE_STUDIO_URLS = {
     # 各主题对应的频道URL
     "scifi": "https://studio.youtube.com/channel/UCDZT5uELAHTw2VhWwHISdZA",  # 科幻频道
-    "thriller": None,  # 惊悚频道 (待配置)
+    "thriller": "https://studio.youtube.com/channel/UCGT_hGqykWVkN8CGij2z4Vg",  # 惊悚频道
     "romance": None,  # 浪漫频道 (待配置)
     "horror": None,  # 恐怖频道 (待配置)
-    "fantasy": None,  # 奇幻频道 (待配置)
+    "fantasy": "https://studio.youtube.com/channel/UCe4grZMmPMmnMcIoaTJc05w",  # 奇幻频道
     # 默认频道 (当主题频道未配置时使用)
     "default": "https://studio.youtube.com/channel/UCiCMH2ZdFy3vNqa6X0NVsoA",
 }
 
+# AdsPower 浏览器 ID 映射 - 按主题映射不同的浏览器账户
+ADSPOWER_BROWSER_IDS = {
+    "scifi": "k10i5y1s",  # 科幻主题使用新浏览器
+    "thriller": "k10i5y1s",  # 惊悚主题使用新浏览器
+    "fantasy": "k10i5y1s",  # 奇幻主题使用新浏览器
+    "romance": "kq316tr",  # 浪漫主题使用旧浏览器
+    "horror": "kq316tr",  # 恐怖主题使用旧浏览器
+    # 默认浏览器 ID (当主题未配置时使用)
+    "default": "kq316tr",
+}
+
 
 # 主题资源路径映射 - 用于获取标题、描述和封面
+def get_adspower_browser_id_for_topics(topics):
+    """根据主题列表获取适合的浏览器 ID"""
+    if not topics:
+        return ADSPOWER_BROWSER_IDS["default"]
+
+    # 如果只有一个主题，使用该主题的浏览器 ID
+    if len(topics) == 1:
+        topic = topics[0]
+        browser_id = ADSPOWER_BROWSER_IDS.get(topic, ADSPOWER_BROWSER_IDS["default"])
+        print(f"🎯 主题 '{topic}' 使用浏览器 ID: {browser_id}")
+        return browser_id
+
+    # 多主题情况：检查是否都使用相同的浏览器 ID
+    browser_ids = set()
+    for topic in topics:
+        browser_id = ADSPOWER_BROWSER_IDS.get(topic, ADSPOWER_BROWSER_IDS["default"])
+        browser_ids.add(browser_id)
+
+    if len(browser_ids) == 1:
+        # 所有主题使用相同的浏览器 ID
+        selected_id = browser_ids.pop()
+        print(f"🎯 多主题 {topics} 都使用相同浏览器 ID: {selected_id}")
+        return selected_id
+    else:
+        # 主题使用不同的浏览器 ID，使用默认的
+        print(
+            f"⚠️  多主题 {topics} 使用不同浏览器 ID，采用默认: {ADSPOWER_BROWSER_IDS['default']}"
+        )
+        print(f"💡 建议分别处理不同浏览器 ID 的主题")
+        return ADSPOWER_BROWSER_IDS["default"]
+
+
 def get_topic_resource_paths(topic: str):
     """根据主题和操作系统返回资源文件路径"""
     system = platform.system()
@@ -255,7 +298,14 @@ class YouTubeAutoPublisher:
     ):
         self.topics = topics if isinstance(topics, list) else [topics]
         self.interval_hours = interval_hours
-        self.ads_id = ads_id or "kq316tr"  # 默认浏览器ID
+
+        # 智能选择浏览器 ID：优先使用用户指定 > 主题自动选择 > 默认
+        if ads_id:
+            self.ads_id = ads_id
+            print(f"🎯 使用用户指定浏览器 ID: {self.ads_id}")
+        else:
+            self.ads_id = get_adspower_browser_id_for_topics(self.topics)
+
         self.max_tabs = max_tabs  # 最大tab数量
 
         # 智能选择频道URL：优先使用用户指定 > 主题专用频道 > 默认频道
@@ -277,7 +327,7 @@ class YouTubeAutoPublisher:
         self.wait_minutes = wait_minutes
         self.http = None
         self.close_url = (
-            f"http://127.0.0.1:50325/api/v1/browser/stop?user_id={self.ads_id}"
+            f"http://local.adspower.net:50325/api/v1/browser/stop?user_id={self.ads_id}"
         )
 
         # tab管理相关
@@ -665,7 +715,7 @@ class YouTubeAutoPublisher:
 
     def get_adspower_info(self):
         """连接AdsPower浏览器"""
-        open_url = f"http://127.0.0.1:50325/api/v1/browser/start?user_id={self.ads_id}"
+        open_url = f"http://local.adspower.net:50325/api/v1/browser/start?user_id={self.ads_id}"
 
         self.http = urllib3.PoolManager()
 
@@ -922,12 +972,132 @@ class YouTubeAutoPublisher:
             # 导航到YouTube Studio
             print(f"🌐 正在导航到YouTube Studio: {studio_url}")
             page.goto(studio_url)
-            page.wait_for_load_state("networkidle")
 
-            # 点击上传图标
-            print("📤 正在点击上传图标...")
-            upload_icon = page.locator('[test-id="upload-icon-url"]')
-            upload_icon.click()
+            # 改进的页面加载等待逻辑
+            print("⏳ 等待页面加载...")
+            try:
+                # 使用更短的超时时间避免无限等待
+                page.wait_for_load_state("domcontentloaded", timeout=15000)
+                print("✅ DOM内容加载完成")
+
+                # 额外等待一段时间让页面完全渲染
+                page.wait_for_timeout(5000)
+                print("✅ 页面渲染等待完成")
+
+                # 尝试等待网络空闲，但设置较短超时
+                try:
+                    page.wait_for_load_state("networkidle", timeout=10000)
+                    print("✅ 网络活动已空闲")
+                except Exception as network_timeout:
+                    print(f"⚠️ 网络空闲等待超时，继续执行: {network_timeout}")
+
+            except Exception as load_error:
+                print(f"⚠️ 页面加载等待超时，继续尝试: {load_error}")
+
+            # 检查当前页面状态
+            current_url = page.url
+            print(f"📍 当前页面URL: {current_url}")
+
+            # 检查页面标题
+            try:
+                page_title = page.title()
+                print(f"📄 页面标题: {page_title}")
+            except Exception as title_error:
+                print(f"⚠️ 无法获取页面标题: {title_error}")
+
+            # 检查是否需要登录
+            try:
+                # 检查常见的登录指示器
+                login_indicators = [
+                    "Sign in",
+                    "登录",
+                    "accounts.google.com",
+                    "Choose an account",
+                    "选择账户",
+                ]
+
+                page_text = page.locator("body").inner_text()
+                for indicator in login_indicators:
+                    if indicator.lower() in page_text.lower():
+                        print(f"⚠️ 检测到可能需要登录: 发现 '{indicator}'")
+                        print("💡 请确保浏览器已登录YouTube账户")
+                        break
+
+            except Exception as login_check_error:
+                print(f"⚠️ 登录状态检查失败: {login_check_error}")
+
+            # 点击上传图标 - 使用多种选择器和重试机制
+            print("📤 正在寻找并点击上传图标...")
+
+            # 多种可能的上传图标选择器
+            upload_selectors = [
+                '[test-id="upload-icon-url"]',  # 原始选择器
+                'button[aria-label*="Create"]',  # Create按钮
+                'button[aria-label*="Upload"]',  # Upload按钮
+                "#upload-icon",  # ID选择器
+                ".upload-icon",  # Class选择器
+                'ytcp-icon-button[icon="upload"]',  # YouTube组件选择器
+                '[title*="Upload"]',  # Title属性
+                '[aria-label*="Upload video"]',  # 更具体的aria-label
+            ]
+
+            upload_clicked = False
+            for i, selector in enumerate(upload_selectors):
+                try:
+                    print(
+                        f"🔍 尝试上传图标选择器 {i+1}/{len(upload_selectors)}: {selector}"
+                    )
+
+                    # 先检查元素是否存在
+                    element_count = page.locator(selector).count()
+                    if element_count > 0:
+                        print(f"✅ 找到 {element_count} 个匹配元素")
+
+                        # 等待元素可见和可点击
+                        page.wait_for_selector(selector, state="visible", timeout=5000)
+                        upload_icon = page.locator(selector).first
+
+                        # 点击元素
+                        upload_icon.click()
+                        print(f"✅ 成功点击上传图标 (选择器: {selector})")
+                        upload_clicked = True
+                        break
+                    else:
+                        print(f"❌ 选择器未找到元素: {selector}")
+
+                except Exception as selector_error:
+                    print(f"❌ 选择器 {selector} 失败: {selector_error}")
+                    continue
+
+            if not upload_clicked:
+                print("❌ 所有上传图标选择器都失败")
+                print("🔍 正在分析页面内容...")
+
+                # 打印页面的一些基本信息用于调试
+                try:
+                    # 查找所有可能相关的按钮
+                    buttons = page.locator("button").all()
+                    print(f"📊 页面中发现 {len(buttons)} 个按钮元素")
+
+                    # 显示前几个按钮的信息
+                    for i, button in enumerate(buttons[:10]):
+                        try:
+                            text = button.inner_text()
+                            aria_label = button.get_attribute("aria-label")
+                            title = button.get_attribute("title")
+                            print(
+                                f"   按钮 {i+1}: text='{text}' aria-label='{aria_label}' title='{title}'"
+                            )
+                        except:
+                            print(f"   按钮 {i+1}: 无法获取属性")
+
+                    if len(buttons) > 10:
+                        print(f"   ... 还有 {len(buttons) - 10} 个按钮")
+
+                except Exception as debug_error:
+                    print(f"⚠️ 页面调试信息获取失败: {debug_error}")
+
+                return False
 
             # 等待文件输入框出现
             print("⏳ 等待文件上传输入框...")
@@ -1762,9 +1932,7 @@ def main():
     )
 
     # 浏览器参数
-    parser.add_argument(
-        "--ads-id", default="kq316tr", help="AdsPower浏览器ID (默认: kq316tr)"
-    )
+    parser.add_argument("--ads-id", help="AdsPower浏览器ID (默认: 根据主题自动选择)")
     parser.add_argument("--studio-url", help="YouTube Studio频道URL")
     parser.add_argument(
         "--max-tabs",
@@ -1790,6 +1958,13 @@ def main():
     print("🎬 YouTube 自动发布系统")
     print("=" * 60)
     print(f"🖥️  操作系统: {platform.system()}")
+
+    # 显示浏览器 ID 映射信息
+    print(f"🌐 浏览器 ID 映射:")
+    for topic, browser_id in ADSPOWER_BROWSER_IDS.items():
+        if topic != "default":
+            print(f"   {topic}: {browser_id}")
+    print(f"   默认: {ADSPOWER_BROWSER_IDS['default']}")
 
     # 确定要处理的主题
     topics_to_process = []

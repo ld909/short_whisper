@@ -57,17 +57,18 @@ def get_base_media_path():
 
 
 class BookInfoScraper:
-    def __init__(self, urls_file="book_url.txt", debug=False):
-        self.urls_file = urls_file
+    def __init__(self, urls_file=None, debug=False, language="en"):
+        self.language = language
         self.debug = debug
         self.base_media_path = get_base_media_path()
-        self.base_path = os.path.join(self.base_media_path, "books", "en")
 
-        # 设置目录结构
-        self.thumbnails_dir = os.path.join(self.base_path, "thumbnails")
-        self.info_dir = os.path.join(self.base_path, "info")
-        self.uuid_mapping_file = os.path.join(self.base_path, "uuid_mapping.json")
-        self.progress_file = os.path.join(self.base_path, "scraper_progress.json")
+        # 设置语言相关配置
+        self.setup_language_config()
+
+        # 如果没有指定urls_file，使用语言相关的默认文件
+        if urls_file is None:
+            urls_file = self.default_urls_file
+        self.urls_file = urls_file
 
         # 创建目录
         self._create_directories()
@@ -92,6 +93,29 @@ class BookInfoScraper:
 
         if self.debug:
             logger.info("🔧 调试模式已启用")
+
+    def setup_language_config(self):
+        """根据语种设置配置"""
+        if self.language == "zh":
+            # 中文配置
+            self.base_path = os.path.join(self.base_media_path, "books_zh", "zh")
+            self.default_urls_file = "book_url_zh.txt"
+            self.language_name = "中文"
+        else:
+            # 英文配置（默认）
+            self.base_path = os.path.join(self.base_media_path, "books", "en")
+            self.default_urls_file = "book_url.txt"
+            self.language_name = "English"
+
+        # 设置目录结构
+        self.thumbnails_dir = os.path.join(self.base_path, "thumbnails")
+        self.info_dir = os.path.join(self.base_path, "info")
+        self.uuid_mapping_file = os.path.join(self.base_path, "uuid_mapping.json")
+        self.progress_file = os.path.join(self.base_path, "scraper_progress.json")
+
+        logger.info(f"🌍 语种设置: {self.language_name}")
+        logger.info(f"📁 目标路径: {self.base_path}")
+        logger.info(f"📄 默认URL文件: {self.default_urls_file}")
 
     def _create_directories(self):
         """创建必要的目录结构"""
@@ -973,7 +997,7 @@ class BookInfoScraper:
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(description="📚 Z-Library 电子书信息抓取工具")
-    parser.add_argument("-f", "--file", default="book_url.txt", help="URL文件路径")
+    parser.add_argument("-f", "--file", help="URL文件路径（不指定则根据语言自动选择）")
     parser.add_argument("-m", "--max", type=int, help="最大处理数量")
     parser.add_argument(
         "-r", "--resume", action="store_true", default=True, help="断点续传"
@@ -986,16 +1010,29 @@ def main():
     parser.add_argument(
         "--fix", action="store_true", help="检查并自动修复文件完整性问题"
     )
+    parser.add_argument(
+        "--language",
+        "-l",
+        choices=["en", "zh"],
+        default="en",
+        help="选择语种: en(英文) 或 zh(中文) [默认: en]",
+    )
 
     args = parser.parse_args()
 
     print("🕷️ Z-Library 电子书信息抓取工具")
     print(f"📁 媒体路径: {get_base_media_path()}")
 
+    # 显示语言配置
+    lang_name = "中文" if args.language == "zh" else "English"
+    print(f"🌍 语种: {lang_name}")
+
     # 处理完整性检查/修复模式
     if args.check or args.fix:
         try:
-            scraper = BookInfoScraper(args.file, debug=args.debug)
+            scraper = BookInfoScraper(
+                args.file, debug=args.debug, language=args.language
+            )
             if args.fix:
                 print("🛠️ 模式: 检查并修复文件完整性")
                 scraper.scan_and_fix_integrity(fix_issues=True)
@@ -1007,7 +1044,8 @@ def main():
         return
 
     # 正常爬取模式
-    print(f"📄 URL文件: {args.file}")
+    scraper = BookInfoScraper(args.file, debug=args.debug, language=args.language)
+    print(f"📄 URL文件: {scraper.urls_file}")
 
     if args.max:
         print(f"🔢 限制数量: {args.max}")
@@ -1021,7 +1059,6 @@ def main():
         print("🔧 调试模式: 启用")
 
     try:
-        scraper = BookInfoScraper(args.file, debug=args.debug)
         scraper.scrape_all_books(max_books=args.max, resume=args.resume)
     except KeyboardInterrupt:
         print("👋 程序已停止")

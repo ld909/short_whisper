@@ -64,7 +64,7 @@ def get_base_media_path():
 
 def get_adspower_info(ads_id):
     """连接AdsPower浏览器"""
-    open_url = f"http://127.0.0.1:50325/api/v1/browser/start?user_id={ads_id}"
+    open_url = f"http://local.adspower.net:50325/api/v1/browser/start?user_id={ads_id}"
 
     http = urllib3.PoolManager()
 
@@ -305,9 +305,7 @@ Ensure the total word count reaches at least 4500 words.
                 self.playwright.stop()
 
             # 关闭AdsPower浏览器
-            close_url = (
-                f"http://127.0.0.1:50325/api/v1/browser/stop?user_id={self.ads_id}"
-            )
+            close_url = f"http://local.adspower.net:50325/api/v1/browser/stop?user_id={self.ads_id}"
             http.request("GET", close_url)
 
             print("🧹 浏览器资源已清理")
