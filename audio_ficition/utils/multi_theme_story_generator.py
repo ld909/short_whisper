@@ -170,8 +170,8 @@ def get_workspace_root():
     return Path(__file__).parent.parent.parent
 
 
-def run_theme_generator(theme, count, workspace_root):
-    """运行特定主题的生成器，支持断点续传"""
+def run_theme_generator_single(theme, workspace_root):
+    """为特定主题生成一个故事参数"""
     themes_config = get_themes_config()
     config = themes_config[theme]
     script_path = workspace_root / config["script_path"]
@@ -180,29 +180,13 @@ def run_theme_generator(theme, count, workspace_root):
         print(f"错误: 未找到 {config['display_name']} 生成器脚本: {script_path}")
         return False
 
-    # 检查断点续传
-    output_dir = config["output_info"]
-    existing_count = count_existing_files(output_dir)
-
-    if existing_count >= count:
-        print(f"\n{'='*50}")
-        print(f"📁 {config['display_name']} 已有 {existing_count} 个文件，无需生成")
-        print(f"目标数量: {count}，已存在: {existing_count}")
-        print(f"输出目录: {output_dir}")
-        print(f"{'='*50}")
-        print(f"✅ {config['display_name']} 跳过生成（已完成）!")
-        return True
-
-    need_generate = count - existing_count
-    print(f"\n{'='*50}")
-    print(f"正在为 {config['display_name']} 生成 {need_generate} 个故事参数...")
-    print(f"目标数量: {count}，已存在: {existing_count}，需要生成: {need_generate}")
+    print(f"\n🎯 为 {config['display_name']} 生成 1 个故事参数...")
     print(f"脚本路径: {script_path}")
-    print(f"输出目录: {output_dir}")
-    print(f"{'='*50}")
+    print(f"输出目录: {config['output_info']}")
 
     try:
         # 确保输出目录存在
+        output_dir = config["output_info"]
         os.makedirs(output_dir, exist_ok=True)
 
         # 构建命令
@@ -210,9 +194,9 @@ def run_theme_generator(theme, count, workspace_root):
 
         # 为科幻主题使用不同的参数名
         if theme == "scifi":
-            cmd.extend(["--num", str(need_generate)])
+            cmd.extend(["--num", "1"])
         else:
-            cmd.extend(["-n", str(need_generate)])
+            cmd.extend(["-n", "1"])
 
         # 设置正确的工作目录（脚本所在目录）
         script_dir = script_path.parent
@@ -220,8 +204,6 @@ def run_theme_generator(theme, count, workspace_root):
         # 设置环境变量，传递正确的基础路径给子脚本
         env = os.environ.copy()
         env["AUDIO_BASE_DIR"] = get_base_audio_dir()
-
-        print(f"🔧 设置环境变量 AUDIO_BASE_DIR={env['AUDIO_BASE_DIR']}")
 
         # 执行命令
         result = subprocess.run(
@@ -235,10 +217,11 @@ def run_theme_generator(theme, count, workspace_root):
 
         # 输出结果
         if result.stdout:
-            print("📤 脚本标准输出:")
-            print(result.stdout)
-        if result.stderr:
-            print(f"⚠️  脚本错误输出: {result.stderr}")
+            # 简化输出，只显示关键信息
+            lines = result.stdout.strip().split('\n')
+            key_lines = [line for line in lines if any(keyword in line for keyword in ['✅', '❌', '成功', '失败', '完成', '错误'])]
+            if key_lines:
+                print("📤", " | ".join(key_lines[-2:]))  # 只显示最后2行关键信息
 
         # 检查是否包含明显的错误信息
         has_error = False
@@ -258,11 +241,10 @@ def run_theme_generator(theme, count, workspace_root):
         ):
             has_error = True
             print("🚨 在错误输出中检测到错误信息")
+            print(f"⚠️  错误详情: {result.stderr}")
 
         if result.returncode == 0 and not has_error:
-            # 再次检查文件数量确认生成成功
-            final_count = count_existing_files(output_dir)
-            print(f"✅ {config['display_name']} 生成完成! 最终文件数量: {final_count}")
+            print(f"✅ {config['display_name']} 生成成功!")
             return True
         else:
             print(f"❌ {config['display_name']} 生成失败! 返回码: {result.returncode}")
@@ -274,12 +256,12 @@ def run_theme_generator(theme, count, workspace_root):
 
 
 def main():
-    """主函数"""
+    """主函数 - 实现轮换生成逻辑"""
     # 首先检查系统要求
     check_system_requirements()
 
     parser = argparse.ArgumentParser(
-        description="一次性生成多个主题的故事参数（支持断点续传）",
+        description="一次性生成多个主题的故事参数（轮换模式+断点续传）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 支持的主题:
@@ -288,6 +270,10 @@ def main():
   romance   - 爱情故事
   horror    - 恐怖故事
   fantasy   - 奇幻故事
+
+生成模式:
+  轮换生成 - 每次为所有主题各生成一个故事，循环直到完成
+  例如：主题1故事1 → 主题2故事1 → 主题3故事1 → 主题1故事2 → ...
 
 系统要求:
   - macOS 系统
@@ -299,9 +285,9 @@ def main():
   - 自动排除 Mac 系统产生的点文件
 
 示例:
-  %(prog)s                          # 为所有主题各生成1个故事
-  %(prog)s -n 5                     # 为所有主题各生成5个故事
-  %(prog)s -t thriller romance -n 3 # 只为惊悚和爱情主题各生成3个故事
+  %(prog)s                          # 为所有主题各生成1个故事（轮换模式）
+  %(prog)s -n 5                     # 为所有主题各生成5个故事（轮换模式）
+  %(prog)s -t thriller romance -n 3 # 只为惊悚和爱情主题各生成3个故事（轮换模式）
         """,
     )
 
@@ -324,64 +310,113 @@ def main():
     workspace_root = get_workspace_root()
     themes_config = get_themes_config()
 
-    print("🚀 多主题故事参数生成器启动 (支持断点续传)")
+    print("🚀 多主题故事参数生成器启动（轮换模式+断点续传）")
     print(f"工作区根目录: {workspace_root}")
     print(f"选择的主题: {[themes_config[t]['display_name'] for t in args.themes]}")
     print(f"每个主题目标数量: {args.number}")
     print(f"输出基础目录: {get_base_audio_dir()}")
 
-    # 显示断点续传信息
+    # 显示断点续传信息和计算实际需要生成的数量
     print(f"\n📊 断点续传检查:")
+    theme_progress = {}
     for theme in args.themes:
         config = themes_config[theme]
         existing = count_existing_files(config["output_info"])
+        need_generate = max(0, args.number - existing)
+        theme_progress[theme] = {
+            'existing': existing,
+            'need_generate': need_generate,
+            'target': args.number
+        }
+        
         status = (
             "✅ 已完成"
             if existing >= args.number
-            else f"📝 需要生成 {args.number - existing} 个"
+            else f"📝 需要生成 {need_generate} 个"
         )
         print(f"  {config['display_name']}: {existing}/{args.number} - {status}")
 
+    # 计算总轮次数
+    max_rounds = max(theme_progress[theme]['need_generate'] for theme in args.themes)
+    
+    if max_rounds == 0:
+        print(f"\n✅ 所有主题都已完成目标数量，无需生成新故事！")
+        return 0
+
+    print(f"\n🔄 开始轮换生成，总计 {max_rounds} 轮")
+    print("=" * 60)
+
     # 统计信息
     total_themes = len(args.themes)
-    successful_themes = 0
-    failed_themes = []
+    total_stories_generated = 0
+    failed_generations = []
 
-    # 为每个主题生成故事参数
-    for theme in args.themes:
-        success = run_theme_generator(theme, args.number, workspace_root)
-        if success:
-            successful_themes += 1
-        else:
-            failed_themes.append(themes_config[theme]["display_name"])
+    # 轮换生成逻辑
+    for round_num in range(1, max_rounds + 1):
+        print(f"\n🔄 第 {round_num}/{max_rounds} 轮生成：")
+        print("-" * 40)
+        
+        round_success = 0
+        round_total = 0
+        
+        for theme in args.themes:
+            config = themes_config[theme]
+            
+            # 检查当前主题是否还需要生成
+            current_existing = count_existing_files(config["output_info"])
+            still_need = args.number - current_existing
+            
+            if still_need > 0:
+                round_total += 1
+                print(f"  📝 {config['display_name']} (第{current_existing + 1}个故事):", end=" ")
+                
+                success = run_theme_generator_single(theme, workspace_root)
+                if success:
+                    round_success += 1
+                    total_stories_generated += 1
+                    print(f"     ✅ 成功")
+                else:
+                    failed_generations.append(f"第{round_num}轮-{config['display_name']}")
+                    print(f"     ❌ 失败")
+            else:
+                print(f"  ✅ {config['display_name']}: 已完成所有故事")
+        
+        if round_total > 0:
+            print(f"\n  第{round_num}轮总结: {round_success}/{round_total} 成功")
+        
+        # 如果不是最后一轮，添加间隔
+        if round_num < max_rounds and round_total > 0:
+            print("  ⏳ 准备下一轮...")
 
     # 输出最终统计
     print(f"\n{'='*60}")
-    print("📊 生成统计报告")
+    print("📊 最终生成报告")
     print(f"{'='*60}")
-    print(f"总主题数: {total_themes}")
-    print(f"成功生成: {successful_themes}")
-    print(f"失败主题: {len(failed_themes)}")
+    print(f"总轮次: {max_rounds}")
+    print(f"总故事生成数: {total_stories_generated}")
+    print(f"失败次数: {len(failed_generations)}")
 
-    if failed_themes:
-        print(f"失败的主题: {', '.join(failed_themes)}")
+    if failed_generations:
+        print(f"失败的生成: {', '.join(failed_generations)}")
 
-    if successful_themes > 0:
-        print(f"\n✅ 成功处理 {successful_themes} 个主题")
-        print("📁 输出目录:")
-        for theme in args.themes:
-            if themes_config[theme]["display_name"] not in failed_themes:
-                final_count = count_existing_files(themes_config[theme]["output_info"])
-                print(
-                    f"  {themes_config[theme]['display_name']}: {themes_config[theme]['output_info']} ({final_count} 个文件)"
-                )
+    print(f"\n📁 最终文件统计:")
+    all_success = True
+    for theme in args.themes:
+        config = themes_config[theme]
+        final_count = count_existing_files(config["output_info"])
+        target = args.number
+        status = "✅ 完成" if final_count >= target else "❌ 未完成"
+        if final_count < target:
+            all_success = False
+        print(f"  {config['display_name']}: {final_count}/{target} - {status}")
+        print(f"    📁 {config['output_info']}")
 
-    if failed_themes:
-        print(f"\n❌ {len(failed_themes)} 个主题生成失败，请检查错误信息")
-        return 1
-    else:
-        print(f"\n🎉 所有主题都成功处理！")
+    if all_success:
+        print(f"\n🎉 所有主题都成功完成目标数量！")
         return 0
+    else:
+        print(f"\n⚠️  部分主题未完成目标数量，请检查错误信息")
+        return 1
 
 
 if __name__ == "__main__":

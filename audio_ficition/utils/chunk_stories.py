@@ -20,11 +20,14 @@
 - 文件命名规则: 数字.txt (例如: 1.txt, 2.txt, 3.txt...)
 
 📤 输出信息:
-- Ubuntu 系统输出根目录: /home/dhl/Documents/audio/chunks/
+- Ubuntu 系统主要输出根目录: /home/dhl/Documents/audio/chunks/
+- Ubuntu 系统额外输出根目录: /mnt/dhl/audio/
 - Mac 系统输出根目录: /Volumes/dhl/audio/
-- Ubuntu 输出目录结构: chunks/{theme}/{story_index}/{chunk_index}.txt
+- Ubuntu 主要输出目录结构: chunks/{theme}/{story_index}/{chunk_index}.txt
+- Ubuntu 额外输出目录结构: {theme}/story_chunks/{story_index}/{chunk_index}.txt
 - Mac 输出目录结构: {theme}/story_chunks/{story_index}/{chunk_index}.txt
-- 例如 Ubuntu: chunks/scifi/1/1.txt, chunks/scifi/1/2.txt...
+- 例如 Ubuntu 主要: chunks/scifi/1/1.txt, chunks/scifi/1/2.txt...
+- 例如 Ubuntu 额外: scifi/story_chunks/1/1.txt, scifi/story_chunks/1/2.txt...
 - 例如 Mac: scifi/story_chunks/1/1.txt, scifi/story_chunks/1/2.txt...
 - 每个故事有自己的子目录，按故事索引命名
 - 每个子目录内的文件按块索引命名
@@ -97,6 +100,8 @@ DEFAULT_THEMES = ["scifi", "thriller", "horror", "romance", "fantasy"]
 # 默认路径配置
 DEFAULT_INPUT_BASE_DIR = "/media/dhl/audio"
 DEFAULT_OUTPUT_BASE_DIR = "/home/dhl/Documents/audio/chunks"
+# Ubuntu系统的额外硬盘输出路径
+UBUNTU_EXTRA_OUTPUT_BASE_DIR = "/mnt/dhl/audio"
 
 
 def check_supported_system():
@@ -135,20 +140,23 @@ def get_default_paths(system_type):
         system_type (str): 系统类型 ("ubuntu" 或 "mac")
 
     Returns:
-        tuple: (默认输入基础目录, 默认输出基础目录)
+        tuple: (默认输入基础目录, 默认输出基础目录, Ubuntu额外输出基础目录)
     """
     if system_type == "ubuntu":
         input_base_dir = "/media/dhl/audio"
         output_base_dir = "/home/dhl/Documents/audio/chunks"
+        extra_output_base_dir = "/mnt/dhl/audio"
     elif system_type == "mac":
         input_base_dir = "/Volumes/dhl/audio"
         output_base_dir = "/Volumes/dhl/audio"  # Mac 输出到同一根目录下
+        extra_output_base_dir = None  # Mac 不需要额外输出
     else:
         # 使用 Ubuntu 默认值作为兜底
         input_base_dir = "/media/dhl/audio"
         output_base_dir = "/home/dhl/Documents/audio/chunks"
+        extra_output_base_dir = "/mnt/dhl/audio"
 
-    return input_base_dir, output_base_dir
+    return input_base_dir, output_base_dir, extra_output_base_dir
 
 
 def split_story_into_chunks(content, max_chars=3000):
@@ -242,7 +250,7 @@ def split_story_into_chunks(content, max_chars=3000):
     return chunks
 
 
-def get_theme_directories(input_base_dir, output_base_dir, theme, system_type="ubuntu"):
+def get_theme_directories(input_base_dir, output_base_dir, theme, system_type="ubuntu", extra_output_base_dir=None):
     """
     获取指定主题的输入和输出目录
 
@@ -251,20 +259,27 @@ def get_theme_directories(input_base_dir, output_base_dir, theme, system_type="u
         output_base_dir (str): 输出基础目录
         theme (str): 主题名称
         system_type (str): 系统类型
+        extra_output_base_dir (str): Ubuntu系统的额外输出基础目录
 
     Returns:
-        tuple: (输入目录, 输出目录)
+        tuple: (输入目录, 主要输出目录, 额外输出目录)
     """
     input_dir = os.path.join(input_base_dir, theme, "full_story_refine")
 
     if system_type == "mac":
         # Mac 系统使用 /Volumes/dhl/audio/theme/story_chunks/ 结构
         output_dir = os.path.join(output_base_dir, theme, "story_chunks")
+        extra_output_dir = None
     else:
         # Ubuntu 系统使用原有的 chunks 结构
         output_dir = os.path.join(output_base_dir, theme)
+        # Ubuntu 额外输出目录使用类似Mac的结构
+        if extra_output_base_dir:
+            extra_output_dir = os.path.join(extra_output_base_dir, theme, "story_chunks")
+        else:
+            extra_output_dir = None
 
-    return input_dir, output_dir
+    return input_dir, output_dir, extra_output_dir
 
 
 def get_story_files(input_dir):
@@ -344,7 +359,7 @@ def get_processed_stories(output_dir):
     return processed_stories
 
 
-def process_single_story(input_file, output_base_dir, max_chars=3000, theme_name=""):
+def process_single_story(input_file, output_base_dir, max_chars=3000, theme_name="", extra_output_base_dir=None):
     """
     处理单个故事文件，分割成块并保存
 
@@ -353,6 +368,7 @@ def process_single_story(input_file, output_base_dir, max_chars=3000, theme_name
         output_base_dir (str): 输出基础目录
         max_chars (int): 每个块的最大字符数
         theme_name (str): 主题名称（用于显示）
+        extra_output_base_dir (str): 额外输出基础目录（Ubuntu系统）
 
     Returns:
         tuple: (成功标志, 块数量)
@@ -375,6 +391,12 @@ def process_single_story(input_file, output_base_dir, max_chars=3000, theme_name
         # 创建故事专用目录
         story_output_dir = os.path.join(output_base_dir, story_index)
         os.makedirs(story_output_dir, exist_ok=True)
+        
+        # 如果有额外输出目录，也创建对应的目录
+        extra_story_output_dir = None
+        if extra_output_base_dir:
+            extra_story_output_dir = os.path.join(extra_output_base_dir, story_index)
+            os.makedirs(extra_story_output_dir, exist_ok=True)
 
         # 分割故事
         chunks = split_story_into_chunks(content, max_chars)
@@ -393,8 +415,15 @@ def process_single_story(input_file, output_base_dir, max_chars=3000, theme_name
             # 去掉换行符，变成一大段话
             chunk_content_no_newlines = chunk_content.replace("\n", " ").strip()
 
+            # 保存到主要输出目录
             with open(chunk_filepath, "w", encoding="utf-8") as f:
                 f.write(chunk_content_no_newlines)
+            
+            # 如果有额外输出目录，也保存一份
+            if extra_story_output_dir:
+                extra_chunk_filepath = os.path.join(extra_story_output_dir, chunk_filename)
+                with open(extra_chunk_filepath, "w", encoding="utf-8") as f:
+                    f.write(chunk_content_no_newlines)
 
             chunk_sizes.append(len(chunk_content_no_newlines))
 
@@ -405,6 +434,8 @@ def process_single_story(input_file, output_base_dir, max_chars=3000, theme_name
         prefix = f"[{theme_name}] " if theme_name else ""
         print(f"✅ {prefix}{filename}: {len(chunks)} 个块 (总计 {total_chars} 字符)")
         print(f"   块大小: [{chunk_sizes_str}] 字符, 平均: {avg_chunk_size:.0f} 字符")
+        if extra_story_output_dir:
+            print(f"   📁 已同时保存到额外目录: {extra_story_output_dir}")
 
         return True, len(chunks)
 
@@ -423,6 +454,7 @@ def process_theme(
     preview_mode=False,
     resume_mode=True,
     system_type="ubuntu",
+    extra_output_base_dir=None,
 ):
     """
     处理指定主题的所有故事文件
@@ -435,18 +467,21 @@ def process_theme(
         preview_mode (bool): 是否为预览模式
         resume_mode (bool): 是否启用断点续传
         system_type (str): 系统类型
+        extra_output_base_dir (str): Ubuntu系统的额外输出基础目录
 
     Returns:
         dict: 处理结果统计
     """
     theme_name = SUPPORTED_THEMES[theme]["name"]
-    input_dir, output_dir = get_theme_directories(
-        input_base_dir, output_base_dir, theme, system_type
+    input_dir, output_dir, extra_output_dir = get_theme_directories(
+        input_base_dir, output_base_dir, theme, system_type, extra_output_base_dir
     )
 
     print(f"\n=== 🎭 处理{theme_name}主题 ({theme}) ===")
     print(f"📁 输入目录: {input_dir}")
-    print(f"📁 输出目录: {output_dir}")
+    print(f"📁 主要输出目录: {output_dir}")
+    if extra_output_dir:
+        print(f"📁 额外输出目录: {extra_output_dir}")
 
     # 获取所有故事文件
     story_files = get_story_files(input_dir)
@@ -515,7 +550,10 @@ def process_theme(
             story_output_dir = os.path.join(output_dir, story_index)
             print(f"  {i:2d}. {filename}")
             print(f"      输入: {input_file}")
-            print(f"      输出目录: {story_output_dir}")
+            print(f"      主要输出目录: {story_output_dir}")
+            if extra_output_dir:
+                extra_story_output_dir = os.path.join(extra_output_dir, story_index)
+                print(f"      额外输出目录: {extra_story_output_dir}")
         return {
             "theme": theme,
             "theme_name": theme_name,
@@ -529,6 +567,8 @@ def process_theme(
 
     # 确保输出目录存在
     os.makedirs(output_dir, exist_ok=True)
+    if extra_output_dir:
+        os.makedirs(extra_output_dir, exist_ok=True)
 
     print(f"\n🔄 开始处理{theme_name}主题的 {len(files_to_process)} 个故事...")
 
@@ -542,7 +582,7 @@ def process_theme(
         print(f"\n[{theme_name}] 处理第 {i}/{len(files_to_process)} 个故事: {filename}")
 
         success, chunk_count = process_single_story(
-            input_file, output_dir, max_chars, theme_name
+            input_file, output_dir, max_chars, theme_name, extra_output_dir
         )
 
         if success:
@@ -625,7 +665,7 @@ def main():
         help="要处理的主题，用逗号分隔多个主题 (默认: scifi,thriller,horror,romance,fantasy)",
     )
     # 获取当前系统的默认路径
-    default_input_dir, default_output_dir = get_default_paths(system_type)
+    default_input_dir, default_output_dir, default_extra_output_dir = get_default_paths(system_type)
 
     parser.add_argument(
         "--input-base-dir",
@@ -636,6 +676,11 @@ def main():
         "--output-base-dir",
         default=default_output_dir,
         help=f"输出基础目录路径 (默认: {default_output_dir})",
+    )
+    parser.add_argument(
+        "--extra-output-base-dir",
+        default=default_extra_output_dir,
+        help=f"额外输出基础目录路径 (Ubuntu系统，默认: {default_extra_output_dir})",
     )
     parser.add_argument(
         "--max-chars", type=int, default=3000, help="每个块的最大字符数 (默认: 3000)"
@@ -674,12 +719,18 @@ def main():
             story_output_dir = os.path.join(output_base_dir, "single_file", story_index)
             print(f"  输入: {input_file}")
             print(f"  输出目录: {story_output_dir}")
+            if args.extra_output_base_dir:
+                extra_story_output_dir = os.path.join(args.extra_output_base_dir, "single_file", story_index)
+                print(f"  额外输出目录: {extra_story_output_dir}")
             return
 
         print(f"\n🔄 开始处理单个文件...")
         single_file_output_dir = os.path.join(output_base_dir, "single_file")
+        extra_single_file_output_dir = None
+        if args.extra_output_base_dir:
+            extra_single_file_output_dir = os.path.join(args.extra_output_base_dir, "single_file")
         success, chunk_count = process_single_story(
-            input_file, single_file_output_dir, args.max_chars
+            input_file, single_file_output_dir, args.max_chars, "", extra_single_file_output_dir
         )
 
         if success:
@@ -702,12 +753,15 @@ def main():
     # 使用用户指定的路径或默认路径
     input_base_dir = args.input_base_dir
     output_base_dir = args.output_base_dir
+    extra_output_base_dir = args.extra_output_base_dir
     max_chars = args.max_chars
     resume_mode = not args.no_resume
 
     print(f"\n🎯 多主题故事分块器")
     print(f"📁 输入基础目录: {input_base_dir}")
-    print(f"📁 输出基础目录: {output_base_dir}")
+    print(f"📁 主要输出基础目录: {output_base_dir}")
+    if extra_output_base_dir:
+        print(f"📁 额外输出基础目录: {extra_output_base_dir}")
     print(f"📊 最大字符数: {max_chars} 字符/块")
     print(
         f"🎭 处理主题: {', '.join([SUPPORTED_THEMES[t]['name'] for t in theme_list])}"
@@ -731,6 +785,7 @@ def main():
                 args.preview,
                 resume_mode,
                 system_type,
+                extra_output_base_dir,
             )
             all_results.append(result)
         except Exception as e:
@@ -790,13 +845,18 @@ def main():
                 )
 
             if total_successful > 0:
-                print(f"\n📝 分块后的文件已保存到: {output_base_dir}")
+                print(f"\n📝 分块后的文件已保存到:")
+                print(f"   - 主要目录: {output_base_dir}")
+                if extra_output_base_dir:
+                    print(f"   - 额外目录: {extra_output_base_dir}")
                 if system_type == "mac":
                     print(
                         "📁 目录结构: <theme>/story_chunks/<story_index>/<chunk_index>.txt"
                     )
                 else:
-                    print("📁 目录结构: chunks/<theme>/<story_index>/<chunk_index>.txt")
+                    print("📁 主要目录结构: chunks/<theme>/<story_index>/<chunk_index>.txt")
+                    if extra_output_base_dir:
+                        print("📁 额外目录结构: <theme>/story_chunks/<story_index>/<chunk_index>.txt")
 
 
 if __name__ == "__main__":

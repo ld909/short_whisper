@@ -44,10 +44,11 @@
   * Linux: /mnt/dhl/audio/scifi/mp4_with_subtitles/[故事索引].mp4
 
 使用方法:
-1. 最大GPU利用率: python add_subtitles_to_videos.py --gpu-max
-2. 指定并行数: python add_subtitles_to_videos.py --gpu --gpu-parallel 4
-3. GPU内存监控: python add_subtitles_to_videos.py --gpu --gpu-monitor
-4. 组合使用: python add_subtitles_to_videos.py --gpu-max --gpu-monitor -f
+1. 处理所有主题（默认）: python add_subtitles_to_videos.py --gpu-max
+2. 指定单个主题: python add_subtitles_to_videos.py --theme scifi --gpu-max
+3. 指定并行数: python add_subtitles_to_videos.py --gpu --gpu-parallel 4
+4. GPU内存监控: python add_subtitles_to_videos.py --gpu --gpu-monitor
+5. 组合使用: python add_subtitles_to_videos.py --gpu-max --gpu-monitor -f
 
 🔧 GPU 测试和调试:
 - 快速GPU测试: python add_subtitles_to_videos.py --test-gpu
@@ -95,14 +96,14 @@ def get_paths(theme="scifi"):
             "input_video_dir": f"/Volumes/dhl/audio/{theme}/mp4_full_audio",  # 🔧 修复：实际输出目录是 mp4_full_audio
             "subtitle_dir": f"/Volumes/dhl/audio/{theme}/srt_merge",
             "output_dir": f"/Volumes/dhl/audio/{theme}/mp4_with_subtitles",
-            "font_dir": "font/en/",
+            "font_dir": "audio_ficition/utils/font/en/",
         }
     else:  # 默认为Linux/Ubuntu
         return {
             "input_video_dir": f"/mnt/dhl/audio/{theme}/mp4_full_audio",  # 🔧 修复：实际输出目录是 mp4_full_audio
             "subtitle_dir": f"/mnt/dhl/audio/{theme}/srt_merge",
             "output_dir": f"/mnt/dhl/audio/{theme}/mp4_with_subtitles",
-            "font_dir": "font/en/",
+            "font_dir": "audio_ficition/utils/font/en/",
         }
 
 
@@ -477,7 +478,7 @@ def get_optimal_thread_count():
     return max_threads
 
 
-def select_font_by_weight(font_weight, font_dir="font/en/"):
+def select_font_by_weight(font_weight, font_dir="audio_ficition/utils/font/en/"):
     """
     根据字体粗细选择对应的字体文件
 
@@ -664,94 +665,6 @@ def benchmark_gpu():
                 pass
 
 
-def select_font_by_weight(font_weight, font_dir="font/en/"):
-    """
-    根据字体粗细选择对应的字体文件
-
-    Args:
-        font_weight: 字体粗细，可以是字符串("light", "normal", "medium", "bold", "extra-bold", "black")
-                    或数字(100-900)
-        font_dir: 字体文件目录
-
-    Returns:
-        tuple: (font_file_path, font_display_name)
-    """
-    # 定义字体映射
-    font_mapping = {
-        # 字符串映射
-        "extra-light": ("Oxanium-ExtraLight.ttf", "Oxanium ExtraLight"),
-        "light": ("Oxanium-Light.ttf", "Oxanium Light"),
-        "normal": ("Oxanium-Regular.ttf", "Oxanium Regular"),
-        "regular": ("Oxanium-Regular.ttf", "Oxanium Regular"),
-        "medium": ("Oxanium-Medium.ttf", "Oxanium Medium"),
-        "semi-bold": ("Oxanium-SemiBold.ttf", "Oxanium SemiBold"),
-        "bold": ("Oxanium-Bold.ttf", "Oxanium Bold"),
-        "extra-bold": ("Oxanium-ExtraBold.ttf", "Oxanium ExtraBold"),
-        "black": ("Oxanium-ExtraBold.ttf", "Oxanium ExtraBold"),
-    }
-
-    # 数字权重映射
-    weight_to_file = {
-        100: ("Oxanium-ExtraLight.ttf", "Oxanium ExtraLight"),
-        200: ("Oxanium-ExtraLight.ttf", "Oxanium ExtraLight"),
-        300: ("Oxanium-Light.ttf", "Oxanium Light"),
-        400: ("Oxanium-Regular.ttf", "Oxanium Regular"),
-        500: ("Oxanium-Medium.ttf", "Oxanium Medium"),
-        600: ("Oxanium-SemiBold.ttf", "Oxanium SemiBold"),
-        700: ("Oxanium-Bold.ttf", "Oxanium Bold"),
-        800: ("Oxanium-ExtraBold.ttf", "Oxanium ExtraBold"),
-        900: ("Oxanium-ExtraBold.ttf", "Oxanium ExtraBold"),
-    }
-
-    # 根据类型选择字体
-    if isinstance(font_weight, str):
-        font_key = font_weight.lower().replace("_", "-")
-        if font_key in font_mapping:
-            font_file, font_name = font_mapping[font_key]
-        else:
-            # 默认使用regular
-            font_file, font_name = font_mapping["regular"]
-    elif isinstance(font_weight, int):
-        # 找到最接近的权重
-        closest_weight = min(weight_to_file.keys(), key=lambda x: abs(x - font_weight))
-        font_file, font_name = weight_to_file[closest_weight]
-    else:
-        # 默认使用regular
-        font_file, font_name = font_mapping["regular"]
-
-    font_path = os.path.join(font_dir, font_file)
-
-    # 检查文件是否存在
-    if not os.path.exists(font_path):
-        font_path = os.path.join(font_dir, "Oxanium-VariableFont_wght.ttf")
-        font_name = "Oxanium"
-
-    return font_path, font_name
-
-
-def detect_subtitle_language(srt_path):
-    """简单检测字幕语言 - 快速模式"""
-    try:
-        # 只读取前1000个字符进行检测
-        with open(srt_path, "r", encoding="utf-8") as f:
-            content = f.read(1000)
-
-        # 简单的语言检测
-        if any("\u4e00" <= char <= "\u9fff" for char in content):
-            return "zh"  # 中文
-        elif any(
-            "\u3040" <= char <= "\u309f" or "\u30a0" <= char <= "\u30ff"
-            for char in content
-        ):
-            return "ja"  # 日文
-        elif any("\uac00" <= char <= "\ud7af" for char in content):
-            return "ko"  # 韩文
-        else:
-            return "en"  # 默认英文
-    except Exception:
-        return "en"
-
-
 def burn_subtitles_to_video(video_path, subtitle_path, output_path, **kwargs):
     """将字幕烧录到视频中 - GPU优化版"""
 
@@ -807,10 +720,8 @@ def burn_subtitles_to_video(video_path, subtitle_path, output_path, **kwargs):
         has_gpu, gpu_type = check_gpu_support(fast_check=fast_mode)
         if has_gpu:
             if gpu_type == "cuda":
-                # CUDA硬件加速 - 稳定设置
-                cmd.extend(["-hwaccel", "cuda"])
-                # 移除可能导致格式转换问题的参数
-                # 保持兼容性，不强制使用CUDA输出格式
+                # CUDA硬件加速 - 为提高稳定性，解码在CPU上进行，仅编码在GPU上进行
+                # -hwaccel cuda 已移除，以避免在GPU解码和CPU滤镜之间传输帧时出现问题
                 hw_accel_used = True
                 encoder_used = "h264_nvenc"
             elif gpu_type == "videotoolbox":
@@ -839,19 +750,15 @@ def burn_subtitles_to_video(video_path, subtitle_path, output_path, **kwargs):
             f"MarginV={margin_v}"
         )
 
-    # 字幕滤镜设置 - GPU优化（修复格式转换问题）
-    if hw_accel_used and gpu_type == "cuda":
-        # 使用更兼容的GPU处理方式
-        subtitle_filter = f"subtitles={subtitle_path}"
-        if fonts_dir and not (gpu_max_mode or extreme_speed):
-            subtitle_filter += f":fontsdir={fonts_dir}"
-        subtitle_filter += f":force_style='{force_style}'"
-        # 对于CUDA，我们在CPU上处理字幕，然后用GPU编码
-    else:
-        subtitle_filter = f"subtitles={subtitle_path}"
-        if fonts_dir and not (gpu_max_mode or extreme_speed):
-            subtitle_filter += f":fontsdir={fonts_dir}"
-        subtitle_filter += f":force_style='{force_style}'"
+    # 字幕滤镜设置 - 确保字体正确加载
+    subtitle_filter = f"subtitles={subtitle_path}"
+    
+    # 总是添加字体目录，除非是极致速度模式
+    if fonts_dir and not extreme_speed:
+        subtitle_filter += f":fontsdir={fonts_dir}"
+    
+    # 添加字体样式
+    subtitle_filter += f":force_style='{force_style}'"
 
     cmd.extend(["-vf", subtitle_filter])
 
@@ -863,57 +770,47 @@ def burn_subtitles_to_video(video_path, subtitle_path, output_path, **kwargs):
         if gpu_type == "cuda":
             cmd.extend(["-c:v", "h264_nvenc"])
             if gpu_max_mode:
-                # GPU最大化模式 - 激进设置
+                # GPU最大化模式 - 激进设置 (已优化，移除不稳定的ll-tune)
                 cmd.extend(
                     [
                         "-preset",
                         "p1",  # 最快预设
-                        "-tune",
-                        "ll",  # 低延迟
                         "-rc",
-                        "vbr",  # 可变比特率
+                        "vbr",
                         "-cq",
-                        "32",  # 较低质量换取速度
+                        "28",  # 稍微提高质量以保证稳定性
                         "-b:v",
-                        "1.5M",  # 中等比特率
+                        "2M",
                         "-maxrate",
-                        "3M",
+                        "4M",
                         "-bufsize",
-                        "3M",
+                        "4M",
                         "-g",
                         "120",  # 大GOP
-                        "-bf",
-                        "0",  # 禁用B帧提升编码速度
-                        "-refs",
-                        "1",  # 减少参考帧
-                        "-rc-lookahead",
-                        "8",  # 减少预测
-                        "-surfaces",
-                        "32",  # 增加编码表面数
-                        "-async_depth",
-                        "4",  # 异步深度
+                        "-b_ref_mode",
+                        "disabled",  # 🔧 修复：禁用B-frame引用模式，解决长视频字幕丢失问题
                     ]
                 )
             elif extreme_speed:
-                # 极致速度NVENC设置
+                # 极致速度NVENC设置 (已优化，移除不稳定的ll-tune)
                 cmd.extend(
                     [
                         "-preset",
                         "p1",
-                        "-tune",
-                        "ll",
                         "-rc",
                         "vbr",
                         "-cq",
-                        "35",
+                        "30",
                         "-b:v",
-                        "1M",
+                        "1.5M",
                         "-maxrate",
-                        "2M",
+                        "2.5M",
                         "-bufsize",
-                        "2M",
+                        "2.5M",
                         "-g",
                         "60",
+                        "-b_ref_mode",
+                        "disabled",  # 🔧 修复：禁用B-frame引用模式，解决长视频字幕丢失问题
                     ]
                 )
             else:
@@ -927,6 +824,8 @@ def burn_subtitles_to_video(video_path, subtitle_path, output_path, **kwargs):
                         "3M",
                         "-bufsize",
                         "3M",
+                        "-b_ref_mode",
+                        "disabled",  # 🔧 修复：禁用B-frame引用模式，解决长视频字幕丢失问题
                     ]
                 )
         elif gpu_type == "videotoolbox":
@@ -1242,9 +1141,9 @@ def main():
     parser.add_argument("--story", help="只处理指定的故事索引")
     parser.add_argument(
         "--theme",
-        default="scifi",
-        choices=["scifi", "thriller", "horror", "fantasy", "romance"],
-        help="指定主题 (默认: scifi)",
+        default="all",
+        choices=["all", "scifi", "thriller", "horror", "fantasy", "romance"],
+        help="指定主题 (默认: all - 处理所有主题)",
     )
 
     # 字体和样式参数
@@ -1310,7 +1209,15 @@ def main():
     print("🚀 视频字幕添加器 - GPU优化并行处理版")
     print("=" * 60)
     print(f"🖥️  操作系统: {platform.system()}")
-    print(f"🎭 主题: {args.theme}")
+    
+    # 确定要处理的主题列表
+    all_themes = ["scifi", "thriller", "horror", "fantasy", "romance"]
+    if args.theme == "all":
+        themes_to_process = all_themes
+        print(f"🎭 主题: 所有主题 ({', '.join(themes_to_process)})")
+    else:
+        themes_to_process = [args.theme]
+        print(f"🎭 主题: {args.theme}")
 
     # 检查依赖
     if not args.fast_mode and not check_ffmpeg():
@@ -1361,6 +1268,7 @@ def main():
             args.gpu = False
 
     # GPU模式设置和并行数计算
+    gpu_monitor = None
     if args.gpu_max or args.gpu or args.gpu_parallel:
         has_gpu, gpu_type = check_gpu_support(fast_check=args.fast_mode)
         if has_gpu:
@@ -1435,224 +1343,256 @@ def main():
     print(f"🎨 字体大小: {args.font_size}")
     print(f"🎨 字体粗细: {args.font_weight}")
 
-    # 获取路径配置
-    paths = get_paths(args.theme)
-    if not args.fast_mode:
-        print(f"📁 输入视频: {paths['input_video_dir']}")
-        print(f"📁 字幕文件: {paths['subtitle_dir']}")
-        print(f"📁 输出目录: {paths['output_dir']}")
+    # 处理所有主题
+    total_session_stats = {"successful": 0, "failed": 0}
+    all_start_time = time.time()
 
-    # 扫描故事文件
-    if not args.fast_mode:
-        print(f"\n🔍 扫描故事文件...")
-    story_info = get_story_files(paths)
+    for theme_index, current_theme in enumerate(themes_to_process, 1):
+        print(f"\n{'=' * 60}")
+        print(f"🎭 处理主题 {theme_index}/{len(themes_to_process)}: {current_theme}")
+        print(f"{'=' * 60}")
 
-    if not story_info:
-        print("❌ 未找到任何故事文件")
-        return
+        # 获取当前主题的路径配置
+        paths = get_paths(current_theme)
+        if not args.fast_mode:
+            print(f"📁 输入视频: {paths['input_video_dir']}")
+            print(f"📁 字幕文件: {paths['subtitle_dir']}")
+            print(f"📁 输出目录: {paths['output_dir']}")
 
-    if not args.fast_mode:
-        print(f"📊 找到 {len(story_info)} 个故事")
+        # 扫描故事文件
+        if not args.fast_mode:
+            print(f"\n🔍 扫描 {current_theme} 主题故事文件...")
+        story_info = get_story_files(paths)
 
-    # 过滤指定故事
-    if args.story:
-        if args.story in story_info:
-            story_info = {args.story: story_info[args.story]}
-            if not args.fast_mode:
-                print(f"🎯 只处理故事: {args.story}")
-        else:
-            print(f"❌ 未找到指定的故事: {args.story}")
-            return
-
-    # 检查文件完整性
-    complete_stories = {}
-    missing_files = []
-
-    for story_index, files in story_info.items():
-        # 应用索引范围过滤
-        try:
-            story_num = int(story_index)
-            if args.start is not None and story_num < args.start:
-                continue
-            if args.end is not None and story_num > args.end:
-                continue
-        except ValueError:
+        if not story_info:
+            print(f"❌ {current_theme} 主题未找到任何故事文件，跳过")
             continue
 
-        has_video = "video_file" in files
-        has_subtitle = "subtitle_file" in files
-
-        if has_video and has_subtitle:
-            complete_stories[story_index] = files
-        else:
-            missing_files.append(story_index)
-
-    if not complete_stories:
-        print("❌ 没有文件完整的故事可以处理")
-        return
-
-    # 扫描已存在的输出视频
-    existing_output = set()
-    if not args.force:
-        existing_output = get_existing_output_videos(
-            paths["output_dir"], args.fast_mode
-        )
-
-    # 确定需要处理的故事
-    stories_to_process = {}
-    for story_index, files in complete_stories.items():
-        if args.force or story_index not in existing_output:
-            stories_to_process[story_index] = files
-
-    # 统计信息
-    stats = {
-        "total_stories": len(story_info),
-        "complete_stories": len(complete_stories),
-        "completed_subtitles": len(existing_output & set(complete_stories.keys())),
-        "pending_subtitles": len(stories_to_process),
-        "missing_files": missing_files,
-    }
-
-    if not args.fast_mode:
-        print(f"\n📈 处理统计:")
-        print(f"   总故事数: {stats['total_stories']}")
-        print(f"   文件完整: {stats['complete_stories']}")
-        print(f"   已完成: {stats['completed_subtitles']}")
-        print(f"   待处理: {stats['pending_subtitles']}")
-
-    if stats["pending_subtitles"] == 0:
-        print(f"\n🎉 所有文件都已完成字幕添加！")
-        return
-
-    # 确保输出目录存在
-    os.makedirs(paths["output_dir"], exist_ok=True)
-
-    # 开始GPU并行处理
-    print(f"\n🎬 启动字幕添加处理（GPU并行模式）")
-    if args.extreme_speed:
-        print("⚡ 极致速度模式已启用")
-
-    # 处理字体权重参数
-    font_weight = args.font_weight
-    if args.font_weight.isdigit():
-        font_weight = int(args.font_weight)
-
-    # 准备处理参数
-    process_kwargs = {
-        "output_dir": paths["output_dir"],
-        "font_size": args.font_size,
-        "font_color": args.font_color,
-        "outline_color": args.outline_color,
-        "outline_width": args.outline_width,
-        "margin_v": args.margin_v,
-        "font_path": args.font_path,
-        "font_weight": font_weight,
-        "font_dir": paths["font_dir"],
-        "use_gpu": args.gpu,
-        "extreme_speed": args.extreme_speed,
-        "fast_mode": args.fast_mode,
-        "gpu_max_mode": args.gpu_max,
-        "gpu_parallel_test": args.gpu_parallel,
-    }
-
-    try:
-        start_time = time.time()
-
-        # 创建GPU并行处理器
-        processor = ParallelGPUProcessor(
-            max_workers=args.gpu_parallel, gpu_monitor=gpu_monitor
-        )
-
-        # 执行GPU并行处理
-        session_stats = processor.process_stories(stories_to_process, **process_kwargs)
-
-        end_time = time.time()
-        total_time = end_time - start_time
-
-        # 停止GPU监控
-        if gpu_monitor:
-            gpu_monitor.stop_monitoring()
-            avg_utilization = gpu_monitor.get_average_utilization()
-            print(f"\n🔍 GPU平均利用率: {avg_utilization:.1f}%")
-
-        # 保存进度日志
         if not args.fast_mode:
-            save_progress_log(paths["output_dir"], stats, session_stats)
+            print(f"📊 找到 {len(story_info)} 个故事")
 
-        # 结果统计
-        print(f"\n=== 🎉 字幕添加完成 ===")
-        print(f"✅ 成功处理: {session_stats['successful']} 个故事")
-        print(f"❌ 处理失败: {session_stats['failed']} 个故事")
-        print(f"⏱️  总耗时: {total_time:.1f} 秒 ({total_time/60:.1f} 分钟)")
+        # 过滤指定故事
+        if args.story:
+            if args.story in story_info:
+                story_info = {args.story: story_info[args.story]}
+                if not args.fast_mode:
+                    print(f"🎯 只处理故事: {args.story}")
+            else:
+                print(f"❌ {current_theme} 主题未找到指定的故事: {args.story}，跳过")
+                continue
 
-        if session_stats["successful"] > 0:
-            avg_time = total_time / session_stats["successful"]
-            throughput = session_stats["successful"] / (total_time / 60)  # 每分钟处理数
+        # 检查文件完整性
+        complete_stories = {}
+        missing_files = []
 
-            print(f"📊 平均处理时间: {avg_time:.1f} 秒/故事")
-            print(f"🎬 处理速度: {throughput:.1f} 故事/分钟")
+        for story_index, files in story_info.items():
+            # 应用索引范围过滤
+            try:
+                story_num = int(story_index)
+                if args.start is not None and story_num < args.start:
+                    continue
+                if args.end is not None and story_num > args.end:
+                    continue
+            except ValueError:
+                continue
 
-            # GPU加速效果统计
-            if args.gpu and args.gpu_parallel > 1:
-                theoretical_speedup = args.gpu_parallel
-                actual_speedup = min(
-                    throughput / (1 / (avg_time * args.gpu_parallel)),
-                    theoretical_speedup,
-                )
-                efficiency = (actual_speedup / theoretical_speedup) * 100
-                print(
-                    f"🚀 GPU并行效率: {efficiency:.1f}% (实际加速: {actual_speedup:.1f}x)"
-                )
+            has_video = "video_file" in files
+            has_subtitle = "subtitle_file" in files
 
-        if stats["pending_subtitles"] > 0:
-            success_rate = (
-                session_stats["successful"] / stats["pending_subtitles"] * 100
+            if has_video and has_subtitle:
+                complete_stories[story_index] = files
+            else:
+                missing_files.append(story_index)
+
+        if not complete_stories:
+            print(f"❌ {current_theme} 主题没有文件完整的故事可以处理，跳过")
+            continue
+
+        # 扫描已存在的输出视频
+        existing_output = set()
+        if not args.force:
+            existing_output = get_existing_output_videos(
+                paths["output_dir"], args.fast_mode
             )
-            print(f"📊 成功率: {success_rate:.1f}%")
 
-        # 性能统计
-        total_completed = stats["completed_subtitles"] + session_stats["successful"]
-        completion_rate = total_completed / stats["complete_stories"] * 100
-        print(
-            f"📊 总体完成率: {completion_rate:.1f}% ({total_completed}/{stats['complete_stories']})"
-        )
+        # 确定需要处理的故事
+        stories_to_process_current = {}
+        for story_index, files in complete_stories.items():
+            if args.force or story_index not in existing_output:
+                stories_to_process_current[story_index] = files
 
-        # 模式提醒
-        if args.gpu_max:
-            print("🚀 GPU最大化模式已使用，获得最佳处理速度")
-        elif args.extreme_speed:
-            print("⚡ 极致速度模式已使用，输出质量可能有所降低")
+        # 统计信息
+        stats = {
+            "total_stories": len(story_info),
+            "complete_stories": len(complete_stories),
+            "completed_subtitles": len(existing_output & set(complete_stories.keys())),
+            "pending_subtitles": len(stories_to_process_current),
+            "missing_files": missing_files,
+        }
 
-        print(f"📁 输出目录: {paths['output_dir']}")
+        if not args.fast_mode:
+            print(f"\n📈 {current_theme} 主题处理统计:")
+            print(f"   总故事数: {stats['total_stories']}")
+            print(f"   文件完整: {stats['complete_stories']}")
+            print(f"   已完成: {stats['completed_subtitles']}")
+            print(f"   待处理: {stats['pending_subtitles']}")
 
-        # 错误提醒和建议
-        if session_stats["failed"] > 0:
-            print(f"\n⚠️  有 {session_stats['failed']} 个故事处理失败")
-            if not args.extreme_speed:
-                print("   建议检查错误日志或重试")
+        if stats["pending_subtitles"] == 0:
+            print(f"\n🎉 {current_theme} 主题所有文件都已完成字幕添加！")
+            continue
 
-        # GPU优化建议
-        if args.gpu and gpu_monitor:
-            avg_utilization = gpu_monitor.get_average_utilization()
-            if avg_utilization < 70:
-                print(f"\n💡 GPU优化建议: GPU利用率较低({avg_utilization:.1f}%)")
-                print("   可尝试增加并行数: --gpu-parallel N")
-            elif avg_utilization > 95:
-                print(f"\n💡 GPU优化建议: GPU利用率很高({avg_utilization:.1f}%)")
-                print("   当前设置已接近最优")
+        # 确保输出目录存在
+        os.makedirs(paths["output_dir"], exist_ok=True)
 
-    except KeyboardInterrupt:
-        print(f"\n⚠️  用户中断程序")
-        if gpu_monitor:
-            gpu_monitor.stop_monitoring()
-        print(f"✅ 已处理: {processor.results['successful']} 个故事")
-        print(f"❌ 处理失败: {processor.results['failed']} 个故事")
-    except Exception as e:
-        print(f"\n❌ 程序异常: {e}")
-        if gpu_monitor:
-            gpu_monitor.stop_monitoring()
-        print(f"✅ 已处理: {processor.results['successful']} 个故事")
-        print(f"❌ 处理失败: {processor.results['failed']} 个故事")
+        # 开始GPU并行处理
+        print(f"\n🎬 启动 {current_theme} 主题字幕添加处理（GPU并行模式）")
+        if args.extreme_speed:
+            print("⚡ 极致速度模式已启用")
+
+        # 处理字体权重参数
+        font_weight = args.font_weight
+        if args.font_weight.isdigit():
+            font_weight = int(args.font_weight)
+
+        # 准备处理参数
+        process_kwargs = {
+            "output_dir": paths["output_dir"],
+            "font_size": args.font_size,
+            "font_color": args.font_color,
+            "outline_color": args.outline_color,
+            "outline_width": args.outline_width,
+            "margin_v": args.margin_v,
+            "font_path": args.font_path,
+            "font_weight": font_weight,
+            "font_dir": paths["font_dir"],
+            "use_gpu": args.gpu,
+            "extreme_speed": args.extreme_speed,
+            "fast_mode": args.fast_mode,
+            "gpu_max_mode": args.gpu_max,
+            "gpu_parallel_test": args.gpu_parallel,
+        }
+
+        try:
+            start_time = time.time()
+
+            # 创建GPU并行处理器
+            processor = ParallelGPUProcessor(
+                max_workers=args.gpu_parallel, gpu_monitor=gpu_monitor
+            )
+
+            # 执行GPU并行处理
+            session_stats = processor.process_stories(stories_to_process_current, **process_kwargs)
+
+            end_time = time.time()
+            total_time = end_time - start_time
+
+            # 累计统计
+            total_session_stats["successful"] += session_stats["successful"]
+            total_session_stats["failed"] += session_stats["failed"]
+
+            # 保存进度日志
+            if not args.fast_mode:
+                save_progress_log(paths["output_dir"], stats, session_stats)
+
+            # 单个主题结果统计
+            print(f"\n=== 🎉 {current_theme} 主题字幕添加完成 ===")
+            print(f"✅ 成功处理: {session_stats['successful']} 个故事")
+            print(f"❌ 处理失败: {session_stats['failed']} 个故事")
+            print(f"⏱️  耗时: {total_time:.1f} 秒 ({total_time/60:.1f} 分钟)")
+
+            if session_stats["successful"] > 0:
+                avg_time = total_time / session_stats["successful"]
+                throughput = session_stats["successful"] / (total_time / 60)  # 每分钟处理数
+
+                print(f"📊 平均处理时间: {avg_time:.1f} 秒/故事")
+                print(f"🎬 处理速度: {throughput:.1f} 故事/分钟")
+
+            if stats["pending_subtitles"] > 0:
+                success_rate = (
+                    session_stats["successful"] / stats["pending_subtitles"] * 100
+                )
+                print(f"📊 成功率: {success_rate:.1f}%")
+
+            # 性能统计
+            total_completed = stats["completed_subtitles"] + session_stats["successful"]
+            completion_rate = total_completed / stats["complete_stories"] * 100
+            print(
+                f"📊 总体完成率: {completion_rate:.1f}% ({total_completed}/{stats['complete_stories']})"
+            )
+
+            print(f"📁 输出目录: {paths['output_dir']}")
+
+            # 错误提醒和建议
+            if session_stats["failed"] > 0:
+                print(f"\n⚠️  有 {session_stats['failed']} 个故事处理失败")
+
+        except KeyboardInterrupt:
+            print(f"\n⚠️  用户中断程序")
+            total_session_stats["successful"] += processor.results['successful']
+            total_session_stats["failed"] += processor.results['failed']
+            break
+        except Exception as e:
+            print(f"\n❌ {current_theme} 主题处理异常: {e}")
+            total_session_stats["successful"] += processor.results['successful']
+            total_session_stats["failed"] += processor.results['failed']
+
+    # 停止GPU监控
+    if gpu_monitor:
+        gpu_monitor.stop_monitoring()
+        avg_utilization = gpu_monitor.get_average_utilization()
+        print(f"\n🔍 GPU平均利用率: {avg_utilization:.1f}%")
+
+    # 最终总结果统计
+    all_end_time = time.time()
+    all_total_time = all_end_time - all_start_time
+
+    print(f"\n{'=' * 60}")
+    print(f"🎉 所有主题字幕添加任务完成")
+    print(f"{'=' * 60}")
+    print(f"🎭 处理主题: {', '.join(themes_to_process)}")
+    print(f"✅ 总成功处理: {total_session_stats['successful']} 个故事")
+    print(f"❌ 总处理失败: {total_session_stats['failed']} 个故事")
+    print(f"⏱️  总耗时: {all_total_time:.1f} 秒 ({all_total_time/60:.1f} 分钟)")
+
+    if total_session_stats["successful"] > 0:
+        avg_time = all_total_time / total_session_stats["successful"]
+        throughput = total_session_stats["successful"] / (all_total_time / 60)  # 每分钟处理数
+
+        print(f"📊 平均处理时间: {avg_time:.1f} 秒/故事")
+        print(f"🎬 处理速度: {throughput:.1f} 故事/分钟")
+
+        # GPU加速效果统计
+        if args.gpu and args.gpu_parallel > 1:
+            theoretical_speedup = args.gpu_parallel
+            actual_speedup = min(
+                throughput / (1 / (avg_time * args.gpu_parallel)),
+                theoretical_speedup,
+            )
+            efficiency = (actual_speedup / theoretical_speedup) * 100
+            print(
+                f"🚀 GPU并行效率: {efficiency:.1f}% (实际加速: {actual_speedup:.1f}x)"
+            )
+
+    total_stories = total_session_stats["successful"] + total_session_stats["failed"]
+    if total_stories > 0:
+        success_rate = (total_session_stats["successful"] / total_stories * 100)
+        print(f"📊 总成功率: {success_rate:.1f}%")
+
+    # 模式提醒
+    if args.gpu_max:
+        print("🚀 GPU最大化模式已使用，获得最佳处理速度")
+    elif args.extreme_speed:
+        print("⚡ 极致速度模式已使用，输出质量可能有所降低")
+
+    # GPU优化建议
+    if args.gpu and gpu_monitor:
+        avg_utilization = gpu_monitor.get_average_utilization()
+        if avg_utilization < 70:
+            print(f"\n💡 GPU优化建议: GPU利用率较低({avg_utilization:.1f}%)")
+            print("   可尝试增加并行数: --gpu-parallel N")
+        elif avg_utilization > 95:
+            print(f"\n💡 GPU优化建议: GPU利用率很高({avg_utilization:.1f}%)")
+            print("   当前设置已接近最优")
 
 
 if __name__ == "__main__":

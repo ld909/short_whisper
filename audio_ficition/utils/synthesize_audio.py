@@ -160,7 +160,7 @@ def get_theme_directories(input_base_dir, output_base_dir, theme):
     return input_dir, output_dir
 
 
-def get_chunk_files_by_theme(input_dir, theme):
+def get_chunk_files_by_theme(input_dir, theme, max_stories=None):
     """
     获取指定主题的所有文本块文件，按故事索引和块索引排序
     排除Mac生成的以点开头的meta文件
@@ -168,6 +168,7 @@ def get_chunk_files_by_theme(input_dir, theme):
     Args:
         input_dir (str): 主题输入目录路径
         theme (str): 主题名称
+        max_stories (int, optional): 最大处理的故事数量，None表示处理所有故事
 
     Returns:
         list: 排序后的文本块文件路径列表，格式：[(story_index, chunk_file)]
@@ -177,8 +178,9 @@ def get_chunk_files_by_theme(input_dir, theme):
         return []
 
     chunk_files = []
+    story_dirs = []
 
-    # 遍历所有故事目录
+    # 先收集所有故事目录
     for story_dir in glob.glob(os.path.join(input_dir, "*")):
         if os.path.isdir(story_dir):
             story_index = os.path.basename(story_dir)
@@ -188,36 +190,7 @@ def get_chunk_files_by_theme(input_dir, theme):
                 print(f"⏭️  [{SUPPORTED_THEMES[theme]['name']}] 跳过隐藏目录: {story_dir}")
                 continue
 
-            # 获取该故事的所有txt文件
-            chunk_pattern = os.path.join(story_dir, "*.txt")
-            story_chunks = glob.glob(chunk_pattern)
-
-            # 过滤掉以点开头的文件
-            filtered_chunks = []
-            for chunk_file in story_chunks:
-                filename = os.path.basename(chunk_file)
-                if filename.startswith("."):
-                    print(f"⏭️  [{SUPPORTED_THEMES[theme]['name']}] 跳过隐藏文件: {chunk_file}")
-                    continue
-                # 确保文件确实是txt文件且不是临时文件
-                if filename.endswith(".txt") and not filename.startswith("._"):
-                    filtered_chunks.append(chunk_file)
-                else:
-                    print(f"⏭️  [{SUPPORTED_THEMES[theme]['name']}] 跳过非txt文件或临时文件: {chunk_file}")
-
-            # 按块索引排序
-            def extract_chunk_number(filepath):
-                basename = os.path.basename(filepath)
-                try:
-                    return int(basename.split(".")[0])
-                except:
-                    return 0
-
-            filtered_chunks.sort(key=extract_chunk_number)
-
-            # 添加到总列表
-            for chunk_file in filtered_chunks:
-                chunk_files.append((story_index, chunk_file))
+            story_dirs.append((story_index, story_dir))
 
     # 按故事索引排序
     def extract_story_number(item):
@@ -227,7 +200,46 @@ def get_chunk_files_by_theme(input_dir, theme):
         except:
             return 0
 
-    chunk_files.sort(key=extract_story_number)
+    story_dirs.sort(key=extract_story_number)
+
+    # 如果指定了数量限制，只处理前N个故事
+    total_available_stories = len(story_dirs)
+    if max_stories is not None and max_stories > 0:
+        story_dirs = story_dirs[:max_stories]
+        print(f"📊 [{SUPPORTED_THEMES[theme]['name']}] 限制处理故事数量: {len(story_dirs)}/{total_available_stories} (指定数量: {max_stories})")
+
+    # 遍历选定的故事目录
+    for story_index, story_dir in story_dirs:
+        # 获取该故事的所有txt文件
+        chunk_pattern = os.path.join(story_dir, "*.txt")
+        story_chunks = glob.glob(chunk_pattern)
+
+        # 过滤掉以点开头的文件
+        filtered_chunks = []
+        for chunk_file in story_chunks:
+            filename = os.path.basename(chunk_file)
+            if filename.startswith("."):
+                print(f"⏭️  [{SUPPORTED_THEMES[theme]['name']}] 跳过隐藏文件: {chunk_file}")
+                continue
+            # 确保文件确实是txt文件且不是临时文件
+            if filename.endswith(".txt") and not filename.startswith("._"):
+                filtered_chunks.append(chunk_file)
+            else:
+                print(f"⏭️  [{SUPPORTED_THEMES[theme]['name']}] 跳过非txt文件或临时文件: {chunk_file}")
+
+        # 按块索引排序
+        def extract_chunk_number(filepath):
+            basename = os.path.basename(filepath)
+            try:
+                return int(basename.split(".")[0])
+            except:
+                return 0
+
+        filtered_chunks.sort(key=extract_chunk_number)
+
+        # 添加到总列表
+        for chunk_file in filtered_chunks:
+            chunk_files.append((story_index, chunk_file))
 
     return chunk_files
 
@@ -469,9 +481,6 @@ def scan_existing_files_by_theme(output_dir, theme):
     return existing_files
 
 
-
-
-
 def process_chunk_with_theme(
     story_index,
     chunk_file,
@@ -539,7 +548,7 @@ def process_chunk_with_theme(
         return False
 
 
-def process_theme(theme, input_base_dir, output_base_dir, ref_audio, model="F5TTS_v1_Base", preview_mode=False, resume_mode=True, force_regenerate=False):
+def process_theme(theme, input_base_dir, output_base_dir, ref_audio, model="F5TTS_v1_Base", preview_mode=False, resume_mode=True, force_regenerate=False, max_stories=None):
     """
     处理指定主题的所有文本块文件
     
@@ -552,6 +561,7 @@ def process_theme(theme, input_base_dir, output_base_dir, ref_audio, model="F5TT
         preview_mode (bool): 是否为预览模式
         resume_mode (bool): 是否启用断点续传
         force_regenerate (bool): 是否强制重新生成
+        max_stories (int, optional): 最大处理的故事数量
         
     Returns:
         dict: 处理结果统计
@@ -563,8 +573,11 @@ def process_theme(theme, input_base_dir, output_base_dir, ref_audio, model="F5TT
     print(f"📁 输入目录: {input_dir}")
     print(f"📁 输出目录: {output_dir}")
     
-    # 获取所有文本块文件
-    chunk_files = get_chunk_files_by_theme(input_dir, theme)
+    if max_stories is not None:
+        print(f"🔢 限制故事数量: {max_stories} 个")
+    
+    # 获取所有文本块文件（带数量限制）
+    chunk_files = get_chunk_files_by_theme(input_dir, theme, max_stories)
     
     if not chunk_files:
         print(f"❌ [{theme_name}] 在目录 {input_dir} 中未找到任何文本块文件")
@@ -577,8 +590,18 @@ def process_theme(theme, input_base_dir, output_base_dir, ref_audio, model="F5TT
             'skipped': 0
         }
     
-    print(f"📊 [{theme_name}] 找到 {len(chunk_files)} 个文本块文件")
+    # 统计故事数量信息
+    unique_stories = set(story_index for story_index, _ in chunk_files)
+    actual_story_count = len(unique_stories)
     
+    print(f"📊 [{theme_name}] 找到 {actual_story_count} 个故事，共 {len(chunk_files)} 个文本块文件")
+    
+    if max_stories is not None:
+        if actual_story_count < max_stories:
+            print(f"⚠️  [{theme_name}] 注意：请求处理 {max_stories} 个故事，但只找到 {actual_story_count} 个故事")
+        else:
+            print(f"✅ [{theme_name}] 按要求处理前 {max_stories} 个故事")
+
     # 扫描已存在的文件（除非强制重新生成）
     existing_files = {}
     if not force_regenerate and resume_mode:
@@ -784,6 +807,8 @@ def main():
   python synthesize_audio.py                           # 处理所有默认主题
   python synthesize_audio.py --theme scifi            # 处理科幻主题
   python synthesize_audio.py --theme scifi,horror     # 处理多个主题
+  python synthesize_audio.py --count 5                # 每个主题只处理前5个故事
+  python synthesize_audio.py --theme scifi --count 3  # 科幻主题只处理前3个故事
   python synthesize_audio.py --preview                # 预览模式
   python synthesize_audio.py --no-resume              # 禁用断点续传
         """
@@ -839,6 +864,11 @@ def main():
         action="store_true",
         help="列出所有支持的主题"
     )
+    parser.add_argument(
+        "--count", "-n",
+        type=int,
+        help="限制每个主题处理的故事数量 (例如: --count 5 表示每个主题只处理前5个故事)"
+    )
 
     args = parser.parse_args()
     
@@ -878,6 +908,11 @@ def main():
     print(f"🎭 处理主题: {', '.join([SUPPORTED_THEMES[t]['name'] for t in theme_list])}")
     print(f"🔄 断点续传: {'启用' if resume_mode else '禁用'}")
     print(f"🚫 自动排除Mac系统文件 (.DS_Store等)")
+    
+    if args.count is not None:
+        print(f"🔢 故事数量限制: 每个主题处理前 {args.count} 个故事")
+    else:
+        print(f"📚 处理模式: 处理所有发现的故事")
 
     if args.force_regenerate:
         print(f"🔄 强制重新生成模式: 将重新生成所有文件")
@@ -907,7 +942,8 @@ def main():
                     model, 
                     args.preview, 
                     resume_mode, 
-                    args.force_regenerate
+                    args.force_regenerate,
+                    args.count
                 )
                 all_results.append(result)
             except Exception as e:

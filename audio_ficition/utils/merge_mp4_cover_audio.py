@@ -27,8 +27,8 @@
 
 输出:
 - 组合视频:
-  * macOS: /Volumes/dhl/audio/scifi/mp4_full_silent/[故事索引].mp4
-  * Linux: /mnt/dhl/audio/scifi/mp4_full_silent/[故事索引].mp4
+  * macOS: /Volumes/dhl/audio/scifi/mp4_full_audio/[故事索引].mp4
+  * Linux: /mnt/dhl/audio/scifi/mp4_full_audio/[故事索引].mp4
 - 静态图像缓存: /tmp/cover_video_cache/[图片哈希]_[分辨率].mp4
 
 使用方法:
@@ -765,14 +765,14 @@ def get_paths(theme: str = "scifi"):
             "cover_img_dir": f"/Volumes/dhl/audio/{theme}/cover_img_large",
             "mp4_source_dir": f"/Volumes/dhl/audio/{theme}/mp4_upscaled",
             "audio_merge_dir": f"/Volumes/dhl/audio/{theme}/mp3_merge",
-            "output_dir": f"/Volumes/dhl/audio/{theme}/mp4_full_silent",
+            "output_dir": f"/Volumes/dhl/audio/{theme}/mp4_full_audio",
         }
     else:  # 默认为Linux/Ubuntu
         return {
             "cover_img_dir": f"/media/dhl/audio/{theme}/cover_img_large",
             "mp4_source_dir": f"/media/dhl/audio/{theme}/mp4_upscaled",
             "audio_merge_dir": f"/media/dhl/audio/{theme}/mp3_merge",
-            "output_dir": f"/mnt/dhl/audio/{theme}/mp4_full_silent",
+            "output_dir": f"/mnt/dhl/audio/{theme}/mp4_full_audio",
         }
 
 
