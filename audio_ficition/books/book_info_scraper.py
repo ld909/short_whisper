@@ -15,6 +15,8 @@ Z-Library 电子书信息抓取工具
 3. 自动修复: python book_info_scraper.py --fix
 4. 限制数量: python book_info_scraper.py -m 10
 5. 调试模式: python book_info_scraper.py -d --fix
+6. 强制重新抓取封面: python book_info_scraper.py --redownload-covers
+7. 限制重新抓取数量: python book_info_scraper.py --redownload-covers -m 5
 
 文件完整性检查项目：
 - JSON文件是否存在且格式正确
@@ -22,6 +24,14 @@ Z-Library 电子书信息抓取工具
 - JSON中有cover_url但缺少封面文件
 - 孤立的封面文件（没有对应JSON）
 - 损坏的文件自动删除并重新处理
+
+封面重新抓取功能：
+- 扫描PDF目录，找到所有有PDF文件的UUID
+- 通过UUID映射找到对应的原始URL
+- 重新访问页面获取最新的封面URL
+- 强制删除旧封面并下载新封面
+- 更新JSON文件中的封面信息和时间戳
+- 支持限制数量和调试模式
 """
 
 import os
@@ -993,6 +1003,173 @@ class BookInfoScraper:
             )
             self._save_progress()
 
+    def get_pdf_directory(self):
+        """获取PDF文件目录路径"""
+        if self.language == "zh":
+            return os.path.join(self.base_media_path, "books_zh", "zh", "pdf")
+        else:
+            return os.path.join(self.base_media_path, "books", "en", "pdf")
+
+    def has_corresponding_pdf(self, book_uuid):
+        """检查是否有对应的PDF文件"""
+        pdf_dir = self.get_pdf_directory()
+        if not os.path.exists(pdf_dir):
+            return False
+
+        pdf_file = os.path.join(pdf_dir, f"{book_uuid}.pdf")
+        return os.path.exists(pdf_file)
+
+    def get_uuids_with_pdf(self):
+        """获取所有有对应PDF文件的UUID列表"""
+        pdf_dir = self.get_pdf_directory()
+        if not os.path.exists(pdf_dir):
+            logger.warning(f"⚠️ PDF目录不存在: {pdf_dir}")
+            return []
+
+        pdf_uuids = []
+        for filename in os.listdir(pdf_dir):
+            if filename.startswith("."):  # 排除mac的点文件
+                continue
+            if filename.endswith(".pdf"):
+                uuid_from_filename = filename[:-4]  # 移除.pdf后缀
+                pdf_uuids.append(uuid_from_filename)
+
+        logger.info(f"📚 找到 {len(pdf_uuids)} 个有PDF文件的UUID")
+        return pdf_uuids
+
+    def get_url_by_uuid(self, target_uuid):
+        """根据UUID查找对应的URL"""
+        for url, uuid_val in self.uuid_mapping.items():
+            if uuid_val == target_uuid:
+                return url
+        return None
+
+    def redownload_covers_for_existing_books(self, max_books=None):
+        """强制重新抓取有PDF文件对应的UUID的封面"""
+        logger.info("🔄 开始强制重新抓取封面...")
+
+        # 获取所有有PDF文件的UUID
+        pdf_uuids = self.get_uuids_with_pdf()
+        if not pdf_uuids:
+            logger.warning("⚠️ 未找到任何有PDF文件的UUID")
+            return
+
+        # 限制处理数量
+        if max_books:
+            pdf_uuids = pdf_uuids[:max_books]
+            logger.info(f"🔢 限制处理数量为: {max_books}")
+
+        # 过滤出有对应URL的UUID
+        valid_uuids = []
+        for uuid_val in pdf_uuids:
+            url = self.get_url_by_uuid(uuid_val)
+            if url:
+                valid_uuids.append((uuid_val, url))
+            else:
+                logger.warning(f"⚠️ UUID {uuid_val} 没有对应的URL，跳过")
+
+        if not valid_uuids:
+            logger.warning("⚠️ 没有找到有效的UUID-URL对应关系")
+            return
+
+        logger.info(f"🎯 将重新抓取 {len(valid_uuids)} 个封面")
+
+        # 设置浏览器
+        self.setup_browser()
+
+        success_count = 0
+        failed_count = 0
+
+        try:
+            for i, (book_uuid, url) in enumerate(
+                tqdm(valid_uuids, desc="🖼️ 重新抓取封面")
+            ):
+                try:
+                    logger.info(
+                        f"🔄 正在重新抓取封面 ({i+1}/{len(valid_uuids)}): {book_uuid}"
+                    )
+
+                    # 删除旧的封面文件（如果存在）
+                    old_cover_path = os.path.join(
+                        self.thumbnails_dir, f"{book_uuid}.png"
+                    )
+                    if os.path.exists(old_cover_path):
+                        try:
+                            os.remove(old_cover_path)
+                            logger.info(f"🗑️ 已删除旧封面: {book_uuid}")
+                        except Exception as e:
+                            logger.warning(f"⚠️ 删除旧封面失败: {e}")
+
+                    # 重新提取书籍信息（主要是为了获取封面URL）
+                    book_info = self.extract_book_info(url)
+                    if not book_info:
+                        logger.error(f"❌ 无法提取书籍信息: {book_uuid}")
+                        failed_count += 1
+                        continue
+
+                    # 下载新的封面
+                    if book_info.get("cover_url"):
+                        cover_path = os.path.join(
+                            self.thumbnails_dir, f"{book_uuid}.png"
+                        )
+                        if self.download_cover_image(
+                            book_info["cover_url"], cover_path
+                        ):
+                            success_count += 1
+                            logger.info(f"✅ 封面重新下载成功: {book_uuid}")
+
+                            # 更新JSON文件中的封面信息
+                            info_file = os.path.join(self.info_dir, f"{book_uuid}.json")
+                            if os.path.exists(info_file):
+                                try:
+                                    with open(info_file, "r", encoding="utf-8") as f:
+                                        existing_info = json.load(f)
+
+                                    # 更新封面相关信息
+                                    existing_info["cover_url"] = book_info["cover_url"]
+                                    existing_info["cover_path"] = cover_path
+                                    existing_info["cover_updated_at"] = time.time()
+
+                                    # 保存更新后的信息
+                                    with open(info_file, "w", encoding="utf-8") as f:
+                                        json.dump(
+                                            existing_info,
+                                            f,
+                                            ensure_ascii=False,
+                                            indent=2,
+                                        )
+
+                                    logger.info(f"📝 已更新JSON文件: {book_uuid}")
+                                except Exception as e:
+                                    logger.warning(f"⚠️ 更新JSON文件失败: {e}")
+                        else:
+                            failed_count += 1
+                            logger.error(f"❌ 封面下载失败: {book_uuid}")
+                    else:
+                        failed_count += 1
+                        logger.warning(f"⚠️ 未找到封面URL: {book_uuid}")
+
+                    # 随机延迟避免被封
+                    time.sleep(random.uniform(1, 3))
+
+                except KeyboardInterrupt:
+                    logger.info("⏹️ 用户中断，正在停止...")
+                    break
+                except Exception as e:
+                    logger.error(f"❌ 处理UUID时出错 {book_uuid}: {e}")
+                    failed_count += 1
+                    continue
+
+            # 最终统计
+            logger.info(f"🎯 封面重新抓取完成!")
+            logger.info(f"✅ 成功: {success_count} 个")
+            logger.info(f"❌ 失败: {failed_count} 个")
+
+        except Exception as e:
+            logger.error(f"❌ 重新抓取封面时出错: {e}")
+        finally:
+            self.cleanup()
+
 
 def main():
     """主函数"""
@@ -1016,6 +1193,11 @@ def main():
         choices=["en", "zh"],
         default="en",
         help="选择语种: en(英文) 或 zh(中文) [默认: en]",
+    )
+    parser.add_argument(
+        "--redownload-covers",
+        action="store_true",
+        help="强制重新抓取有PDF文件对应的UUID的封面",
     )
 
     args = parser.parse_args()
@@ -1041,6 +1223,20 @@ def main():
                 scraper.scan_and_fix_integrity(fix_issues=False)
         except Exception as e:
             print(f"❌ 完整性检查出错: {e}")
+        return
+
+    # 处理强制重新抓取封面模式
+    if args.redownload_covers:
+        try:
+            scraper = BookInfoScraper(
+                args.file, debug=args.debug, language=args.language
+            )
+            print("🔄 模式: 强制重新抓取封面")
+            if args.max:
+                print(f"🔢 限制数量: {args.max}")
+            scraper.redownload_covers_for_existing_books(max_books=args.max)
+        except Exception as e:
+            print(f"❌ 重新抓取封面出错: {e}")
         return
 
     # 正常爬取模式

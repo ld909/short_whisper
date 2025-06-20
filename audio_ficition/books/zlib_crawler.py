@@ -2,7 +2,69 @@
 # -*- coding: utf-8 -*-
 """
 Z-Library 电子书URL爬虫
-支持断点续传、URL去重、自动翻页和多语种
+
+【功能描述】
+这是一个专门用于爬取Z-Library（https://zlib.fi/）电子书URL的自动化脚本。
+脚本使用Playwright模拟浏览器操作，能够自动翻页、点击"Load More"按钮，
+并智能提取所有电子书的下载链接。
+
+【主要特性】
+1. 🌍 多语种支持：支持英文(en)和中文(zh)两种语言的Z-Library站点
+2. 🔄 断点续传：支持中断后从上次停止的页面继续爬取
+3. 🎯 URL去重：自动去除重复的电子书链接
+4. 🤖 智能翻页：自动识别并点击各种"Load More"按钮
+5. 📊 进度保存：实时保存爬取进度，防止数据丢失
+6. 🚫 过滤无效链接：智能过滤掉登录、注册等非电子书页面
+7. 📝 详细日志：提供详细的爬取日志，便于调试和监控
+
+【输入参数】
+命令行模式：
+  --language/-l    语种选择: 'en'(英文) 或 'zh'(中文)，默认为'en'
+  --max-pages/-p   最大爬取页数，默认为50页
+  --resume/-r      启用断点续传模式
+
+交互模式：
+  如果不提供命令行参数，脚本会启动交互式界面：
+  - 选择语种（英文/中文）
+  - 选择爬取模式（全新开始/断点续传）
+  - 输入最大爬取页数
+
+【输出文件】
+1. URL文件：
+   - book_url.txt      (英文站点的电子书URL列表)
+   - book_url_zh.txt   (中文站点的电子书URL列表)
+
+2. 进度文件：
+   - crawler_progress.json     (英文站点爬取进度)
+   - crawler_progress_zh.json  (中文站点爬取进度)
+
+3. 日志文件：
+   - zlib_crawler.log  (详细的爬取日志)
+
+【使用示例】
+# 交互式模式
+python zlib_crawler.py
+
+# 爬取英文站点，最多100页
+python zlib_crawler.py --language en --max-pages 100
+
+# 断点续传中文站点
+python zlib_crawler.py --language zh --resume
+
+# 简化命令
+python zlib_crawler.py -l zh -p 50 -r
+
+【注意事项】
+1. 🚀 首次运行请确保安装依赖：pip install playwright beautifulsoup4 requests
+2. 🌐 需要稳定的网络连接，建议在网络状况良好时运行
+3. ⏱️ 脚本内置随机延迟，避免被网站反爬虫机制封禁
+4. 💾 爬取数据实时保存，可随时安全中断程序
+5. 🔧 支持无头浏览器模式，资源占用较低
+
+【输出格式说明】
+- URL文件：每行一个电子书URL，按字母序排列
+- 进度文件：JSON格式，包含最后爬取页数、总书籍数量等信息
+- 日志文件：包含时间戳的详细运行日志，便于问题排查
 """
 
 import requests
