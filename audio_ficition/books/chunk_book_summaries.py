@@ -20,10 +20,10 @@
 
 📤 输出信息:
 - 输出根目录: /home/dhl/Documents/book/
-- 输出目录结构: book/{uuid}/{chunk_index}.txt
-- 例如: book/12345678-abcd-efgh-ijkl-123456789012/1.txt
+- 完整输出路径格式: /home/dhl/Documents/book/{uuid}/{chunk_index}.txt
+- 完整路径示例: /home/dhl/Documents/book/12345678-abcd-efgh-ijkl-123456789012/1.txt
 - 每个书籍有自己的子目录，按UUID命名
-- 每个子目录内的文件按块索引命名
+- 每个子目录内的文件按块索引命名（1.txt, 2.txt, 3.txt...）
 
 🔄 处理规则:
 1. 将书籍总结分割成指定最大字符数的块

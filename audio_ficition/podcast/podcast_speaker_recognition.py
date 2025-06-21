@@ -9,12 +9,14 @@ Podcast 语音识别和说话人识别脚本
 - 使用 WhisperX 进行高精度语音识别
 - 进行说话人识别（Speaker Diarization）
 - 生成带时间戳和说话人标签的转录文本
+- 支持可调节批量大小以优化内存使用和处理速度
 - 自动排除Mac系统产生的点文件
 
 📥 输入信息:
 - 默认输入目录: audio_ficition/podcast/
 - 支持文件格式: .mp3, .wav, .m4a, .flac, .ogg
 - 自动排除以点开头的Mac系统文件
+- 批量大小默认为16，可通过--batch-size参数调节（推荐范围1-16）
 
 📤 输出信息:
 - 转录文本文件: {filename}_transcript.txt
@@ -26,6 +28,8 @@ python podcast_speaker_recognition.py                          # 处理当前目
 python podcast_speaker_recognition.py --file t.mp3             # 处理指定文件
 python podcast_speaker_recognition.py --preview                # 预览模式
 python podcast_speaker_recognition.py --hf-token YOUR_TOKEN    # 设置 HuggingFace Token
+python podcast_speaker_recognition.py --batch-size 4           # 设置批量大小为4（默认为16）
+python podcast_speaker_recognition.py --model base --batch-size 8 --device cuda  # 组合设置
 """
 
 import os
@@ -61,7 +65,7 @@ except ImportError:
 DEFAULT_INPUT_DIR = "."
 SUPPORTED_FORMATS = [".mp3", ".wav", ".m4a", ".flac", ".ogg"]
 DEFAULT_MODEL = "turbo"
-DEFAULT_BATCH_SIZE = 2
+DEFAULT_BATCH_SIZE = 16
 DEFAULT_COMPUTE_TYPE = "float16"
 HF_TOKEN = None  # 请在命令行参数中提供或在此设置您的 HuggingFace Token
 # ===================================

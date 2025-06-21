@@ -1,0 +1,1688 @@
+[00:00.15 -> 00:01.59] SPEAKER_06: There was a five-year waiting list.
+[00:03.07 -> 00:05.30] SPEAKER_06: And we got a rotary telephone.
+[00:06.38 -> 00:08.18] SPEAKER_06: But it dramatically changed our lives.
+[00:08.36 -> 00:11.53] SPEAKER_06: You know, people would come to our house to make calls to their loved ones.
+[00:12.61 -> 00:16.11] SPEAKER_06: You know, I would have to go all the way to the hospital to get blood test records.
+[00:16.13 -> 00:17.55] SPEAKER_06: And it would take two hours to go.
+[00:17.57 -> 00:19.25] SPEAKER_06: And they would say, sorry, it's not ready.
+[00:19.32 -> 00:20.18] SPEAKER_06: Come back the next day.
+[00:20.20 -> 00:21.86] SPEAKER_06: Two hours to come back.
+[00:22.52 -> 00:24.18] SPEAKER_06: And that became a five-minute thing.
+[00:24.58 -> 00:30.85] SPEAKER_06: So as a kid, like, I mean, this light bulb went in my head, you know, this power of technology to kind of change people's lives.
+[00:32.11 -> 00:33.15] SPEAKER_06: We had no running water.
+[00:33.17 -> 00:35.44] SPEAKER_06: You know, it was a massive drought.
+[00:36.16 -> 00:41.24] SPEAKER_06: So they would get water in these trucks, maybe eight buckets per household.
+[00:41.58 -> 00:47.53] SPEAKER_06: So me and my brother, sometimes my mom, we would wait in line, get that and bring it back home.
+[00:49.17 -> 00:54.03] SPEAKER_06: Many years later, like we had running water and we had a water heater.
+[00:54.72 -> 00:56.59] SPEAKER_06: And you would get hot water to take a shower.
+[00:57.85 -> 01:01.24] SPEAKER_06: I mean, like, so, you know, for me, everything was discreet like that.
+[01:02.42 -> 01:10.98] SPEAKER_06: And so I've always had this thing, you know, first-hand feeling of, like, how technology can dramatically change, like...
+[01:11.16 -> 01:13.54] SPEAKER_06: your life and the opportunity it brings.
+[01:13.80 -> 01:21.49] SPEAKER_06: I think if PDOM is actually high, at some point, all of humanity is aligned in making sure that's not the case, right?
+[01:21.61 -> 01:24.96] SPEAKER_06: And so we'll actually make more progress against it, I think.
+[01:25.00 -> 01:31.02] SPEAKER_06: So the irony is, so there is a self-modulating aspect there.
+[01:31.44 -> 01:37.43] SPEAKER_06: Like, I think if humanity collectively puts their mind to solving a problem, whatever it is, I think we can get there.
+[01:37.45 -> 01:42.84] SPEAKER_06: So because of that, I think I'm optimistic on the PDOOM scenarios.
+[01:44.32 -> 01:47.88] SPEAKER_06: But that doesn't mean, I think the underlying risk is actually pretty high.
+[01:50.03 -> 01:55.35] SPEAKER_06: But I have a lot of faith in humanity kind of rising up to meet that moment.
+[01:55.73 -> 01:59.36] SPEAKER_02: Take me through that experience when there's all these articles saying,
+[02:00.08 -> 02:02.60] SPEAKER_02: You're the wrong guy to lead Google through this.
+[02:03.10 -> 02:05.81] SPEAKER_02: Google is lost, it's done, it's over.
+[02:08.55 -> 02:17.50] SPEAKER_02: The following is a conversation with Sundar Pichai, the CEO of Google and Alphabet, on this, The Lex Friedman Podcast.
+[02:18.74 -> 02:20.90] SPEAKER_02: Your life story is inspiring to a lot of people.
+[02:20.92 -> 02:21.86] SPEAKER_02: It's inspiring to me.
+[02:21.88 -> 02:28.79] SPEAKER_02: You grew up in India, whole family living in a humble two-room apartment.
+[02:29.31 -> 02:31.65] SPEAKER_02: very little, almost no access to technology.
+[02:32.49 -> 02:40.94] SPEAKER_02: And from those humble beginnings, you rose to lead a $2 trillion technology company.
+[02:41.30 -> 02:50.87] SPEAKER_02: So if you could travel back in time and told that, let's say, 12-year-old Sundar, that you're now leading one of the largest companies in human history, what do you think that young kid would say?
+[02:50.89 -> 02:52.91] SPEAKER_06: I would have probably laughed it off.
+[02:54.27 -> 02:58.00] SPEAKER_06: You know, probably too far-fetched to
+[02:58.20 -> 03:00.00] SPEAKER_06: imagine or believe at that time.
+[03:00.22 -> 03:02.34] SPEAKER_06: You would have to explain the internet first.
+[03:02.66 -> 03:03.23] SPEAKER_06: For sure.
+[03:03.25 -> 03:08.40] SPEAKER_06: I mean, computers to me at that time, you know, I was 12 in 1984.
+[03:09.84 -> 03:14.37] SPEAKER_06: So probably, you know, by then I'd started reading about them.
+[03:15.61 -> 03:16.51] SPEAKER_06: I hadn't seen one.
+[03:16.85 -> 03:17.85] SPEAKER_06: What was that place like?
+[03:18.13 -> 03:19.14] SPEAKER_06: Take me to your childhood.
+[03:19.50 -> 03:20.64] SPEAKER_06: I grew up in Chennai.
+[03:21.10 -> 03:22.20] SPEAKER_06: It's in south of India.
+[03:22.32 -> 03:24.30] SPEAKER_06: It's a beautiful, bustling city.
+[03:24.34 -> 03:26.52] SPEAKER_06: Lots of people, lots of energy.
+[03:26.54 -> 03:28.08] SPEAKER_06: You know, simple life.
+[03:28.37 -> 03:33.39] SPEAKER_06: Definitely like fond memories of playing cricket outside the home.
+[03:33.43 -> 03:34.99] SPEAKER_06: We just used to play on the streets.
+[03:35.69 -> 03:41.66] SPEAKER_06: All the neighborhood kids would come out and we would play until it got dark and we couldn't play anymore barefoot.
+[03:43.06 -> 03:43.88] SPEAKER_06: Traffic would come.
+[03:44.56 -> 03:45.60] SPEAKER_06: We would just stop the game.
+[03:46.12 -> 03:51.21] SPEAKER_06: Everything would drive through and you would just continue playing, right, just to kind of get the visual in your head.
+[03:51.73 -> 03:53.80] SPEAKER_06: You know, pre-computers was a lot of free time.
+[03:53.84 -> 03:59.79] SPEAKER_06: Now that I think about it, now you have to go and seek that quiet solitude or something.
+[04:00.51 -> 04:06.36] SPEAKER_06: Newspapers, books is how I gained access to the worst information at the time, you will.
+[04:07.18 -> 04:09.44] SPEAKER_06: My grandfather was a big influence.
+[04:09.91 -> 04:11.01] SPEAKER_06: He worked in the post office.
+[04:11.67 -> 04:13.73] SPEAKER_06: He was so good with language.
+[04:14.29 -> 04:19.88] SPEAKER_06: His English, you know, his handwriting till today is the most beautiful handwriting I've ever seen.
+[04:19.92 -> 04:22.12] SPEAKER_06: He would write so clearly.
+[04:22.16 -> 04:23.54] SPEAKER_06: He was so articulate.
+[04:24.66 -> 04:27.12] SPEAKER_06: And so he kind of got me introduced into books.
+[04:28.19 -> 04:29.53] SPEAKER_06: He loved politics.
+[04:30.07 -> 04:31.89] SPEAKER_06: So we could talk about anything.
+[04:32.51 -> 04:35.04] SPEAKER_06: And, you know, that was there in my family throughout.
+[04:35.14 -> 04:44.49] SPEAKER_06: So lots of books, trashy books, good books, everything from Ayn Rand to books on philosophy to stupid crime novels.
+[04:45.35 -> 04:46.93] SPEAKER_06: So books was a big part of my life.
+[04:47.01 -> 04:54.43] SPEAKER_06: But that kind of this whole, it's not surprising I ended up at Google because Google's mission kind of always resonated deeply with me.
+[04:55.05 -> 04:57.81] SPEAKER_06: This access to knowledge, I was hungry for it.
+[04:58.52 -> 05:01.26] SPEAKER_06: But definitely have fond memories of my childhood.
+[05:01.32 -> 05:03.54] SPEAKER_06: Access to knowledge was there.
+[05:03.92 -> 05:05.60] SPEAKER_06: So that's the wealth we had.
+[05:07.17 -> 05:09.73] SPEAKER_06: You know, every aspect of technology I had to wait for a while.
+[05:09.79 -> 05:13.19] SPEAKER_06: I've obviously spoken before about how long it took for us to get a phone.
+[05:13.39 -> 05:15.60] SPEAKER_06: About five years, but it's not the only thing.
+[05:15.86 -> 05:16.42] SPEAKER_06: A telephone.
+[05:16.82 -> 05:18.26] SPEAKER_06: There was a five-year waiting list.
+[05:19.00 -> 05:22.00] SPEAKER_06: And we got a rotary telephone.
+[05:23.06 -> 05:24.89] SPEAKER_06: But it dramatically changed our lives.
+[05:25.05 -> 05:28.37] SPEAKER_06: You know, people would come to our house to make calls to their loved ones.
+[05:29.25 -> 05:32.69] SPEAKER_06: You know, I would have to go all the way to the hospital to get blood test records.
+[05:32.79 -> 05:34.21] SPEAKER_06: And it would take two hours to go.
+[05:34.23 -> 05:35.92] SPEAKER_06: And they would say, sorry, it's not ready.
+[05:35.98 -> 05:36.84] SPEAKER_06: Come back the next day.
+[05:36.86 -> 05:38.54] SPEAKER_06: Two hours to come back.
+[05:39.16 -> 05:40.74] SPEAKER_06: And that became a five-minute thing.
+[05:41.34 -> 05:47.55] SPEAKER_06: So as a kid, like, I mean, this light bulb went in my head, you know, this power of technology to kind of change people's lives.
+[05:48.79 -> 05:49.81] SPEAKER_06: We had no running water.
+[05:50.15 -> 05:52.14] SPEAKER_06: You know, it was a massive drought.
+[05:52.84 -> 05:55.84] SPEAKER_06: So they would get water in these trucks.
+[05:55.96 -> 05:57.88] SPEAKER_06: maybe eight buckets per household.
+[05:58.24 -> 06:04.19] SPEAKER_06: So me and my brother, sometimes my mom, we would wait in line, get that and bring it back home.
+[06:05.83 -> 06:13.24] SPEAKER_05: Many years later, like we had running water and we had a water heater and you could get hot water to take a shower.
+[06:14.55 -> 06:18.27] SPEAKER_06: I mean, like, so, you know, for me, everything was discreet like that.
+[06:18.67 -> 06:30.21] SPEAKER_06: And so I've always had this first-hand feeling of how technology can dramatically change your life and the opportunity it brings.
+[06:31.47 -> 06:36.38] SPEAKER_06: So that was kind of a subliminal takeaway for me throughout growing up.
+[06:36.48 -> 06:40.78] SPEAKER_06: And I kind of actually observed it and felt it.
+[06:41.67 -> 06:46.30] SPEAKER_06: we had to convince my dad for a long time to get a VCR.
+[06:46.32 -> 06:47.68] SPEAKER_06: Do you know what a VCR is?
+[06:47.70 -> 06:48.22] SPEAKER_06: Yeah.
+[06:49.10 -> 06:51.40] SPEAKER_06: I'm trying to date you now.
+[06:51.42 -> 06:57.81] SPEAKER_06: But, you know, because before that, you only had like kind of one TV channel, right?
+[06:57.87 -> 06:58.27] SPEAKER_06: That's it.
+[06:59.47 -> 07:03.24] SPEAKER_06: And so, you know, you can watch movies or something like that.
+[07:03.48 -> 07:08.32] SPEAKER_06: But this was by the time I was in 12th grade, we got a VCR, you know, it was a
+[07:09.26 -> 07:14.47] SPEAKER_06: like a Panasonic, which we had to go to some like shop, which had kind of smuggled it in, I guess.
+[07:14.53 -> 07:15.94] SPEAKER_06: And that's where we bought a VCR.
+[07:16.64 -> 07:21.25] SPEAKER_06: But then being able to record like a World Cup football game,
+[07:21.60 -> 07:26.95] SPEAKER_06: And then, or like get bootlegged videotapes and watch movies, like all that.
+[07:26.99 -> 07:29.97] SPEAKER_06: So like, you know, I had these discreet memories growing up.
+[07:30.09 -> 07:38.49] SPEAKER_06: And so, you know, always left me with the feeling of like how getting access to technology drives that step change in your life.
+[07:38.51 -> 07:41.95] SPEAKER_02: I don't think you'll ever be able to equal the first time you get hot water.
+[07:41.99 -> 07:47.00] SPEAKER_06: To have that convenience of going and opening a tap and have hot water come out.
+[07:47.04 -> 07:47.30] SPEAKER_06: Yeah.
+[07:47.32 -> 07:47.42] SPEAKER_06: Yeah.
+[07:47.55 -> 07:51.88] SPEAKER_02: It's interesting, we take for granted the progress we've made.
+[07:51.94 -> 08:03.82] SPEAKER_02: If you look at human history, just those plots that look at GDP across 2000 years, and you see that exponential growth to where most of the progress happened since the Industrial Revolution,
+[08:03.80 -> 08:04.93] SPEAKER_02: And we just take for granted.
+[08:04.94 -> 08:07.45] SPEAKER_02: We forget how far we've gone.
+[08:07.49 -> 08:16.80] SPEAKER_02: So our ability to understand how great we have it and also how quickly technology can improve is quite poor.
+[08:16.82 -> 08:18.79] SPEAKER_06: Oh, I mean, it's extraordinary.
+[08:18.81 -> 08:21.19] SPEAKER_06: You know, I go back to India now, the power of technology.
+[08:21.71 -> 08:22.31] SPEAKER_06: mobile.
+[08:22.33 -> 08:25.69] SPEAKER_06: You know, it's mind-blowing to see the progress through the arc of time.
+[08:25.71 -> 08:26.78] SPEAKER_06: It's phenomenal.
+[08:27.36 -> 08:44.51] SPEAKER_02: What advice would you give to young folks listening to this all over the world who look up to you and find your story inspiring, who want to be maybe the next Sundar Bichai, who want to start, create companies, build something that has a lot of impact on the world?
+[08:44.57 -> 08:48.98] SPEAKER_06: Look, you have a lot of luck along the way, but you obviously have to make smart choices.
+[08:49.00 -> 08:50.57] SPEAKER_06: You're thinking about what you want to do.
+[08:50.59 -> 08:52.07] SPEAKER_06: Your brain is telling you something.
+[08:53.15 -> 09:00.38] SPEAKER_06: But when you do things, I think it's important to kind of get that, listen to your heart and see whether you actually enjoy doing it, right?
+[09:00.46 -> 09:06.29] SPEAKER_06: That feeling of if you love what you do, it's so much easier.
+[09:06.97 -> 09:10.03] SPEAKER_06: And you're going to see the best version of yourself.
+[09:10.79 -> 09:11.99] SPEAKER_06: It's easier said than done.
+[09:12.23 -> 09:14.94] SPEAKER_06: I think it's tough to find things you love doing.
+[09:16.62 -> 09:24.99] SPEAKER_06: But I think kind of listening to your heart a bit more than your mind in terms of figuring out what you want to do, I think is one of the best things I would tell people.
+[09:25.01 -> 09:32.70] SPEAKER_06: The second thing is, I mean, trying to work with people who you feel at various points in my life.
+[09:32.92 -> 09:34.88] SPEAKER_06: I've worked with people who I felt were better than me.
+[09:36.00 -> 09:36.70] SPEAKER_06: I kind of like...
+[09:37.43 -> 09:40.97] SPEAKER_06: You know, you almost are sitting in a room talking to someone and they're like, wow.
+[09:42.35 -> 09:44.32] SPEAKER_06: You know, and you want that feeling a few times.
+[09:44.42 -> 09:55.57] SPEAKER_06: Trying to get yourself in a position where you're working with people who you feel are kind of like stretching your abilities is what helps you grow, I think.
+[09:56.35 -> 09:58.88] SPEAKER_06: So putting yourself in uncomfortable situations.
+[09:59.62 -> 10:01.78] SPEAKER_06: And I think often you'll surprise yourself.
+[10:01.92 -> 10:08.93] SPEAKER_06: So I think being open-minded enough to kind of put yourself in those positions is maybe another thing I would say.
+[10:09.57 -> 10:17.32] SPEAKER_02: Well, lessons can we learn, maybe from an outsider perspective, for me, looking at your story and gotten to know you a bit, you're humble, you're kind.
+[10:17.66 -> 10:27.23] SPEAKER_02: Usually when I think of somebody who has had a journey like yours and climbs to the very top of leadership, they're in a cutthroat world.
+[10:27.21 -> 10:29.15] SPEAKER_02: they're usually going to be a bit of an asshole.
+[10:29.89 -> 10:39.78] SPEAKER_02: So what wisdom are we supposed to draw from the fact that your general approach is of balance, of humility, of kindness, listening to everybody?
+[10:40.36 -> 10:42.10] SPEAKER_02: What's your secret?
+[10:42.18 -> 10:43.00] SPEAKER_06: I do get angry.
+[10:43.08 -> 10:44.08] SPEAKER_06: I do get frustrated.
+[10:44.16 -> 10:49.11] SPEAKER_06: I have the same emotions all of us do, right, in the context of work and everything.
+[10:50.41 -> 10:53.65] SPEAKER_06: But a few things, right, I think, you know, I...
+[10:55.27 -> 10:59.54] SPEAKER_06: Over time, I figured out the best way to get the most out of people.
+[11:00.36 -> 11:09.15] SPEAKER_06: You know, you kind of find mission-oriented people who are on the shared journey, who have this inner drive to excellence to do the best.
+[11:10.23 -> 11:15.96] SPEAKER_06: And, you know, you kind of motivate people and you can achieve a lot that way.
+[11:16.41 -> 11:19.38] SPEAKER_06: And so it often tends to work out that way.
+[11:19.93 -> 11:22.82] SPEAKER_06: But have there been times like I lose it?
+[11:22.96 -> 11:25.57] SPEAKER_06: Yeah, but maybe less often than others.
+[11:26.59 -> 11:29.28] SPEAKER_06: And maybe over the years,
+[11:29.46 -> 11:35.28] SPEAKER_06: Less and less so, because I find it's not needed to achieve what you need to do.
+[11:35.62 -> 11:37.55] SPEAKER_02: So losing your shit has not been productive.
+[11:37.79 -> 11:39.21] SPEAKER_06: Yeah, less often than not.
+[11:39.23 -> 11:40.75] SPEAKER_06: I think people respond to that.
+[11:41.75 -> 11:45.77] SPEAKER_06: They may do stuff to react to that, like you actually want them to do the right thing.
+[11:45.81 -> 11:50.22] SPEAKER_06: And so maybe there's a bit of sports.
+[11:50.32 -> 11:51.82] SPEAKER_06: I'm a sports fan.
+[11:51.88 -> 11:56.34] SPEAKER_06: In football, coaches in soccer, that football,
+[11:56.58 -> 12:00.10] SPEAKER_06: You know, people often talk about like man management, right?
+[12:00.12 -> 12:02.11] SPEAKER_06: Great coaches do, right?
+[12:02.12 -> 12:04.79] SPEAKER_06: I think there is an element of that in our lives.
+[12:04.85 -> 12:06.87] SPEAKER_06: How do you get the best out of the people you work with?
+[12:08.09 -> 12:11.82] SPEAKER_06: You know, at times you're working with people who are so committed to achieving.
+[12:11.86 -> 12:17.01] SPEAKER_06: If they've done something wrong, they feel it more than you do, right?
+[12:17.03 -> 12:25.32] SPEAKER_06: So you treat them differently than, you know, occasionally there are people who you need to clearly let them know like that wasn't okay or whatever it is.
+[12:25.70 -> 12:27.93] SPEAKER_06: But I've often found that not to be the case.
+[12:28.35 -> 12:35.38] SPEAKER_02: And sometimes the right words at the right time, spoken firmly, can reverberate through time.
+[12:35.80 -> 12:43.47] SPEAKER_06: Also, sometimes the unspoken words, you know, people can sometimes see that, like, you know, you're unhappy without you saying it.
+[12:44.23 -> 12:48.13] SPEAKER_06: And so sometimes the silence can deliver that message even more.
+[12:48.30 -> 12:49.38] SPEAKER_02: Sometimes less is more.
+[12:50.24 -> 12:52.34] SPEAKER_02: Who's the greatest soccer player of all time?
+[12:52.52 -> 12:55.45] SPEAKER_02: Messi or Ronaldo or Pele or Maradona?
+[12:55.77 -> 12:57.67] SPEAKER_02: I'm going to make, you know, in this question.
+[12:57.69 -> 12:58.93] SPEAKER_06: Is this going to be a political answer?
+[12:58.95 -> 12:59.85] SPEAKER_02: No, no, no.
+[13:00.21 -> 13:02.98] SPEAKER_06: I will tell the truthful answer because the truthful answer.
+[13:03.00 -> 13:03.72] SPEAKER_06: So it's Messi.
+[13:03.94 -> 13:04.40] SPEAKER_06: Okay.
+[13:04.46 -> 13:04.72] SPEAKER_06: It is.
+[13:04.86 -> 13:09.42] SPEAKER_06: You know, it's been interesting because my son is a big Cristiano Ronaldo fan.
+[13:10.37 -> 13:14.93] SPEAKER_06: And so we've had to watch El Classico's together
+[13:15.06 -> 13:17.05] SPEAKER_06: you know, with that dynamic in there.
+[13:18.05 -> 13:20.58] SPEAKER_06: I so admire CR Simmons.
+[13:20.92 -> 13:25.07] SPEAKER_06: I mean, I've never seen an athlete more committed to that kind of excellence.
+[13:25.09 -> 13:27.23] SPEAKER_06: And so he's one of the all-time greats.
+[13:28.00 -> 13:30.96] SPEAKER_06: But, you know, for me, Messi is it.
+[13:31.43 -> 13:39.72] SPEAKER_02: Yeah, when I see Lionel Messi, you just are in awe that humans are able to achieve that level of greatness and genius and artistry.
+[13:40.18 -> 13:43.45] SPEAKER_02: When we talk, we'll talk about AI, maybe robotics and this kind of stuff.
+[13:43.77 -> 13:49.23] SPEAKER_02: That level of genius, I'm not sure you can possibly match by AI in a long time.
+[13:49.29 -> 13:50.89] SPEAKER_02: It's just an example of greatness.
+[13:51.05 -> 13:59.02] SPEAKER_02: And you have that kind of greatness in other disciplines, but in sport, you get to visually see it unlike anything else.
+[13:59.12 -> 14:03.85] SPEAKER_02: And just the timing, the movement, there's just genius.
+[14:04.05 -> 14:05.79] SPEAKER_06: I had the chance to see him a couple of weeks ago.
+[14:05.81 -> 14:09.99] SPEAKER_06: He played in San Jose against the Quakes.
+[14:10.05 -> 14:12.27] SPEAKER_06: So I went to see it, see the game.
+[14:12.74 -> 14:17.18] SPEAKER_06: I was a fan on the, had good seats, knew where he would play in the second half, hopefully.
+[14:17.28 -> 14:24.59] SPEAKER_06: And even at his age, just watching him when he gets the ball, that movement, you know, you're right, that special quality.
+[14:25.31 -> 14:27.69] SPEAKER_06: It's tough to describe, but you feel it when you see it, yeah.
+[14:28.25 -> 14:29.13] SPEAKER_02: He's still got it.
+[14:30.44 -> 14:40.14] SPEAKER_02: If we rank all the technological innovations throughout human history, let's go back maybe the history of human civilization is 12,000 years ago.
+[14:41.58 -> 14:46.47] SPEAKER_02: And you rank them by how much of a productivity multiplier they've been.
+[14:47.11 -> 14:57.26] SPEAKER_02: So we can go to electricity or the labor mechanization of the Industrial Revolution, or we can go back to the first agricultural revolution 12,000 years ago.
+[14:57.85 -> 15:08.22] SPEAKER_02: In that long list of inventions, do you think AI, when history is written a thousand years from now, do you think it has a chance to be the number one productivity multiplier?
+[15:08.54 -> 15:09.20] SPEAKER_06: It's a great question.
+[15:09.22 -> 15:18.61] SPEAKER_06: Look, many years ago, I think it might've been 2017 or 2018, you know, I said at the time, like, you know, AI is the most profound technology humanity will ever work on.
+[15:18.86 -> 15:21.50] SPEAKER_06: It'll be more profound than fire or electricity.
+[15:21.54 -> 15:23.54] SPEAKER_06: So I have to back myself.
+[15:23.64 -> 15:26.40] SPEAKER_06: I, you know, I still think that's the case.
+[15:27.11 -> 15:31.80] SPEAKER_06: You know, when you asked this question, I was thinking, well, do we have a recency bias, right?
+[15:31.90 -> 15:37.14] SPEAKER_06: You know, like in sports, it's very tempting to call the current person you're seeing the greatest player, right?
+[15:37.26 -> 15:40.29] SPEAKER_06: And so is there a recency bias?
+[15:41.53 -> 15:47.16] SPEAKER_06: And, you know, I do think from first principles, I would argue...
+[15:47.50 -> 15:49.76] SPEAKER_06: AI will be bigger than all of those.
+[15:49.78 -> 15:51.36] SPEAKER_06: I didn't live through those moments.
+[15:52.02 -> 15:59.21] SPEAKER_06: You know, two years ago, I had to go through a surgery, and then I processed that there was a point in time people didn't have anesthesia when they went through these procedures.
+[15:59.95 -> 16:05.23] SPEAKER_06: At that moment, I was like, that has got to be the greatest invention humanity has ever done, right?
+[16:05.29 -> 16:10.10] SPEAKER_06: So, look, we don't know what it is to have lived through those times.
+[16:11.44 -> 16:15.76] SPEAKER_06: But, you know, many of what you're talking about were kind of this general...
+[16:16.54 -> 16:21.26] SPEAKER_06: things which pretty much affected everything, you know, electricity or internet, etc.
+[16:22.72 -> 16:29.87] SPEAKER_06: But I don't think we've ever dealt with a technology, both which is progressing so fast, becoming so capable.
+[16:29.89 -> 16:33.27] SPEAKER_06: It's not clear what the ceiling is.
+[16:34.68 -> 16:39.02] SPEAKER_06: And the main unique, it's recursively self-improving, right?
+[16:39.06 -> 16:40.00] SPEAKER_06: It's capable of that.
+[16:41.16 -> 16:45.65] SPEAKER_06: And so the fact it is going, it's the first technology will kind of dramatically
+[16:45.88 -> 16:54.55] SPEAKER_06: Accelerate creation itself, like creating things, building new things, can improve and achieve things on its own.
+[16:55.76 -> 16:56.00] SPEAKER_06: Right.
+[16:56.02 -> 16:58.46] SPEAKER_06: I think like puts it in a different league.
+[16:58.68 -> 16:58.96] SPEAKER_06: Right.
+[16:59.08 -> 17:00.70] SPEAKER_06: And so differently.
+[17:00.78 -> 17:07.77] SPEAKER_06: And so I think the impact it will end up having will far surpass everything we've seen before.
+[17:08.61 -> 17:15.26] SPEAKER_06: obviously with that comes a lot of important things to think and wrestle with, but I definitely think that'll end up being the case.
+[17:15.56 -> 17:20.71] SPEAKER_02: Especially if it gets to the point of where we can achieve superhuman performance on the AI research itself.
+[17:21.13 -> 17:32.84] SPEAKER_02: So it's a technology that may, it's an open question, but it may be able to achieve a level to where the technology itself can create itself better than it could yesterday.
+[17:33.31 -> 17:34.91] SPEAKER_06: It's like the move 37 of
+[17:35.51 -> 17:37.37] SPEAKER_06: alpha research or whatever it is, right?
+[17:37.41 -> 17:39.76] SPEAKER_06: Like, you know, and when, yeah, you're right.
+[17:39.90 -> 17:50.57] SPEAKER_06: When it can do novel, self-directed research, obviously for a long time, we'll have hopefully always humans in the loop and all that stuff.
+[17:50.59 -> 17:53.41] SPEAKER_06: And these are complex questions to talk about.
+[17:53.49 -> 18:01.60] SPEAKER_06: But yes, I think the underlying technology, you know, I've said this, like if you watched seeing alpha go start from scratch,
+[18:02.80 -> 18:12.97] SPEAKER_06: be clueless, and become better through the course of a day, it really hits you when you see that happen.
+[18:13.91 -> 18:28.74] SPEAKER_06: Even the VO3 models, if you sample the models when they were 30% done and 60% done and looked at what they were generating, and you kind of see how it all comes together, it's kind of like, I would say...
+[18:29.36 -> 18:33.64] SPEAKER_06: kind of inspiring, a little bit unsettling, right, as a human.
+[18:33.81 -> 18:35.23] SPEAKER_06: So all of that is true, I think.
+[18:35.77 -> 18:45.14] SPEAKER_02: Well, the interesting thing of the Industrial Revolution, electricity, like you mentioned, you can go back to the, again, the agriculture, the first agricultural revolution.
+[18:45.80 -> 18:50.78] SPEAKER_02: There's what's called the Neolithic package of the first agricultural revolution.
+[18:51.40 -> 18:52.79] SPEAKER_02: It wasn't just
+[18:53.26 -> 18:56.94] SPEAKER_02: that the nomads settled down and started planting food.
+[18:57.72 -> 19:03.56] SPEAKER_02: But all this other kind of technology was born from that, and it's included in this package.
+[19:03.64 -> 19:09.15] SPEAKER_02: It wasn't one piece of technology, it's there's these ripple effects, second and third order effects that happen.
+[19:09.43 -> 19:21.54] SPEAKER_02: Everything from something silly, like, silly, profound, like pottery, it can store liquids in food, to something we kind of take for granted, but social hierarchies,
+[19:21.52 -> 19:23.78] SPEAKER_02: and political hierarchy.
+[19:23.80 -> 19:40.62] SPEAKER_02: So like early government was formed because it turns out if humans stop moving and have some surplus food, they start coming up with, they get bored and they start coming up with interesting systems and then trade emerges, which turns out to be a really profound thing.
+[19:40.94 -> 19:50.50] SPEAKER_02: And like I said, government, I mean, there's just a second and third order effects from that, including that package is incredible and probably extremely difficult to,
+[19:50.48 -> 19:55.27] SPEAKER_02: If you ask one of the people in the nomadic tribes to predict that, it would be impossible.
+[19:55.51 -> 19:56.47] SPEAKER_02: It's difficult to predict.
+[19:56.53 -> 20:05.00] SPEAKER_02: But all that said, what do you think are some of the early things we might see in the quote-unquote AI package?
+[20:06.35 -> 20:09.25] SPEAKER_06: I mean, most of it probably we don't know today.
+[20:09.39 -> 20:13.40] SPEAKER_06: But the one thing which we can tangibly start seeing now is
+[20:14.96 -> 20:17.83] SPEAKER_06: Obviously, with the coding progress, you got a sense of it.
+[20:18.39 -> 20:24.52] SPEAKER_06: It's going to be so easy to imagine, like thoughts in your head, translating that into things that exist.
+[20:25.02 -> 20:26.44] SPEAKER_06: That'll be part of the package, right?
+[20:26.94 -> 20:33.03] SPEAKER_06: Like it's going to empower almost all of humanity to kind of express themselves.
+[20:34.25 -> 20:42.09] SPEAKER_06: Maybe in the past you could have expressed with words, but like you could kind of build things into existence, right?
+[20:42.11 -> 20:43.59] SPEAKER_06: You know, maybe not fully today.
+[20:44.14 -> 20:46.14] SPEAKER_06: We are at the early stages of Vibe coding.
+[20:46.96 -> 20:49.87] SPEAKER_06: You know, I've been amazed at what people have put out online with VO3.
+[20:50.27 -> 20:51.43] SPEAKER_06: But it takes a bit of work, right?
+[20:51.45 -> 20:53.21] SPEAKER_06: You have to stitch together a set of prompts.
+[20:54.39 -> 20:55.79] SPEAKER_06: But all this is going to get better.
+[20:57.08 -> 20:59.62] SPEAKER_06: The thing I always think about, this is the worst it'll ever be.
+[21:00.36 -> 21:00.50] SPEAKER_06: Right?
+[21:00.52 -> 21:01.86] SPEAKER_06: Like at any given moment in time.
+[21:02.12 -> 21:05.32] SPEAKER_02: Yeah, it's interesting you went there as kind of a first thought.
+[21:05.85 -> 21:11.61] SPEAKER_02: So the exponential increase of access to creativity.
+[21:11.95 -> 21:13.89] SPEAKER_06: Software, creation.
+[21:14.68 -> 21:21.65] SPEAKER_06: Are you creating a program, a piece of content to be shared with others, games down the line?
+[21:21.69 -> 21:25.66] SPEAKER_06: All of that, like, just becomes infinitely more possible.
+[21:25.86 -> 21:29.24] SPEAKER_02: Well, I think the big thing is that it makes it accessible.
+[21:29.40 -> 21:32.96] SPEAKER_02: It unlocks the cognitive capabilities of the entire 8 billion.
+[21:33.24 -> 21:33.78] SPEAKER_06: No, I agree.
+[21:33.80 -> 21:38.31] SPEAKER_06: Look, think about 40 years ago, maybe in the U.S.
+[21:38.33 -> 21:40.27] SPEAKER_06: there were five people who could do what you were doing.
+[21:41.09 -> 21:44.23] SPEAKER_06: Like, go do an interview, you know, and, you know,
+[21:44.74 -> 21:50.32] SPEAKER_06: But today, think about with YouTube and other products, et cetera, like how many more people are doing it?
+[21:52.09 -> 21:54.49] SPEAKER_06: So I think this is what technology does, right?
+[21:54.85 -> 21:59.35] SPEAKER_06: Like when the internet created blogs, you know, you heard from so many more people.
+[21:59.41 -> 22:07.20] SPEAKER_06: So I think, but with AI, I think that number won't be in the few hundreds of thousands.
+[22:08.24 -> 22:13.33] SPEAKER_06: It'll be tens of millions of people, maybe even a billion people, like,
+[22:13.78 -> 22:16.85] SPEAKER_06: putting out things into the world in a deeper way.
+[22:17.41 -> 22:19.78] SPEAKER_02: And I think it'll change the landscape of creativity.
+[22:19.80 -> 22:21.70] SPEAKER_02: It makes a lot of people nervous.
+[22:21.80 -> 22:27.98] SPEAKER_02: Like, for example, whatever, Fox, MSNBC, CNN are really nervous about this part.
+[22:28.00 -> 22:29.68] SPEAKER_02: Like, you mean this dude in a suit?
+[22:29.66 -> 22:30.76] SPEAKER_02: could just do this.
+[22:31.26 -> 22:37.43] SPEAKER_02: And YouTube and thousands of others, tens of thousands, millions of other creators can do the same kind of thing.
+[22:37.73 -> 22:38.56] SPEAKER_02: That makes them nervous.
+[22:39.18 -> 22:42.36] SPEAKER_02: And now you get a podcast from Notebook LM.
+[22:42.86 -> 22:46.59] SPEAKER_02: It's about five to 10 times better than any podcast I've ever done.
+[22:46.57 -> 22:49.73] SPEAKER_02: I'm joking at this time, but maybe not.
+[22:49.75 -> 22:50.39] SPEAKER_02: And that changes.
+[22:50.43 -> 22:59.62] SPEAKER_02: You have to evolve because I, on the podcasting front, I'm a fan of podcasts much more than I am a fan of being a host or whatever.
+[22:59.96 -> 23:04.23] SPEAKER_02: If there's great podcasts that are both AIs, I'll just stop doing this podcast.
+[23:04.29 -> 23:07.25] SPEAKER_02: I'll listen to that podcast, but you have to evolve and you have to change.
+[23:07.27 -> 23:11.17] SPEAKER_02: And that makes people really nervous, I think, but it's also really exciting future.
+[23:11.23 -> 23:16.34] SPEAKER_06: The only thing I may say is I do think like in a world in which there are two AI, I think
+[23:16.32 -> 23:21.83] SPEAKER_06: People value and choose just like in chess.
+[23:22.71 -> 23:27.47] SPEAKER_06: You and I would never watch Stockfish 10 or whatever and AlphaGo play against each.
+[23:27.62 -> 23:29.32] SPEAKER_06: Like it would be boring for us to watch.
+[23:30.30 -> 23:34.81] SPEAKER_06: But Magnus Carlsen and Gukesh, that game would be much more fascinating to watch.
+[23:35.09 -> 23:36.39] SPEAKER_06: So it's tough to say.
+[23:36.41 -> 23:39.89] SPEAKER_06: Like one way to say is you'll have a lot more content.
+[23:39.91 -> 23:44.42] SPEAKER_06: And so you will be listening to AI generated content because sometimes it's efficient, et cetera.
+[23:45.53 -> 23:53.16] SPEAKER_06: But the premium experiences you value might be a version of the human essence wherever it comes through.
+[23:53.18 -> 23:56.65] SPEAKER_06: Going back to what we talked earlier about watching Messi dribble the ball.
+[23:56.69 -> 23:56.97] SPEAKER_06: I don't know.
+[23:56.99 -> 23:59.41] SPEAKER_06: One day I'm sure a machine will dribble much better than Messi.
+[24:00.33 -> 24:03.21] SPEAKER_06: But I don't know whether it would evoke that same emotion in us.
+[24:03.64 -> 24:05.38] SPEAKER_06: So I think that'll be fascinating to see.
+[24:05.60 -> 24:08.80] SPEAKER_02: I think the element of podcasting...
+[24:08.93 -> 24:20.25] SPEAKER_02: or audio books that is about information gathering, that part might be removed or that might be more efficiently and in a compelling way done by AI.
+[24:21.10 -> 24:33.03] SPEAKER_02: But then it'll be just nice to hear humans struggle with the information, contend with the information, try to internalize it, combine it with the complexity of our own emotions and consciousness and all that kind of stuff.
+[24:33.36 -> 24:35.40] SPEAKER_02: But if you actually wanna find out
+[24:35.58 -> 24:38.96] SPEAKER_02: about a piece of history, you go to Gemini.
+[24:39.54 -> 24:46.53] SPEAKER_02: If you want to see Lex struggle with that history, then you look, or other humans, you look at that.
+[24:46.77 -> 24:56.26] SPEAKER_02: But the point is it's going to change the nature, continue to change the nature of how we discover information, how we consume the information, how we create that information.
+[24:56.60 -> 25:00.26] SPEAKER_02: The same way that YouTube changed everything completely, changed news.
+[25:01.04 -> 25:03.16] SPEAKER_02: And that's something our society is struggling with.
+[25:03.38 -> 25:03.81] SPEAKER_06: Yeah.
+[25:04.03 -> 25:05.27] SPEAKER_06: Look, YouTube enabled,
+[25:05.70 -> 25:07.35] SPEAKER_06: I mean, you know this better than anyone else.
+[25:07.43 -> 25:09.33] SPEAKER_06: It's enabled so many creators.
+[25:10.31 -> 25:16.12] SPEAKER_06: There is no doubt in me that we will enable more filmmakers than there have ever been.
+[25:16.14 -> 25:18.28] SPEAKER_06: You're going to empower a lot more people.
+[25:20.03 -> 25:24.89] SPEAKER_06: So I think there is an expansionary aspect of this, which is underestimated, I think.
+[25:25.65 -> 25:30.39] SPEAKER_06: I think it'll unleash human creativity in a way that hasn't been seen before.
+[25:30.60 -> 25:32.04] SPEAKER_06: It's tough to internalize.
+[25:32.86 -> 25:40.03] SPEAKER_06: The only way it is if you brought someone from the 50s or 40s and just put them in front of YouTube, you know, I think it would blow their mind away.
+[25:40.81 -> 25:44.85] SPEAKER_06: Similarly, I think we would get blown away by what's possible in a 10 to 20 year timeframe.
+[25:45.63 -> 25:46.58] SPEAKER_02: Do you think there's a future?
+[25:46.64 -> 25:51.52] SPEAKER_02: How many years out is it that, let's say, let's put a mark on it, 50% of content?
+[25:52.62 -> 25:53.84] SPEAKER_02: Good content.
+[25:54.12 -> 25:58.47] SPEAKER_02: 50% of good content is generated by VO4, 5, 6.
+[25:59.75 -> 26:02.05] SPEAKER_06: You know, I think it depends on what it is for.
+[26:03.74 -> 26:09.59] SPEAKER_06: Like, you know, maybe if you look at movies today with CGI, there are great filmmakers.
+[26:09.67 -> 26:12.85] SPEAKER_06: Like you still look at like who the directors are and who use it.
+[26:12.97 -> 26:15.20] SPEAKER_06: There are filmmakers who don't use it at all.
+[26:15.38 -> 26:16.14] SPEAKER_06: You value that.
+[26:16.78 -> 26:18.56] SPEAKER_06: There are people who use it incredibly.
+[26:18.84 -> 26:23.81] SPEAKER_06: You know, think about somebody like a James Cameron, like what he would do with these tools in his hands.
+[26:24.55 -> 26:33.04] SPEAKER_06: But I think there'll be a lot more content created, like just like writers today use Google Docs and not think about the fact that they're using a tool like that.
+[26:33.90 -> 26:36.34] SPEAKER_06: Like people will be using the future versions of these things.
+[26:37.20 -> 26:39.23] SPEAKER_06: Like it won't be a big deal at all to them.
+[26:40.86 -> 26:44.18] SPEAKER_02: I've gotten a chance to get to know Darren Aronofsky well.
+[26:44.96 -> 26:48.74] SPEAKER_02: He's been really leaning in and trying to figure, it's fun to,
+[26:48.81 -> 26:54.98] SPEAKER_02: watch a genius who came up before any of this was even remotely possible.
+[26:55.00 -> 27:00.68] SPEAKER_02: He created Pi, one of my favorite movies, and from there just continued to create a really interesting variety of movies.
+[27:01.06 -> 27:05.77] SPEAKER_02: And now he's trying to see how can AI be used to create compelling films.
+[27:06.47 -> 27:07.33] SPEAKER_02: You have people like that.
+[27:07.75 -> 27:15.34] SPEAKER_02: You have people, I've gotten to just know edgier folks that are AI first, like door brothers.
+[27:15.32 -> 27:21.41] SPEAKER_02: both Aronofsky and Doar Brothers create at the edge of the Overton window of society.
+[27:21.43 -> 27:29.73] SPEAKER_02: They push, whether it's sexuality or violence, it's edgy, like artists are, but it's still classy.
+[27:29.75 -> 27:33.37] SPEAKER_02: It doesn't cross that line, whatever that line is.
+[27:33.41 -> 27:35.88] SPEAKER_02: Hunter S. Thompson has this line
+[27:37.21 -> 27:42.41] SPEAKER_02: that the only way to find out where the edge, where the line is, is by crossing it.
+[27:43.41 -> 27:44.78] SPEAKER_02: And I think for artists, that's true.
+[27:44.82 -> 27:46.32] SPEAKER_02: That's kind of their purpose sometimes.
+[27:46.38 -> 27:48.14] SPEAKER_02: Comedians and artists just cross that line.
+[27:49.22 -> 27:53.15] SPEAKER_02: I wonder if you can comment on the weird place that puts Google.
+[27:54.99 -> 27:58.55] SPEAKER_02: Because Google's line is probably different than some of these artists.
+[27:59.45 -> 28:04.80] SPEAKER_02: What's your, how do you think about, specifically VO and Flow,
+[28:05.35 -> 28:14.87] SPEAKER_02: about like how to allow artists to do crazy shit, but also like the responsibility of like not for it not to be too crazy.
+[28:15.33 -> 28:16.19] SPEAKER_06: I mean, it's a great question.
+[28:16.21 -> 28:20.60] SPEAKER_06: Look, part of, you mentioned Darren, you know, he's a clear visionary, right?
+[28:20.64 -> 28:28.91] SPEAKER_06: Part of the reason we started working with him early on VO is he's one of those people who's able to kind of
+[28:29.30 -> 28:38.59] SPEAKER_06: see that future, get inspired by it, and kind of showing the way for how creative people can express themselves with it.
+[28:38.61 -> 28:45.90] SPEAKER_06: Look, I think when it comes to allowing artistic free expression, it's one of the most important values in a society, right?
+[28:45.98 -> 28:53.03] SPEAKER_06: I think, you know, artists have always been the ones to push boundaries, expand the frontiers of thought.
+[28:53.99 -> 28:59.17] SPEAKER_06: And so, look, I think that's going to be an important value we have.
+[28:59.61 -> 29:08.39] SPEAKER_06: So I think we will provide tools and put it in the hands of artists for them to use and put out their work.
+[29:10.07 -> 29:13.72] SPEAKER_06: Those APIs, I mean, I almost think of that as infrastructure.
+[29:14.22 -> 29:20.79] SPEAKER_06: Just like when you provide electricity to people or something, you want them to use it and you're not thinking about the use cases on top of it.
+[29:20.81 -> 29:21.57] SPEAKER_06: It's a pain brush.
+[29:21.99 -> 29:22.37] SPEAKER_06: Yeah.
+[29:22.57 -> 29:27.52] SPEAKER_06: And so I think that's how obviously there have to be some things.
+[29:27.60 -> 29:33.01] SPEAKER_06: And society needs to decide at a fundamental level what's okay, what's not.
+[29:33.29 -> 29:34.53] SPEAKER_06: We'll be responsible with it.
+[29:35.61 -> 29:43.72] SPEAKER_06: But I do think when it comes to artistic free expression, I think that's one of those values we should work hard to defend.
+[29:44.36 -> 29:55.27] SPEAKER_02: I wonder if you can comment on maybe earlier versions of Gemini where we're a little bit careful on the kind of things you would be willing to answer.
+[29:55.31 -> 30:05.62] SPEAKER_02: I just want to comment on I was really surprised and pleasantly surprised and enjoyed the fact that Gemini 2.5 Pro is a lot less careful in a good sense.
+[30:05.61 -> 30:11.59] SPEAKER_02: Don't ask me why, but I've been doing a lot of research on Genghis Khan and the Estes.
+[30:12.30 -> 30:14.30] SPEAKER_02: So there's a lot of violence there in that history.
+[30:14.32 -> 30:15.52] SPEAKER_02: It's a very violent history.
+[30:15.98 -> 30:18.90] SPEAKER_02: I've also been doing a lot of research on World War I and World War II.
+[30:19.41 -> 30:22.23] SPEAKER_02: And earlier versions of Gemini were very...
+[30:22.21 -> 30:26.44] SPEAKER_02: basically this kind of sense, are you sure you want to learn about this?
+[30:26.96 -> 30:36.35] SPEAKER_02: And now it's actually very factual, objective, talks about very difficult parts of human history, and does so with nuance and depth.
+[30:36.43 -> 30:37.52] SPEAKER_02: It's been really nice.
+[30:37.69 -> 30:40.98] SPEAKER_02: But there's a line there that I guess Google has to kind of walk.
+[30:41.02 -> 30:44.29] SPEAKER_02: I wonder if it's... And it's also an engineering challenge, how to...
+[30:44.27 -> 30:49.01] SPEAKER_02: how to do that at scale across all the weird queries that people ask.
+[30:49.03 -> 30:51.17] SPEAKER_02: Can you just speak to that challenge?
+[30:51.53 -> 30:59.46] SPEAKER_02: How do you allow Gemini to say, again, forgive, pardon my French, crazy shit, but not too crazy?
+[30:59.48 -> 31:08.83] SPEAKER_06: I think one of the good insights here has been, as the models are getting more capable, the models are really good at this stuff, right?
+[31:08.95 -> 31:13.51] SPEAKER_06: And so I think in some ways, maybe a year ago, the models weren't fully there.
+[31:13.93 -> 31:15.99] SPEAKER_06: So they would also do stupid things more often.
+[31:17.56 -> 31:25.25] SPEAKER_06: And so you're trying to handle those edge cases, but then you make a mistake in how you handle those edge cases and it compounds.
+[31:26.41 -> 31:33.34] SPEAKER_06: But I think with 2.5, what we particularly found is once the models cross a certain level of intelligence and sophistication,
+[31:34.06 -> 31:37.39] SPEAKER_06: you know, they are able to reason through these nuanced issues pretty well.
+[31:37.53 -> 31:39.25] SPEAKER_06: And I think users really want that, right?
+[31:39.27 -> 31:44.06] SPEAKER_06: Like, you know, you want as much access to the raw model as possible, right?
+[31:44.98 -> 31:52.82] SPEAKER_06: But I think it's a great area to think about, like, you know, over time, you know, we should allow more and more closer access to it.
+[31:53.81 -> 32:00.71] SPEAKER_06: Maybe, obviously, let people custom prompts if they wanted to and, like, you know, and, you know, experiment with it, et cetera.
+[32:01.55 -> 32:03.94] SPEAKER_06: I think that's an important direction.
+[32:04.00 -> 32:16.01] SPEAKER_06: But look, the first principles we want to think about it is, you know, from a scientific standpoint, like making sure the models, and I'm saying scientific in the sense of like how you would approach math or physics or something like that.
+[32:16.77 -> 32:27.88] SPEAKER_06: From first principles, having the models reason about the world, be nuanced, et cetera, you know, from the ground up is the right way to build these things, right?
+[32:27.98 -> 32:28.96] SPEAKER_06: Not...
+[32:29.11 -> 32:33.84] SPEAKER_06: like some subset of humans kind of hard coding things on top of it.
+[32:34.64 -> 32:37.26] SPEAKER_06: So I think it's the direction we've been taking.
+[32:37.48 -> 32:39.60] SPEAKER_06: And I think you'll see us continue to push in that direction.
+[32:40.37 -> 32:49.76] SPEAKER_02: Yeah, I actually asked, I gave these notes, I took extensive notes and I gave them to Gemini and said, can you ask a novel question that's not in these notes?
+[32:50.96 -> 32:55.18] SPEAKER_02: And it wrote, Gemini continues to really surprise me.
+[32:55.30 -> 32:56.38] SPEAKER_02: really surprised me.
+[32:56.40 -> 32:57.54] SPEAKER_02: It's been really beautiful.
+[32:57.74 -> 32:59.01] SPEAKER_02: It's an incredible model.
+[33:00.73 -> 33:09.42] SPEAKER_02: The question it generated was, you, meaning Sundar, told the world Gemini's churning out 480 trillion tokens a month.
+[33:10.57 -> 33:14.57] SPEAKER_02: What's the most life-changing five-word sentence hiding in that haystack?
+[33:14.99 -> 33:16.07] SPEAKER_02: That's a Gemini question.
+[33:16.69 -> 33:17.92] SPEAKER_02: But it gave me a sense.
+[33:17.94 -> 33:18.84] SPEAKER_02: I don't think you can answer that.
+[33:19.04 -> 33:21.76] SPEAKER_02: But it woke me up to like,
+[33:21.85 -> 33:27.67] SPEAKER_02: All of these tokens are providing little aha moments for people across the globe.
+[33:28.23 -> 33:29.21] SPEAKER_02: So that's like learning.
+[33:29.28 -> 33:35.26] SPEAKER_02: Those tokens are, people are curious, they ask a question, and they find something out.
+[33:35.28 -> 33:37.07] SPEAKER_02: And it truly could be life-changing.
+[33:37.57 -> 33:38.29] SPEAKER_06: Oh, it is.
+[33:38.35 -> 33:41.75] SPEAKER_06: Look, you know, I had the same feeling about search many, many years ago.
+[33:41.77 -> 33:44.28] SPEAKER_06: You know, you definitely...
+[33:45.05 -> 33:49.08] SPEAKER_06: You know, these tokens per month is like grown 50 times in the last 12 months.
+[33:49.16 -> 33:50.64] SPEAKER_02: Is that accurate, by the way?
+[33:50.77 -> 33:51.41] SPEAKER_06: Yeah, it is.
+[33:51.55 -> 33:52.27] SPEAKER_06: It is accurate.
+[33:52.43 -> 33:53.71] SPEAKER_06: I'm glad it got it right.
+[33:55.08 -> 33:59.95] SPEAKER_06: But, you know, that number was 9.7 trillion tokens per month 12 months ago.
+[34:00.34 -> 34:02.42] SPEAKER_06: It's gone up to 480.
+[34:02.64 -> 34:04.36] SPEAKER_06: It's a 50x increase.
+[34:05.12 -> 34:10.99] SPEAKER_06: So there's no limit to human curiosity, and I think it's one of those moments.
+[34:12.15 -> 34:23.95] SPEAKER_06: Maybe, I don't think it is there today, but maybe one day there's a five-word phrase which says what the actual universe is or something like that and something very meaningful, but I don't think we are quite there yet.
+[34:25.17 -> 34:28.88] SPEAKER_02: Do you think the scaling laws are holding strong on...
+[34:29.93 -> 34:34.70] SPEAKER_02: There's a lot of ways to describe the scaling laws for AI, but on the pre-training, on the post-training fronts.
+[34:35.78 -> 34:40.09] SPEAKER_02: So the flip side of that, do you anticipate AI progress will hit a wall?
+[34:40.93 -> 34:41.53] SPEAKER_02: Is there a wall?
+[34:42.09 -> 34:44.75] SPEAKER_06: You know, it's a cherished micro kitchen conversation.
+[34:44.77 -> 34:57.48] SPEAKER_06: Once in a while I have it, you know, like when Demis is visiting or, you know, Demis, Korai, Jeff, Noam, Sergey, a bunch of our people, like, you know, we sit and, you know, talk about this, right?
+[34:57.50 -> 34:59.07] SPEAKER_06: And, um,
+[34:59.92 -> 35:02.73] SPEAKER_06: Look, we see a lot of headroom ahead, right?
+[35:02.81 -> 35:08.13] SPEAKER_06: I think we've been able to optimize and improve on all fronts, right?
+[35:09.09 -> 35:10.89] SPEAKER_06: Pre-training, post-training,
+[35:11.43 -> 35:18.08] SPEAKER_06: test time, compute, tool use, right, over time, making these more agentic.
+[35:18.10 -> 35:29.86] SPEAKER_06: So getting these models to be more general world models in that direction, like VO3, you know, the physics understanding is dramatically better than what VO1 or something like that was.
+[35:30.70 -> 35:37.15] SPEAKER_06: So you kind of see on all those dimensions, I feel, you know, progress is very obvious to see.
+[35:37.57 -> 35:42.58] SPEAKER_06: And I feel like there is significant headroom.
+[35:43.54 -> 35:49.47] SPEAKER_06: More importantly, you know, I'm fortunate to work with some of the best researchers on the planet, right?
+[35:49.51 -> 35:52.99] SPEAKER_06: They think there is more headroom to be had here.
+[35:53.69 -> 35:56.05] SPEAKER_06: And so I think we have an exciting trajectory ahead.
+[35:56.86 -> 36:04.32] SPEAKER_06: It's tougher to say, you know, each year I sit and say, okay, we are going to throw 10x more compute over the course of next year at it.
+[36:04.34 -> 36:06.45] SPEAKER_06: And like, will we see progress?
+[36:07.54 -> 36:11.08] SPEAKER_06: Sitting here today, I feel like the year ahead will have a lot of progress.
+[36:11.36 -> 36:19.29] SPEAKER_02: And do you feel any limitations like that or the bottlenecks, compute limited, data limited, idea limited?
+[36:19.31 -> 36:23.32] SPEAKER_02: Do you feel any of those limitations or is it full steam ahead on all fronts?
+[36:24.16 -> 36:26.12] SPEAKER_06: I think it's compute limited in this sense, right?
+[36:26.18 -> 36:34.47] SPEAKER_06: Like, you know, we can all, part of the reason you've seen us do flash, nano flash and pro models, but not an ultra model.
+[36:34.83 -> 36:36.35] SPEAKER_06: It's like for each generation,
+[36:36.92 -> 36:43.01] SPEAKER_06: We feel like we've been able to get the pro model at like, I don't know, 80, 90% of Ultra's capability.
+[36:43.75 -> 36:51.37] SPEAKER_06: But Ultra would be a lot more like slow and a lot more expensive to serve.
+[36:52.99 -> 37:04.56] SPEAKER_06: But what we've been able to do is to go to the next generation and make the next generation's pro as good as the previous generation's ultra, but be able to serve it in a way that it's fast and you can use it and so on.
+[37:05.30 -> 37:11.95] SPEAKER_06: So I do think scaling laws are working, but it's tough to get at any given time.
+[37:12.41 -> 37:22.15] SPEAKER_06: The models we all use the most is maybe like a few months behind the maximum capability we can deliver, right?
+[37:22.62 -> 37:26.47] SPEAKER_06: because that won't be the fastest, easiest to use, et cetera.
+[37:26.97 -> 37:28.56] SPEAKER_02: Also, that's in terms of intelligence.
+[37:28.62 -> 37:36.02] SPEAKER_02: It becomes harder and harder to measure performance, in quotes, because you could argue Gemini Flash
+[37:36.79 -> 37:39.38] SPEAKER_02: is much more impactful than Pro.
+[37:40.08 -> 37:42.82] SPEAKER_02: Just because of the latency, it's super intelligent already.
+[37:42.84 -> 37:52.94] SPEAKER_02: I mean, sometimes latency is maybe more important than intelligence, especially when the intelligence is just a little bit less in Flash.
+[37:52.96 -> 37:55.24] SPEAKER_02: It's still an incredibly smart model.
+[37:55.22 -> 37:57.88] SPEAKER_02: And so you have to now start measuring impact.
+[37:57.92 -> 38:07.60] SPEAKER_02: And then it feels like benchmarks are less and less capable of capturing the intelligence of models, the effectiveness of models, the usefulness, the real-world usefulness of models.
+[38:08.10 -> 38:09.22] SPEAKER_02: Another kitchen question.
+[38:09.90 -> 38:12.91] SPEAKER_02: So lots of folks are talking about timelines for AGI.
+[38:12.89 -> 38:15.97] SPEAKER_02: or ASI, artificial super intelligence.
+[38:16.47 -> 38:24.40] SPEAKER_02: So AGI, loosely defined, is basically human expert level at a lot of the main fields of pursuit for humans.
+[38:25.30 -> 38:32.11] SPEAKER_02: And then ASI is what AGI becomes, presumably quickly, by being able to self-improve.
+[38:32.65 -> 38:36.87] SPEAKER_02: So becoming far superior in intelligence across all these disciplines in humans.
+[38:37.67 -> 38:38.85] SPEAKER_02: When do you think we'll have AGI?
+[38:39.27 -> 38:41.05] SPEAKER_02: Is 2030 a possibility?
+[38:41.26 -> 38:43.70] SPEAKER_06: There's one other term we should throw in there.
+[38:43.86 -> 38:45.32] SPEAKER_06: I don't know who used it first.
+[38:45.34 -> 38:47.50] SPEAKER_06: Maybe Karpathy did AJI.
+[38:47.60 -> 38:51.09] SPEAKER_06: Have you heard AJI, the artificial jagged intelligence?
+[38:51.81 -> 38:53.25] SPEAKER_06: Sometimes feels that way, right?
+[38:53.27 -> 38:55.94] SPEAKER_06: Both there are progress and you see what they can do.
+[38:55.96 -> 39:05.95] SPEAKER_06: And then like you can trivially find they make numeric letters or like, you know, counting R's in strawberry or something which seems to trip up most models or whatever it is, right?
+[39:06.71 -> 39:07.31] SPEAKER_06: So...
+[39:07.92 -> 39:10.00] SPEAKER_06: So maybe we should throw that term in there.
+[39:10.16 -> 39:19.03] SPEAKER_06: I feel like we are in the AGI phase where like dramatic progress, some things don't work well, but overall, you know, you're seeing lots of progress.
+[39:20.01 -> 39:22.56] SPEAKER_06: But if your question is, will it happen by 2030?
+[39:23.62 -> 39:28.63] SPEAKER_06: Look, we constantly move the line of what it means to be AGI.
+[39:29.51 -> 39:37.42] SPEAKER_06: There are moments today, you know, like sitting in a Waymo in a San Francisco street with all the crowds and the people and kind of work its way through.
+[39:38.26 -> 39:39.66] SPEAKER_06: I see glimpses of it there.
+[39:40.28 -> 39:49.18] SPEAKER_06: The car is sometimes kind of impatient, trying to work its way using Astra, like in Gemini Live or seeing, you know, asking questions about the world.
+[39:49.51 -> 39:51.67] SPEAKER_00: What's this skinny building doing in my neighborhood?
+[39:51.99 -> 39:54.48] SPEAKER_00: It's a street light, not a building.
+[39:54.66 -> 39:55.86] SPEAKER_06: You see glimpses.
+[39:56.47 -> 40:04.06] SPEAKER_06: That's why I use the word AGI, because then you see stuff which obviously, you know, we are far from AGI too.
+[40:04.16 -> 40:07.03] SPEAKER_06: So you have both experiences simultaneously happening to you.
+[40:07.79 -> 40:09.65] SPEAKER_06: I'll answer your question, but I'll also throw out this.
+[40:09.87 -> 40:11.76] SPEAKER_06: I almost feel the term doesn't matter.
+[40:11.99 -> 40:15.30] SPEAKER_06: What I know is by 2030, there'll be such dramatic progress.
+[40:16.97 -> 40:28.50] SPEAKER_06: we'll be dealing with the consequences of that progress, both the positives, both the positive externalities and the negative externalities that come with it in a big way by 2030.
+[40:29.07 -> 40:31.13] SPEAKER_06: So that I strongly feel, right?
+[40:31.37 -> 40:41.28] SPEAKER_06: Whatever, we may be arguing about the term or maybe Gemini can answer what that moment is in time in 2030, but I think the progress will be dramatic, right?
+[40:41.30 -> 40:42.28] SPEAKER_06: So that I believe in.
+[40:42.84 -> 40:45.74] SPEAKER_06: Will the AI think it has reached AGI by 2030?
+[40:46.42 -> 40:49.54] SPEAKER_06: I would say we will just fall short of that timeline, right?
+[40:49.56 -> 40:50.78] SPEAKER_06: So I think it'll take a bit longer.
+[40:50.82 -> 41:00.47] SPEAKER_06: It's amazing in the early days of Google DeepMind in 2010, they talked about a 20-year timeframe to achieve AGI, which is kind of fascinating to see.
+[41:01.53 -> 41:15.53] SPEAKER_06: But for me, the whole thing, seeing what Google Brain did in 2012 and when we acquired DeepMind in 2014, right close to where we are sitting in 2012,
+[41:16.15 -> 41:22.32] SPEAKER_06: Jeff Dean showed the image of when the neural networks could recognize a picture of a cat and identify it.
+[41:22.92 -> 41:24.70] SPEAKER_06: This is the early versions of brain.
+[41:24.82 -> 41:28.47] SPEAKER_06: And so we all talked about a couple of decades.
+[41:29.51 -> 41:31.07] SPEAKER_06: I don't think we'll quite get there by 2030.
+[41:32.45 -> 41:34.52] SPEAKER_06: So my sense is it's slightly after that.
+[41:35.28 -> 41:38.95] SPEAKER_06: But I would stress it doesn't matter what that definition is.
+[41:40.27 -> 41:41.13] SPEAKER_06: Because...
+[41:41.89 -> 41:44.73] SPEAKER_06: you will have mind-blowing progress on many dimensions.
+[41:45.05 -> 41:46.71] SPEAKER_06: Maybe AI can create videos.
+[41:47.38 -> 41:57.87] SPEAKER_06: We have to figure out as a society, how do we, we need some system by which we all agree that this is AI generated and we have to disclose it in a certain way because how do you distinguish reality otherwise?
+[41:58.49 -> 42:00.10] SPEAKER_02: Yeah, there's so many interesting things you said.
+[42:00.20 -> 42:04.59] SPEAKER_02: So first of all, just looking back at this recent, now it feels like distant history,
+[42:04.68 -> 42:14.48] SPEAKER_02: with Google Brain, I mean, that was before TensorFlow, before TensorFlow was made public and open sourced, so the tooling matters too, combined with GitHub ability to share code.
+[42:15.26 -> 42:25.34] SPEAKER_02: Then you have the ideas of attention, transformers, and the diffusion now, and then there might be a new idea that seems simple in retrospect, but it will change everything.
+[42:25.79 -> 42:28.38] SPEAKER_02: and that could be the post-training, the inference, time, innovations.
+[42:28.72 -> 42:36.39] SPEAKER_02: And I think Shad Cien tweeted that Google is just one great UI from completely winning the AI race.
+[42:36.41 -> 42:39.82] SPEAKER_02: Meaning like UI is a huge part of it.
+[42:39.94 -> 42:43.03] SPEAKER_02: Like how that intelligence works
+[42:43.01 -> 42:46.11] SPEAKER_02: I think Logan Kerr-Patrick likes to talk about this right now.
+[42:46.13 -> 42:53.84] SPEAKER_02: It's an LLM, but when is it going to become a system where you're talking about shipping systems versus shipping a particular model?
+[42:54.54 -> 43:00.55] SPEAKER_02: Yeah, that matters too, how the system manifests itself and how it presents itself to the world.
+[43:00.93 -> 43:01.87] SPEAKER_02: That really, really matters.
+[43:02.59 -> 43:04.05] SPEAKER_06: Oh, hugely so.
+[43:04.49 -> 43:06.74] SPEAKER_06: There are simple UI innovations that
+[43:07.12 -> 43:08.36] SPEAKER_06: which have changed the world, right?
+[43:08.68 -> 43:11.12] SPEAKER_06: And I absolutely think so.
+[43:12.51 -> 43:21.12] SPEAKER_06: We will see a lot more progress in the next couple of years as I think AI itself on a self-improving track for UI itself.
+[43:21.38 -> 43:25.80] SPEAKER_06: Like, you know, today we are like constraining the models.
+[43:25.90 -> 43:30.39] SPEAKER_06: The models can't quite express themselves in terms of the UI to people.
+[43:32.27 -> 43:36.97] SPEAKER_06: But that is like, you know, if you think about it, we've kind of boxed them in that way.
+[43:38.10 -> 43:47.06] SPEAKER_06: But given these models can code, you know, they should be able to write the best interfaces to express their ideas over time, right?
+[43:47.24 -> 43:48.73] SPEAKER_02: That is an incredible idea.
+[43:48.75 -> 43:50.87] SPEAKER_02: So their API is already open.
+[43:51.51 -> 43:57.01] SPEAKER_02: So you create a really nice agentic system that continuously improves
+[43:57.32 -> 43:59.69] SPEAKER_02: the way you can be talking to an AI.
+[44:00.61 -> 44:02.91] SPEAKER_02: But a lot of that is the interface.
+[44:03.49 -> 44:08.54] SPEAKER_02: And then, of course, the incredible multimodal aspect of the interface that Google has been pushing.
+[44:08.82 -> 44:10.53] SPEAKER_06: These models are natively multimodal.
+[44:10.59 -> 44:14.63] SPEAKER_06: They can easily take content from any format, put it in any format.
+[44:15.40 -> 44:17.00] SPEAKER_06: They can write a good user interface.
+[44:17.64 -> 44:20.45] SPEAKER_06: They probably understand your preferences better over time.
+[44:21.08 -> 44:46.79] SPEAKER_06: like you know and so so all this is like the evolution ahead right and so um that goes back to where we started the conversation i like i think there'll be dramatic evolutions in the years ahead maybe one more kitchen question uh this even further ridiculous concept of p doom so the philosophically minded folks in the ai community think about the probability
+[44:47.16 -> 44:51.58] SPEAKER_02: that AGI and then ASI might destroy all of human civilization.
+[44:52.40 -> 44:54.97] SPEAKER_02: I would say my PDoom is about 10%.
+[44:56.27 -> 45:01.01] SPEAKER_02: Do you ever think about this kind of long-term threat of ASI?
+[45:01.59 -> 45:02.90] SPEAKER_02: And what would your PDoom be?
+[45:03.68 -> 45:05.06] SPEAKER_06: Look, I mean, for sure.
+[45:05.18 -> 45:15.59] SPEAKER_06: Look, I've both been very excited about AI, but I've always felt this is a technology, you know, we have to actively think about
+[45:16.05 -> 45:22.41] SPEAKER_06: the risks and work very, very hard to harness it in a way that it all works out well.
+[45:23.39 -> 45:30.06] SPEAKER_06: On the PDOOM question, look, it wouldn't surprise you to say that's probably another micro kitchen conversation that pops up once in a while, right?
+[45:30.24 -> 45:41.84] SPEAKER_06: And given how powerful the technology is, maybe stepping back, you know, when you're running a large organization, if you can kind of align the incentives of the organization, you can achieve pretty much anything, right?
+[45:41.88 -> 45:44.16] SPEAKER_06: Like, you know, if you can get kind of people all marching and
+[45:44.63 -> 45:49.82] SPEAKER_06: towards a goal in a very focused way, in a mission-driven way, you can pretty much achieve anything.
+[45:50.78 -> 45:54.28] SPEAKER_06: But it's very tough to organize all of humanity that way.
+[45:54.68 -> 46:03.13] SPEAKER_06: But I think if PDOM is actually high, at some point, all of humanity is aligned in making sure that's not the case, right?
+[46:03.21 -> 46:06.57] SPEAKER_06: And so we'll actually make more progress against it, I think.
+[46:06.59 -> 46:12.80] SPEAKER_06: So the irony is, so there is a self-modulating aspect there, right?
+[46:13.05 -> 46:19.62] SPEAKER_06: Like, I think if humanity collectively puts their mind to solving a problem, whatever it is, I think we can get there.
+[46:19.64 -> 46:26.53] SPEAKER_06: So because of that, you know, I think I'm optimistic on the PDOOM scenarios.
+[46:27.99 -> 46:31.55] SPEAKER_06: But that doesn't mean I think the underlying risk is actually pretty high.
+[46:31.59 -> 46:34.09] SPEAKER_06: But I'm
+[46:34.23 -> 46:39.00] SPEAKER_06: You know, I have a lot of faith in humanity kind of rising up to meet that moment.
+[46:39.64 -> 46:40.66] SPEAKER_02: That's really, really well put.
+[46:40.68 -> 46:47.98] SPEAKER_02: I mean, as the threat becomes more concrete and real, humans do really come together and get their shit together.
+[46:48.34 -> 46:54.10] SPEAKER_02: Well, the other thing I think people don't often talk about is probability of doom without AI.
+[46:54.36 -> 47:07.56] SPEAKER_02: So there's all these other ways that humans can destroy themselves, and it's very possible, at least I believe so, that AI will help us become smarter, kinder to each other, more efficient.
+[47:09.40 -> 47:13.90] SPEAKER_02: It'll help more parts of the world flourish where it would be less resource constrained.
+[47:13.88 -> 47:17.67] SPEAKER_02: which is often the source of military conflict and tensions and so on.
+[47:18.43 -> 47:23.08] SPEAKER_02: So we also have to load into that, what's the P-Doom without AI?
+[47:24.44 -> 47:26.50] SPEAKER_02: P-Doom with AI and P-Doom without AI.
+[47:26.76 -> 47:32.35] SPEAKER_02: Because it's very possible that AI will be the thing that saves us, saves human civilizations from all the other threats.
+[47:32.65 -> 47:33.39] SPEAKER_06: I agree with you.
+[47:33.55 -> 47:34.88] SPEAKER_06: I think it's insightful.
+[47:35.26 -> 47:42.19] SPEAKER_06: Look, I felt like to make progress on some of the toughest problems would be good to have AI, like a pair,
+[47:42.44 -> 47:43.02] SPEAKER_06: helping you.
+[47:43.54 -> 47:43.92] SPEAKER_06: Right.
+[47:43.94 -> 47:47.91] SPEAKER_06: And, and like, you know, so that resonates with me for sure.
+[47:48.09 -> 47:48.27] SPEAKER_05: Yeah.
+[47:48.51 -> 47:49.51] SPEAKER_06: Quick pause, bath and break.
+[47:51.41 -> 47:53.36] SPEAKER_05: Let's do that.
+[47:53.38 -> 47:59.89] SPEAKER_02: If notebook LM was the same, like what I saw today with beam, if it was compelling in the same kind of way.
+[48:01.91 -> 48:02.61] SPEAKER_02: Blew my mind.
+[48:03.05 -> 48:03.71] SPEAKER_02: It was incredible.
+[48:03.83 -> 48:04.69] SPEAKER_06: I didn't think it's possible.
+[48:05.25 -> 48:06.59] SPEAKER_06: I didn't think it's possible.
+[48:06.69 -> 48:14.78] SPEAKER_06: Can you imagine like the US president and the Chinese president being able to do something like Beam with the live meat translation working well?
+[48:15.26 -> 48:19.01] SPEAKER_06: So they're both sitting and talking, make progress a bit more.
+[48:20.25 -> 48:25.11] SPEAKER_02: Yeah, just for people listening, we took a quick bathroom break and now we're talking about the demo I did.
+[48:25.13 -> 48:28.57] SPEAKER_02: We'll probably post it somewhere, somehow, maybe here.
+[48:28.59 -> 48:31.92] SPEAKER_02: I got a chance to experience Beam and it was...
+[48:31.90 -> 48:40.54] SPEAKER_02: It's hard to describe in words how real it felt with just, what is it, six cameras.
+[48:41.00 -> 48:41.58] SPEAKER_02: It's incredible.
+[48:41.74 -> 48:42.28] SPEAKER_02: It's incredible.
+[48:42.70 -> 48:44.30] SPEAKER_06: It's one of the toughest products.
+[48:44.97 -> 48:46.65] SPEAKER_06: You can't quite describe it to people.
+[48:47.49 -> 48:51.98] SPEAKER_06: Even when we show it in slides, et cetera, you don't know what it is.
+[48:52.40 -> 48:53.68] SPEAKER_06: You have to kind of experience it.
+[48:54.50 -> 48:59.61] SPEAKER_02: On the world leaders front, on politics, geopolitics, there's something really special.
+[48:59.81 -> 49:07.06] SPEAKER_02: Again, we're studying World War II and how much could have been saved if Chamberlain met Stalin in person.
+[49:07.46 -> 49:14.89] SPEAKER_02: And I sometimes also struggle explaining to people, articulating why I believe meeting in person for world leaders is powerful.
+[49:16.00 -> 49:20.26] SPEAKER_02: It just seems naive to say that, but there is something there in person.
+[49:20.33 -> 49:22.59] SPEAKER_02: And with Beam, I felt that same thing.
+[49:22.95 -> 49:25.68] SPEAKER_02: And then I'm unable to explain.
+[49:25.72 -> 49:28.29] SPEAKER_02: All I kept doing is what a child does.
+[49:28.77 -> 49:29.49] SPEAKER_02: You look real.
+[49:29.55 -> 49:37.85] SPEAKER_02: And I mean, I don't know if that makes meetings more productive or so on, but it certainly makes them more
+[49:39.58 -> 49:45.41] SPEAKER_02: The same reason you want to show up to work versus remote sometimes, that human connection.
+[49:45.93 -> 49:46.61] SPEAKER_02: I don't know what that is.
+[49:46.89 -> 49:48.59] SPEAKER_02: It's hard to put into words.
+[49:50.96 -> 50:03.53] SPEAKER_02: There's something beautiful about great teams collaborating on a thing that's not captured by the productivity of that team or by whatever on paper.
+[50:04.11 -> 50:07.18] SPEAKER_02: Some of the most beautiful moments you experience in life is at work.
+[50:07.85 -> 50:11.77] SPEAKER_02: pursuing a difficult thing together for many months.
+[50:12.03 -> 50:13.05] SPEAKER_02: There's nothing like it.
+[50:13.55 -> 50:17.04] SPEAKER_02: You're in the trenches and yeah, you do form bonds that way, for sure.
+[50:17.62 -> 50:23.02] SPEAKER_02: And to be able to do that like somewhat remotely in that same personal touch, I don't know, that's a deeply fulfilling thing.
+[50:23.32 -> 50:33.39] SPEAKER_02: I know a lot of people, I personally hate meetings because a significant percent of meetings when done poorly don't serve a clear purpose.
+[50:33.55 -> 50:34.72] SPEAKER_02: But that's a meeting problem.
+[50:34.76 -> 50:36.80] SPEAKER_02: That's not a communication problem.
+[50:37.44 -> 50:40.42] SPEAKER_02: If you can improve the communication for the meetings that are useful,
+[50:41.02 -> 50:41.86] SPEAKER_02: It's just incredible.
+[50:41.89 -> 50:45.65] SPEAKER_02: So yeah, I was blown away by the great engineering behind it.
+[50:46.05 -> 50:48.31] SPEAKER_02: And then we get to see what impact that has.
+[50:48.35 -> 50:50.55] SPEAKER_02: That's really interesting, but just incredible engineering.
+[50:50.73 -> 50:51.37] SPEAKER_02: Really impressive.
+[50:51.45 -> 50:51.86] SPEAKER_06: Oh, it is.
+[50:51.99 -> 50:55.94] SPEAKER_06: And obviously we'll work hard over the years to make it more and more accessible.
+[50:56.70 -> 51:08.57] SPEAKER_06: But yeah, even on a personal front, outside of work meetings, you know, a grandmother who's far away from our grandchild and being able to, you know, have that kind of an interaction, right?
+[51:08.65 -> 51:10.15] SPEAKER_06: All of that, I think will end up being
+[51:10.57 -> 51:29.93] SPEAKER_06: very mean nothing substitutes being in person you know it's not always possible you know you could be a soldier deployed try trying to talk to your loved ones so i think uh you know so that's what inspires us when you and i hung out last year and took a walk
+[51:30.89 -> 51:42.89] SPEAKER_02: I remember, I don't think we talked about this, but I remember outside of that seeing dozens of articles written by analysts and experts and so on that Sundar Pichai should step down.
+[51:43.22 -> 51:56.10] SPEAKER_02: because the perception was that Google was definitively losing the AI race, has lost its magic touch in the rapidly evolving technological landscape.
+[51:57.11 -> 51:59.07] SPEAKER_02: And now, a year later, it's crazy.
+[51:59.23 -> 52:04.03] SPEAKER_02: You show this plot of all the things that were shipped over the past year.
+[52:04.01 -> 52:04.94] SPEAKER_02: It's incredible.
+[52:05.38 -> 52:09.98] SPEAKER_02: And Gemini Pro is winning across many benchmarks and products as we sit here today.
+[52:10.04 -> 52:17.47] SPEAKER_02: So take me through that experience when there's all these articles saying, you're the wrong guy to lead Google through this.
+[52:18.01 -> 52:18.87] SPEAKER_02: Google is lost.
+[52:19.11 -> 52:19.53] SPEAKER_02: It's done.
+[52:19.59 -> 52:20.70] SPEAKER_02: It's over.
+[52:21.66 -> 52:23.82] SPEAKER_02: To today where Google is winning again.
+[52:24.54 -> 52:26.24] SPEAKER_05: What were some low points during that time?
+[52:27.66 -> 52:32.25] SPEAKER_05: Look, I mean, lots to unpack.
+[52:32.49 -> 52:33.55] SPEAKER_05: You know, obviously...
+[52:35.66 -> 52:51.34] SPEAKER_06: Like, I mean, the main bet I made as a CEO was to really, you know, make sure the company was approaching everything in an AI first way, really, you know, setting ourselves up to develop AGI responsibly, right?
+[52:52.70 -> 52:59.80] SPEAKER_06: And make sure we're putting out products, which embodies that, things that are very, very useful for people.
+[53:00.81 -> 53:04.97] SPEAKER_06: So look, I knew even through moments like that last year,
+[53:06.08 -> 53:11.01] SPEAKER_06: I had a good sense of what we were building internally.
+[53:11.77 -> 53:23.02] SPEAKER_06: So I'd already made many important decisions, bringing together teams of the caliber of Brain and DeepMind and setting up Google DeepMind.
+[53:24.10 -> 53:28.86] SPEAKER_06: There were things like we made the decision to invest in TPUs 10 years ago.
+[53:29.46 -> 53:32.45] SPEAKER_06: So we knew we were scaling up and building big models.
+[53:33.49 -> 53:35.33] SPEAKER_06: Anytime you're in a situation like that,
+[53:36.56 -> 53:37.46] SPEAKER_06: a few aspects.
+[53:39.82 -> 53:41.90] SPEAKER_06: I'm good at tuning out noise, right?
+[53:41.92 -> 53:43.19] SPEAKER_06: Separating signal from noise.
+[53:43.67 -> 53:44.93] SPEAKER_06: Do you scuba dive?
+[53:45.15 -> 53:45.75] SPEAKER_06: Like, have you?
+[53:46.25 -> 53:46.45] SPEAKER_06: No.
+[53:47.49 -> 53:48.01] SPEAKER_06: It's amazing.
+[53:48.03 -> 53:50.84] SPEAKER_06: Like, I'm not good at it, but I've done it a few times.
+[53:51.98 -> 53:55.20] SPEAKER_06: But sometimes you jump in the ocean, it's so choppy.
+[53:57.04 -> 54:03.27] SPEAKER_06: But you go down one feet under, it's the calmest thing in the entire universe, right?
+[54:03.31 -> 54:03.83] SPEAKER_06: So
+[54:04.43 -> 54:05.96] SPEAKER_06: There's a version of that, right?
+[54:05.98 -> 54:14.02] SPEAKER_06: Like, you know, running Google, you know, you may as well be coaching Barcelona or Real Madrid, right?
+[54:14.04 -> 54:16.03] SPEAKER_06: Like, you know, you have a bad season.
+[54:16.49 -> 54:17.91] SPEAKER_06: So there are aspects to that.
+[54:18.05 -> 54:21.65] SPEAKER_06: But, you know, like, look, I'm good at tuning out the noise.
+[54:22.37 -> 54:23.55] SPEAKER_06: I do watch out for signals.
+[54:23.57 -> 54:25.64] SPEAKER_06: You know, it's important to separate the signal from the noise.
+[54:26.28 -> 54:29.62] SPEAKER_06: So there are good people sometimes making good points outside.
+[54:29.66 -> 54:30.74] SPEAKER_06: So you want to listen to it.
+[54:30.78 -> 54:32.28] SPEAKER_06: You want to take that feedback in.
+[54:33.98 -> 54:39.37] SPEAKER_06: But, you know, internally, like, you know, you're making a set of consequential decisions, right?
+[54:39.39 -> 54:42.41] SPEAKER_06: As leaders, you're making a lot of decisions.
+[54:43.56 -> 54:45.48] SPEAKER_06: Many of them are, like, inconsequential.
+[54:46.46 -> 54:48.76] SPEAKER_06: Like, it feels like, but over time, you learn that.
+[54:49.40 -> 54:53.25] SPEAKER_06: Most of the decisions you're making on a day-to-day basis doesn't matter.
+[54:54.11 -> 54:58.20] SPEAKER_06: Like, you have to make them and you're making them just to keep things moving.
+[54:59.02 -> 55:01.48] SPEAKER_06: But you have to make a few consequential decisions, right?
+[55:01.60 -> 55:02.84] SPEAKER_06: And...
+[55:03.73 -> 55:09.16] SPEAKER_06: We had set up the right teams, right leaders.
+[55:10.02 -> 55:11.66] SPEAKER_06: We had world-class researchers.
+[55:12.92 -> 55:14.58] SPEAKER_06: We were training Gemini.
+[55:15.72 -> 55:19.35] SPEAKER_06: Internally, there are factors which were, for example, outside people may not have appreciated.
+[55:19.37 -> 55:23.85] SPEAKER_06: I mean, TPUs are amazing, but we had to ramp up TPUs too.
+[55:24.93 -> 55:26.59] SPEAKER_06: That took time, right?
+[55:26.61 -> 55:32.34] SPEAKER_06: And to scale, actually having enough TPUs to get the compute needed.
+[55:33.52 -> 55:36.52] SPEAKER_06: But I could see internally the trajectory we were on.
+[55:36.56 -> 55:42.83] SPEAKER_06: And I was so excited internally about the possibility.
+[55:43.53 -> 55:48.35] SPEAKER_06: To me, this moment felt like one of the biggest opportunities ahead for us as a company.
+[55:49.16 -> 55:55.62] SPEAKER_06: That the opportunity space ahead over the next decade, next 20 years is bigger than what has happened in the past.
+[55:56.78 -> 56:01.89] SPEAKER_06: And I thought we were set up better than most companies in the world.
+[56:02.44 -> 56:04.57] SPEAKER_06: to go realize that vision.
+[56:05.07 -> 56:09.97] SPEAKER_02: I mean, you had to make some consequential, bold decisions.
+[56:10.15 -> 56:13.10] SPEAKER_02: Like you mentioned the merger of deep mind and brain.
+[56:16.24 -> 56:18.47] SPEAKER_02: Maybe it's my perspective, just knowing humans.
+[56:18.55 -> 56:20.37] SPEAKER_02: I'm sure there's a lot of egos involved.
+[56:21.07 -> 56:25.11] SPEAKER_02: It's very difficult to merge teams, and I'm sure there were some hard decisions to be made.
+[56:25.56 -> 56:28.08] SPEAKER_02: Can you take me through your process of how you think through that?
+[56:28.80 -> 56:30.96] SPEAKER_02: Do you go to pull the trigger and make that decision?
+[56:31.55 -> 56:33.11] SPEAKER_02: Maybe what were some painful points?
+[56:33.16 -> 56:35.94] SPEAKER_02: How do you navigate those turbulent waters?
+[56:36.48 -> 56:39.67] SPEAKER_06: Look, we were fortunate to have two world-class teams, but you're right.
+[56:39.77 -> 56:43.96] SPEAKER_06: Like, it's like somebody coming and telling to you, take Stanford and MIT.
+[56:44.20 -> 56:44.46] SPEAKER_06: Right.
+[56:44.52 -> 56:47.40] SPEAKER_06: And then put them together and create a great department, right?
+[56:47.42 -> 56:49.37] SPEAKER_06: And easier said than done.
+[56:50.91 -> 56:53.47] SPEAKER_06: But we are fortunate, you know, phenomenal teams.
+[56:53.84 -> 56:58.17] SPEAKER_06: Both had their strengths, you know, but they were run very differently, right?
+[56:58.19 -> 57:07.40] SPEAKER_06: Like Brain was kind of a lot of diverse projects, bottoms up, and out of it came a lot of important research breakthroughs.
+[57:08.10 -> 57:15.45] SPEAKER_06: DeepMind at the time had a strong vision of how you want to build AGI, and so they were pursuing their direction.
+[57:16.87 -> 57:20.71] SPEAKER_06: But I think through those moments, luckily tapping into...
+[57:20.91 -> 57:28.54] SPEAKER_06: Jeff had expressed a desire to go back to more of a scientific individual contributor roots.
+[57:28.90 -> 57:31.70] SPEAKER_06: He felt like management was taking up too much of his time.
+[57:32.58 -> 57:40.45] SPEAKER_06: And Demis naturally, I think, was running DeepMind and was a natural choice there.
+[57:41.29 -> 57:42.65] SPEAKER_06: But I think you're right.
+[57:42.75 -> 57:45.01] SPEAKER_06: It took us a while to bring the teams together.
+[57:45.03 -> 57:49.50] SPEAKER_06: Credit to Demis, Jeff, Korai, all the great people there.
+[57:49.67 -> 57:55.36] SPEAKER_06: They worked super hard to combine the best of both worlds when you set up that team.
+[57:56.44 -> 58:06.83] SPEAKER_06: A few sleepless nights here and there as we put that thing together, we were patient in how we did it so that it works well for the long term, right?
+[58:07.29 -> 58:15.07] SPEAKER_06: And some of that in that moment, I think, yes, with things moving fast, I think you definitely felt the pressure.
+[58:15.60 -> 58:18.15] SPEAKER_06: But I think we pulled off that transition well.
+[58:18.23 -> 58:24.09] SPEAKER_06: And I think they were obviously doing incredible work.
+[58:24.11 -> 58:26.62] SPEAKER_06: And there's a lot more incredible things I had coming from them.
+[58:26.91 -> 58:30.51] SPEAKER_02: Like we talked about, you have a very calm, even-tempered, respectful demeanor.
+[58:30.57 -> 58:41.01] SPEAKER_02: During that time, whether it's the merger or just dealing with the noise, were there times where frustration boiled over?
+[58:41.05 -> 58:47.95] SPEAKER_02: Did you have to go a bit more intense on everybody than you usually would?
+[58:48.44 -> 58:50.64] SPEAKER_06: Probably, you know, probably, right?
+[58:50.74 -> 59:01.38] SPEAKER_06: I think in the sense that, you know, there was a moment where we were all driving hard, but when you're in the trenches working with passion, you're going to have days, right?
+[59:01.40 -> 59:10.05] SPEAKER_06: You disagree, you argue, but like all that, I mean, just part of the course of working intensely, right?
+[59:10.18 -> 59:13.10] SPEAKER_06: And, you know, at the end of the day,
+[59:13.79 -> 59:18.13] SPEAKER_06: All of us are doing what we are doing because the impact it can have.
+[59:18.17 -> 59:19.47] SPEAKER_06: We are motivated by it.
+[59:20.24 -> 59:25.04] SPEAKER_06: It's like, you know, for many of us, this has been a long-term journey.
+[59:25.10 -> 59:27.30] SPEAKER_06: And so it's been super exciting.
+[59:27.90 -> 59:31.67] SPEAKER_06: The positive moments far outweigh the kind of stressful moments.
+[59:31.91 -> 59:42.90] SPEAKER_06: Just early this year, I had a chance to celebrate back-to-back over two days, like, you know, Nobel Prize for Jeff Fenton and the next day a Nobel Prize for...
+[59:42.88 -> 59:46.95] SPEAKER_06: Demis and John Jumper, you know, you worked with people like that.
+[59:47.01 -> 59:48.47] SPEAKER_06: All that is super inspiring.
+[59:49.11 -> 60:00.66] SPEAKER_02: Is there something like with you where you had to like put your foot down maybe with less versus more where like I'm the CEO and we're doing this?
+[60:01.31 -> 60:08.74] SPEAKER_06: To my earlier point about consequential decisions you make, there are decisions you make people can disagree pretty vehemently and
+[60:09.83 -> 60:17.62] SPEAKER_06: But at some point, you make a clear decision and you just ask people to commit, right?
+[60:17.68 -> 60:22.70] SPEAKER_06: You can disagree, but it's time to disagree and commit so that we can get moving.
+[60:23.19 -> 60:30.03] SPEAKER_06: And whether it's putting the foot down or it's a natural part of what all of us have to do.
+[60:30.15 -> 60:34.96] SPEAKER_06: And I think you can do that calmly and be very firm in the direction you're
+[60:35.36 -> 60:36.52] SPEAKER_06: making the decision.
+[60:37.06 -> 60:40.97] SPEAKER_06: And I think if you're clear, actually, people over time respect that, right?
+[60:41.01 -> 60:43.03] SPEAKER_06: Like, you know, if you can make decisions with clarity.
+[60:44.07 -> 60:50.28] SPEAKER_06: I find it very effective in meetings where you're making such decisions to hear everyone out.
+[60:51.09 -> 60:54.71] SPEAKER_06: I think it's important when you can to hear everyone out.
+[60:55.37 -> 61:00.52] SPEAKER_06: Sometimes what you're hearing actually influences how you think about and you're wrestling with it and making a decision.
+[61:01.58 -> 61:03.24] SPEAKER_06: Sometimes you have a clear conviction.
+[61:03.86 -> 61:08.53] SPEAKER_06: And you state, so, look, I, you know, this is how I feel.
+[61:08.59 -> 61:10.84] SPEAKER_06: And, you know, this is my conviction.
+[61:10.88 -> 61:13.02] SPEAKER_06: And you kind of place the bet and you move on.
+[61:13.30 -> 61:14.84] SPEAKER_06: Are there big decisions like that?
+[61:14.86 -> 61:19.25] SPEAKER_06: I'm kind of intuitively assume the merger was the big one.
+[61:19.65 -> 61:23.78] SPEAKER_06: I think that was a very important decision, you know, for the company to...
+[61:24.40 -> 61:29.39] SPEAKER_06: To meet the moment, I think we had to make sure we were doing that and doing that well.
+[61:30.01 -> 61:31.63] SPEAKER_06: I think that was a consequential decision.
+[61:31.87 -> 61:32.87] SPEAKER_06: There were many other things.
+[61:32.99 -> 61:46.69] SPEAKER_06: We set up an AI infrastructure team, like to really go meet the moment to scale up the compute we needed to, and really brought teams from the separate parts of the company, kind of created it to move forward.
+[61:48.15 -> 61:48.25] SPEAKER_06: Yeah.
+[61:49.36 -> 62:02.71] SPEAKER_06: you know, bringing people, like getting people to kind of work together physically, both in London with DeepMind and what we call Gradient Canopy, which is where the Mountain View, Google DeepMind teams are.
+[62:03.35 -> 62:14.62] SPEAKER_06: But one of my favorite moments is I routinely walk multiple times per week to the Gradient Canopy building where our top researchers are working on the models and
+[62:15.55 -> 62:18.09] SPEAKER_06: Sergey is often there amongst them, right?
+[62:18.11 -> 62:24.22] SPEAKER_06: Like, you know, just, you know, looking at, you know, getting an update on the model, seeing loss curves.
+[62:24.24 -> 62:32.20] SPEAKER_06: So all that, I think that cultural part of getting the teams together back with that energy, I think ended up playing a big role too.
+[62:32.64 -> 62:36.65] SPEAKER_02: What about the decision to recently add AI mode?
+[62:36.95 -> 62:42.65] SPEAKER_02: So Google search is the, as they say, the front page of the internet, right?
+[62:42.80 -> 62:48.31] SPEAKER_02: It's like a legendary minimalist thing with 10 blue links.
+[62:48.91 -> 62:51.48] SPEAKER_02: When people think internet, they think that page.
+[62:52.12 -> 62:53.86] SPEAKER_02: And now you're starting to mess with that.
+[62:54.54 -> 62:58.29] SPEAKER_02: So the AI mode, which is a separate tab, and then integrating AI in the results.
+[62:58.91 -> 63:01.76] SPEAKER_02: I'm sure there were some battles in meetings on that one.
+[63:02.38 -> 63:05.80] SPEAKER_06: Look, in some ways when mobile came,
+[63:06.36 -> 63:09.96] SPEAKER_06: You know, people wanted answers to more questions.
+[63:10.00 -> 63:11.87] SPEAKER_06: So we're kind of constantly evolving it.
+[63:11.91 -> 63:12.41] SPEAKER_06: But you're right.
+[63:12.59 -> 63:18.86] SPEAKER_06: This moment, you know, that evolution, because the underlying technology is becoming much more capable.
+[63:20.06 -> 63:23.84] SPEAKER_06: You know, you can have AI give a lot of context, you know.
+[63:24.00 -> 63:28.57] SPEAKER_06: But one of our important design goals, though, is when you come to Google search, you're
+[63:29.19 -> 63:33.60] SPEAKER_06: going to get a lot of context, but you're going to go and find a lot of things out on the web.
+[63:33.96 -> 63:37.66] SPEAKER_06: So that will be true in AI mode, in AI overviews, and so on.
+[63:39.27 -> 63:54.65] SPEAKER_06: But I think to our earlier conversation, we are still giving you access to links, but think of the AI as a layer which is giving you context, summary, maybe in AI mode, you can have a dialogue with it back and forth on your journey.
+[63:55.72 -> 63:55.97] SPEAKER_06: Right.
+[63:56.61 -> 63:59.92] SPEAKER_06: And, but through it all, you're kind of learning what's out there in the world.
+[64:00.16 -> 64:08.25] SPEAKER_06: So those core principles don't change, but I think AI mode allows us to push the, we have our best models there, right?
+[64:09.05 -> 64:17.51] SPEAKER_06: Models which are using search as a deep tool, really for every query you're asking, kind of fanning out, doing multiple searches,
+[64:18.13 -> 64:22.99] SPEAKER_06: like kind of assembling that knowledge in a way so you can go and consume what you want to, right?
+[64:23.09 -> 64:24.78] SPEAKER_06: And that's how we think about it.
+[64:25.18 -> 64:30.26] SPEAKER_02: I got to just listen to a bunch of Elizabeth, Liz Reed, describe this.
+[64:30.28 -> 64:32.47] SPEAKER_02: Two things stood out to me that she mentioned.
+[64:32.49 -> 64:39.49] SPEAKER_02: One thing is what you were talking about is the query fan out, which I didn't even think about before.
+[64:40.67 -> 64:45.42] SPEAKER_02: is the powerful aspect of integrating a bunch of stuff on the web for you in one place.
+[64:45.97 -> 64:51.72] SPEAKER_02: So yes, it provides that context so that you can decide which page to then go on to.
+[64:52.18 -> 64:55.31] SPEAKER_02: The other really, really big thing speaks to the earlier
+[64:56.03 -> 65:00.78] SPEAKER_02: in terms of productivity multiply that we're talking about that she mentioned was language.
+[65:01.64 -> 65:13.85] SPEAKER_02: So one of the things you don't quite understand is through AI mode, you make, for non-English speakers, you make sort of, let's say, English language websites accessible
+[65:14.95 -> 65:20.36] SPEAKER_02: by in the reasoning process as you try to figure out what you're looking for.
+[65:20.82 -> 65:24.18] SPEAKER_02: Of course, once you show up to a page, you can use a basic translate.
+[65:24.20 -> 65:33.61] SPEAKER_02: But that process of figuring it out, if you empathize with a large part of the world that doesn't speak English, their web
+[65:33.90 -> 65:37.18] SPEAKER_02: is much smaller in that original language.
+[65:37.68 -> 65:41.35] SPEAKER_02: And so it unlocks, again, unlocks that huge cognitive capacity there.
+[65:42.21 -> 65:53.28] SPEAKER_02: We don't, you know, you take for granted here with all the bloggers and the journalists writing about AI mode, you forget that this now unlocks, because Gemini is really good at translation.
+[65:54.12 -> 65:54.55] SPEAKER_06: No, it is.
+[65:54.70 -> 65:59.33] SPEAKER_06: I mean, the multimodality, the translation, its ability to reason,
+[66:00.10 -> 66:01.95] SPEAKER_06: we are dramatically improving tool use.
+[66:03.09 -> 66:11.09] SPEAKER_06: Like, so putting that power in the flow of search, I think, look, I'm super excited with the AI overviews.
+[66:12.22 -> 66:15.82] SPEAKER_06: We've seen the product has gotten much better.
+[66:15.90 -> 66:18.64] SPEAKER_06: We measured using all kinds of user metrics.
+[66:19.40 -> 66:22.11] SPEAKER_06: It's obviously driven strong growth of the product.
+[66:23.19 -> 66:26.49] SPEAKER_06: And, you know, we've been testing AI mode.
+[66:27.11 -> 66:29.13] SPEAKER_06: You know, it's now in the hands of
+[66:29.48 -> 66:33.01] SPEAKER_06: millions of people and the early metrics are very encouraging.
+[66:33.09 -> 66:36.29] SPEAKER_06: So look, I'm excited about this next chapter of search.
+[66:36.85 -> 66:38.85] SPEAKER_02: For people who are not thinking through or aware of this.
+[66:38.97 -> 66:44.54] SPEAKER_02: So there's the 10 blue links with the AI overview on top that provides a nice summarization.
+[66:44.56 -> 66:45.30] SPEAKER_02: You can expand it.
+[66:45.52 -> 66:49.47] SPEAKER_02: And you have sources and links now embedded.
+[66:49.53 -> 66:51.39] SPEAKER_02: I believe at least Liz said so.
+[66:51.51 -> 66:56.01] SPEAKER_02: I actually didn't notice it, but there's ads in the AI overview also.
+[66:57.02 -> 66:59.02] SPEAKER_02: I don't think there's ads in AI mode.
+[67:00.30 -> 67:02.98] SPEAKER_02: when ads in AI mode.
+[67:03.54 -> 67:06.16] SPEAKER_02: When do you think, I mean, it's okay.
+[67:06.18 -> 67:15.71] SPEAKER_02: We should say that in the 90s, I remember the animated GIFs, banner GIFs that take you to some shady websites that have nothing to do with anything.
+[67:16.13 -> 67:18.14] SPEAKER_02: AdSense revolutionized advertisement.
+[67:18.16 -> 67:25.78] SPEAKER_02: It's one of the greatest inventions in recent history because it allows us for free
+[67:26.62 -> 67:28.52] SPEAKER_02: to have access to all these kinds of services.
+[67:28.91 -> 67:31.03] SPEAKER_02: So ads fuel a lot of really powerful services.
+[67:32.53 -> 67:41.22] SPEAKER_02: And at its best, it's showing you relevant ads, but also very importantly, in a way that's not super annoying, in a classy way.
+[67:41.72 -> 67:52.28] SPEAKER_02: So when do you think it's possible to add ads into AI mode, and what does that look like from a classy, non-annoying perspective?
+[67:52.41 -> 67:58.94] SPEAKER_06: Two things, early part of AI mode, we'll obviously focus more on the organic experience to make sure we are getting it right.
+[68:00.16 -> 68:07.39] SPEAKER_06: I think the fundamental value of ads are it enables access to deploy the services to billions of people.
+[68:08.49 -> 68:15.84] SPEAKER_06: The second is ads are, the reason we've always taken ads seriously is we view ads as commercial information, but it's still information.
+[68:16.80 -> 68:19.33] SPEAKER_06: And so we bring the same quality metrics to it.
+[68:20.05 -> 68:29.38] SPEAKER_06: I think with AI mode to our earlier conversation about, I think AI itself will help us over time figure out the best way to do it.
+[68:30.80 -> 68:38.99] SPEAKER_06: I think given we are giving context around everything, I think it'll give us more opportunities to also explain, okay, here's some commercial information.
+[68:39.69 -> 68:45.62] SPEAKER_06: Like today as a podcaster, you do it at certain spots and you probably figure out what's best in your podcast.
+[68:47.23 -> 68:50.06] SPEAKER_06: I think so there are aspects of that.
+[68:50.36 -> 68:58.17] SPEAKER_06: But I think, you know, I think the underlying need of people value commercial information, businesses are trying to connect to users.
+[68:58.81 -> 69:01.41] SPEAKER_06: All that doesn't change in an AI moment.
+[69:02.41 -> 69:04.15] SPEAKER_06: But look, we will rethink it.
+[69:04.19 -> 69:10.98] SPEAKER_06: You've seen us in YouTube now do a mixture of subscription and ads, like obviously Facebook.
+[69:11.94 -> 69:16.52] SPEAKER_06: you know, we are now introducing subscription offerings across everything.
+[69:16.94 -> 69:23.01] SPEAKER_06: And so as part of that, we can optimize, the optimization point will end up being a different place as well.
+[69:23.53 -> 69:31.80] SPEAKER_02: Do you see a trajectory in the possible future where AI mode completely replaces the 10 blue links plus AI overview?
+[69:32.96 -> 69:38.47] SPEAKER_06: Our current plan is AI mode is going to be there as a separate tab for people who really want to experience that.
+[69:38.94 -> 69:40.65] SPEAKER_06: But it's not yet that the,
+[69:40.98 -> 69:43.53] SPEAKER_06: level where our main search page is.
+[69:44.29 -> 69:49.46] SPEAKER_06: But as features work, we'll keep migrating it to the main page.
+[69:49.48 -> 69:51.40] SPEAKER_06: And so you can view it as a continuum.
+[69:51.75 -> 69:54.39] SPEAKER_06: AI mode will offer you the bleeding edge experience.
+[69:55.64 -> 69:58.60] SPEAKER_06: But it thinks that work will keep overflowing.
+[69:59.58 -> 70:01.88] SPEAKER_06: to AI overviews and the main experience.
+[70:01.94 -> 70:05.94] SPEAKER_02: And the idea that AI mode will still take you to the web, to the human created web.
+[70:06.31 -> 70:06.52] SPEAKER_02: Yes.
+[70:06.69 -> 70:08.61] SPEAKER_02: That's going to be a core design principle for us.
+[70:08.85 -> 70:11.79] SPEAKER_02: So really if users decide, right, they drive this.
+[70:12.09 -> 70:13.33] SPEAKER_02: Yeah.
+[70:13.35 -> 70:17.16] SPEAKER_02: It's just exciting, a little bit scary that it might change the internet.
+[70:18.58 -> 70:26.75] SPEAKER_02: Because Google has been dominating with a very specific look and idea of what it means to have the internet.
+[70:27.49 -> 70:33.37] SPEAKER_02: And as you move to AI mode, I mean, it's just a different experience.
+[70:34.22 -> 70:41.64] SPEAKER_02: I think Liz was talking about, I think you've mentioned that you ask more questions, you ask longer questions.
+[70:42.00 -> 70:43.69] SPEAKER_06: Dramatically different types of questions.
+[70:43.77 -> 70:45.95] SPEAKER_02: Yeah, like it actually fuels curiosity.
+[70:46.23 -> 70:55.32] SPEAKER_02: Like I think for me, I've been asking just a much larger number of questions of this black box machine, let's say, whatever it is.
+[70:56.95 -> 71:05.98] SPEAKER_02: And with the AI overview, it's interesting because I still value the human, I still ultimately want to end up on the human created web.
+[71:07.06 -> 71:09.48] SPEAKER_02: But like you said, the context really helps.
+[71:10.06 -> 71:13.67] SPEAKER_06: It helps us deliver higher quality referrals, right?
+[71:13.75 -> 71:18.11] SPEAKER_06: You know, where people are like, they have much higher likelihood of finding what they're looking for.
+[71:18.17 -> 71:19.45] SPEAKER_06: They're exploring.
+[71:19.84 -> 71:20.54] SPEAKER_06: They're curious.
+[71:20.98 -> 71:22.90] SPEAKER_06: Their intent is getting satisfied more.
+[71:23.04 -> 71:24.84] SPEAKER_06: So that's what all our metrics show.
+[71:25.50 -> 71:27.65] SPEAKER_02: It makes the humans that create the web nervous.
+[71:28.11 -> 71:29.09] SPEAKER_02: The journalists are getting nervous.
+[71:29.11 -> 71:30.15] SPEAKER_02: They've already been nervous.
+[71:30.91 -> 71:34.01] SPEAKER_02: Like I mentioned, CNN is nervous because of podcasts.
+[71:35.75 -> 71:36.67] SPEAKER_02: It makes people nervous.
+[71:37.09 -> 71:44.38] SPEAKER_06: Look, I think news and journalism will play an important role in the future.
+[71:44.44 -> 71:46.77] SPEAKER_06: We're pretty committed to it, right?
+[71:46.85 -> 71:53.62] SPEAKER_06: And so I think making sure that ecosystem, in fact, I think we'll be able to differentiate ourselves as a company.
+[71:54.09 -> 71:56.69] SPEAKER_06: over time because of our commitment there.
+[71:57.03 -> 72:00.46] SPEAKER_06: So it's something I think I definitely value a lot.
+[72:00.54 -> 72:04.48] SPEAKER_06: And as we are designing, we'll continue prioritizing approaches.
+[72:05.38 -> 72:13.51] SPEAKER_02: I'm sure for the people who want, they can have a fine-tuned AI model that's clickbait hit pieces that will replace current journalism.
+[72:14.39 -> 72:16.17] SPEAKER_02: That's a shot at journalism, forgive me.
+[72:17.34 -> 72:23.64] SPEAKER_02: But I find that if you're looking for really strong criticism of things, that Gemini is very good at providing that.
+[72:23.62 -> 72:24.44] SPEAKER_02: Absolutely.
+[72:24.50 -> 72:25.55] SPEAKER_02: It's better than anything.
+[72:26.19 -> 72:38.73] SPEAKER_02: For now, I mean, people are concerned that there will be bias that's introduced that as the AI systems become more and more powerful, there's incentive from sponsors to roll in and try to control the output.
+[72:39.70 -> 72:40.85] SPEAKER_02: of the AI models.
+[72:41.97 -> 72:45.71] SPEAKER_02: But for now, the objective criticism that's provided is way better than journalism.
+[72:46.17 -> 72:48.40] SPEAKER_02: Of course, the argument is the journalists are still valuable.
+[72:49.18 -> 72:55.67] SPEAKER_02: But then, I don't know, the crowdsourced journalism that we get on the open internet is also very, very powerful.
+[72:56.23 -> 72:58.87] SPEAKER_06: I feel like they're all super important things.
+[72:58.95 -> 73:03.52] SPEAKER_06: I think it's good that you get a lot of crowdsourced information coming in.
+[73:04.90 -> 73:10.67] SPEAKER_06: but I feel like there is real value for high quality journalism, right?
+[73:10.87 -> 73:14.63] SPEAKER_06: And I think these are all complimentary.
+[73:14.77 -> 73:23.02] SPEAKER_06: I think like I view this, I find myself constantly seeking out also like try to find objective reporting on things too.
+[73:23.94 -> 73:31.72] SPEAKER_06: And sometimes you get more context from the crowdfunded sources you read online, but I think both end up playing a super important role.
+[73:31.70 -> 73:34.72] SPEAKER_02: So you've spoken a little bit about this.
+[73:34.78 -> 73:37.22] SPEAKER_02: Demis talked about this as sort of the
+[73:38.94 -> 73:43.28] SPEAKER_02: the slice of the web that will increasingly become about providing information for agents.
+[73:43.58 -> 73:46.73] SPEAKER_02: So we can think about is like two layers of the web.
+[73:47.43 -> 73:49.65] SPEAKER_02: One is for humans, one is for agents.
+[73:49.67 -> 73:51.97] SPEAKER_02: Do you see the AI agents?
+[73:52.63 -> 73:56.40] SPEAKER_02: Do you see the one that's for AI agents growing over time?
+[73:56.92 -> 74:05.85] SPEAKER_02: Do you see there still being long term, five, 10 years value for the human created, human created for the purpose of human consumption web?
+[74:06.39 -> 74:08.45] SPEAKER_02: Or will it all be agents in the end?
+[74:08.85 -> 74:22.71] SPEAKER_06: Today, not everyone does, but you go to a big retail store, you love walking the aisle, you love shopping or grocery store, picking out food, etc.
+[74:23.03 -> 74:25.66] SPEAKER_06: But you're also online shopping and they're delivering, right?
+[74:26.36 -> 74:30.44] SPEAKER_06: So both are complementary and that's true for restaurants, etc.
+[74:31.97 -> 74:35.99] SPEAKER_06: So I do feel like over time, websites will also get better for humans.
+[74:36.56 -> 74:37.69] SPEAKER_06: They will be better designed.
+[74:38.67 -> 74:41.09] SPEAKER_06: AI might actually design them better for humans.
+[74:42.11 -> 74:48.20] SPEAKER_06: So I expect the web to get a lot richer and more interesting and better to use.
+[74:49.52 -> 74:55.89] SPEAKER_06: At the same time, I think there'll be an agentic web, which is also making a lot of progress.
+[74:57.73 -> 75:02.94] SPEAKER_06: And you have to solve the business value and the incentives to make that work well, right?
+[75:02.96 -> 75:04.55] SPEAKER_06: Like for people to participate in it.
+[75:05.69 -> 75:28.86] SPEAKER_06: but i think both will coexist and obviously the agents may not need the same i mean not may not they won't need the same design and ui paradigms which humans need to interact with uh but i think both will both will be there i have to ask you about chrome uh i have to say for me personally google chrome was probably
+[75:31.12 -> 75:33.45] SPEAKER_02: I don't know, I'd like to see where I would rank it.
+[75:33.87 -> 75:37.69] SPEAKER_02: But in this temptation, and this is not a recency bias,
+[75:37.90 -> 75:39.33] SPEAKER_02: although it might be a little bit.
+[75:39.35 -> 75:44.09] SPEAKER_02: But I think it's up there, top three, maybe the number one piece of software for me of all time.
+[75:44.63 -> 75:45.31] SPEAKER_02: So it's incredible.
+[75:45.60 -> 75:46.56] SPEAKER_02: It's really incredible.
+[75:47.06 -> 75:48.94] SPEAKER_02: The browsers are a window to the web.
+[75:49.40 -> 75:58.77] SPEAKER_02: And Chrome really continued for many years, but even initially, to push the innovation on that front when it was stale and it continues to challenge.
+[75:59.52 -> 76:04.16] SPEAKER_02: It continues to make it more performant, so efficient, just innovate constantly.
+[76:05.02 -> 76:07.71] SPEAKER_02: And the Chromium aspect of it.
+[76:07.69 -> 76:20.27] SPEAKER_02: Anyway, you were one of the pioneers of Chrome pushing for it when it was an insane idea, probably one of the ideas that was criticized and doubted and so on.
+[76:20.79 -> 76:25.97] SPEAKER_02: So can you tell me the story of what it took to push for Chrome?
+[76:26.23 -> 76:26.99] SPEAKER_02: What was your vision?
+[76:29.36 -> 76:37.19] SPEAKER_06: Look, it was such a dynamic time, you know, around 2004, 2005,
+[76:37.71 -> 76:50.09] SPEAKER_06: with Ajax, the web suddenly becoming dynamic, in a matter of few months, Flickr, Gmail, Google Maps, all kind of came into existence, right?
+[76:50.11 -> 77:00.64] SPEAKER_06: Like the fact that you have an interactive dynamic web, the web was evolving from simple text pages, simple HTML to rich dynamic applications.
+[77:01.97 -> 77:05.37] SPEAKER_06: But at the same time, you could see the browser was never...
+[77:06.23 -> 77:07.45] SPEAKER_06: meant for that world.
+[77:08.21 -> 77:10.13] SPEAKER_06: JavaScript execution was super slow.
+[77:10.19 -> 77:20.44] SPEAKER_06: The browser was far away from being an operating system for that rich, modern web which was coming into place.
+[77:21.48 -> 77:22.93] SPEAKER_06: So that's the opportunity we saw.
+[77:23.41 -> 77:25.97] SPEAKER_06: It's an amazing early team.
+[77:27.11 -> 77:34.16] SPEAKER_06: I still remember the day we got a shell on WebKit running and how fast it was.
+[77:35.86 -> 77:39.72] SPEAKER_06: We had a clear vision for building a browser.
+[77:39.74 -> 77:43.79] SPEAKER_06: We wanted to bring core OS principles into the browser.
+[77:44.45 -> 77:48.90] SPEAKER_06: So we built a secure browser sandbox.
+[77:48.95 -> 77:49.90] SPEAKER_06: Each tab was its own.
+[77:50.14 -> 77:54.36] SPEAKER_06: These things are common now, but at the time, it was pretty unique.
+[77:55.90 -> 78:00.03] SPEAKER_06: We found an amazing team in Aarhus, Denmark, with the leader.
+[78:00.43 -> 78:09.28] SPEAKER_06: who built the JavaScript VM, which at the time was 25 times faster than any other JavaScript VM out there.
+[78:09.31 -> 78:10.79] SPEAKER_06: And by the way, you're right.
+[78:10.83 -> 78:14.25] SPEAKER_06: We open sourced it all and put it in Chromium, too.
+[78:15.11 -> 78:23.89] SPEAKER_06: But we really thought the web could work much better, much faster, and you could be much safer browsing the web.
+[78:24.19 -> 78:32.36] SPEAKER_06: And the name Chrome came was because we literally felt people were like, the Chrome of the browser was getting clunkier.
+[78:33.10 -> 78:34.18] SPEAKER_06: We wanted to minimize it.
+[78:34.54 -> 78:36.33] SPEAKER_06: And so that was the origins of the project.
+[78:37.09 -> 78:42.85] SPEAKER_06: Definitely, obviously, highly biased person here talking about Chrome.
+[78:43.64 -> 78:47.66] SPEAKER_06: But it's the most fun I've had building a product from the ground up.
+[78:47.78 -> 78:50.48] SPEAKER_06: And it was an extraordinary team.
+[78:50.78 -> 78:54.69] SPEAKER_06: I had my co-founders on the project, but terrific.
+[78:54.71 -> 78:56.12] SPEAKER_06: So definitely fond memories.
+[78:56.32 -> 79:01.59] SPEAKER_02: So for people who don't know, Sundar, it's probably fair to say you're the reason we have Chrome.
+[79:01.95 -> 79:07.48] SPEAKER_02: Yes, I know there's a lot of incredible engineers, but pushing for it inside a company that probably was opposing it.
+[79:07.46 -> 79:32.42] SPEAKER_06: because it's a crazy idea because uh as everybody probably knows it's incredibly difficult to build a browser yeah look i uh eric who was the ceo at the time i think it was less that he was supposed to it he kind of firsthand knew what a crazy thing it is to go build a browser and so he definitely was like this is you know there was a crazy aspect to actually wanting to go build a browser but um
+[79:32.69 -> 79:33.83] SPEAKER_06: He was very supportive.
+[79:34.49 -> 79:36.35] SPEAKER_06: You know, everyone, the founders were.
+[79:36.37 -> 79:46.09] SPEAKER_06: I think once we started, you know, building something and we could use it and see how much better, from then on, like, you know, you're really tinkering with the product and making it better.
+[79:46.10 -> 79:48.93] SPEAKER_06: It came to life pretty fast.
+[79:48.95 -> 79:56.32] SPEAKER_02: What wisdom do you draw from that, from pushing through on a crazy idea in the early days that ends up being revolutionary?
+[79:57.20 -> 80:00.25] SPEAKER_02: What, for future crazy ideas like it,
+[80:00.97 -> 80:05.26] SPEAKER_06: I mean, this is something Larry and Sergey have articulated clearly.
+[80:05.28 -> 80:19.82] SPEAKER_06: I really internalized this early on, which is their whole feeling around working on moonshots, like as a way, when you work on something very ambitious, first of all, it attracts the best people, right?
+[80:19.85 -> 80:21.03] SPEAKER_06: So that's an advantage you get.
+[80:21.97 -> 80:22.69] SPEAKER_06: Number two,
+[80:23.50 -> 80:26.40] SPEAKER_06: Because it's so ambitious, you don't have others working on something crazy.
+[80:26.46 -> 80:29.00] SPEAKER_06: So you pretty much have the path to yourself, right?
+[80:29.04 -> 80:30.25] SPEAKER_06: It's like Waymo and self-driving.
+[80:30.73 -> 80:40.34] SPEAKER_06: Number three, it is even if you end up quite not accomplishing what you set out to do and you end up doing 60, 80% of it, it'll end up being a terrific success.
+[80:41.34 -> 80:45.15] SPEAKER_06: So, you know, that's the advice I would give people, right?
+[80:45.23 -> 80:50.75] SPEAKER_06: I think like, you know, it's just aiming for big ideas, has all these advantages, right?
+[80:50.89 -> 80:57.46] SPEAKER_06: And it's risky, but it also has all these advantages, which people I don't think fully internalize.
+[80:57.86 -> 81:01.28] SPEAKER_02: I mean, you mentioned one of the craziest, biggest moonshots, which is Waymo.
+[81:02.25 -> 81:10.90] SPEAKER_02: It's one of what I first saw over a decade ago, a Waymo vehicle, a Google self-driving car vehicle.
+[81:11.66 -> 81:16.05] SPEAKER_02: For me, it was an aha moment for robotics.
+[81:16.07 -> 81:19.52] SPEAKER_02: It made me fall in love with robotics even more than before.
+[81:19.54 -> 81:21.56] SPEAKER_02: It gave me a glimpse into the future, so it's incredible.
+[81:21.85 -> 81:24.98] SPEAKER_02: I'm truly grateful for that project, for what it symbolizes.
+[81:25.46 -> 81:27.00] SPEAKER_02: But it's also a crazy moonshot.
+[81:27.94 -> 81:43.60] SPEAKER_02: is for a long time Waymo's been just, like you mentioned with scuba diving, just not listening to anybody, just calmly improving the system better and better, more testing, just expanding the operational domain more and more.
+[81:44.00 -> 81:47.35] SPEAKER_02: First of all, congrats on 10 million paid robo-taxi rides.
+[81:48.45 -> 81:56.30] SPEAKER_02: What lessons do you take from Waymo about the perseverance, the persistence on that project?
+[81:56.63 -> 82:00.15] SPEAKER_06: I look really proud of the progress we have had with Waymo.
+[82:00.58 -> 82:09.05] SPEAKER_06: One of the things I think we were very committed to, you know, the final 20% can look like, I mean, we always say, right, the first 80% is easy.
+[82:09.09 -> 82:11.19] SPEAKER_06: The final 20% takes 80% of the time.
+[82:11.21 -> 82:18.16] SPEAKER_06: I think we definitely were working through that phase with Waymo, but I was aware of that.
+[82:18.22 -> 82:20.20] SPEAKER_06: So, but, you know, we knew we were at that stage.
+[82:21.85 -> 82:23.55] SPEAKER_06: We knew we were
+[82:23.98 -> 82:30.27] SPEAKER_06: the technology gap between, while there were many people, many other self-driving companies, we knew the technology gap was there.
+[82:31.57 -> 82:40.34] SPEAKER_06: In fact, right at the moment when others were doubting Waymo is when, I don't know, I made the decision to invest more in Waymo, right?
+[82:40.62 -> 82:44.62] SPEAKER_06: Because so in some ways, it's counterintuitive.
+[82:45.47 -> 82:52.69] SPEAKER_06: But I think, look, we've always been a deep technology company and like, you know, Waymo is a version of
+[82:52.99 -> 82:55.80] SPEAKER_06: kind of building a AI robot that works well.
+[82:56.04 -> 83:03.63] SPEAKER_06: And so we get attracted to problems like that, the caliber of the teams there, you know, phenomenal teams.
+[83:03.65 -> 83:06.51] SPEAKER_06: And so I know you follow the space super closely.
+[83:06.53 -> 83:12.68] SPEAKER_06: You know, I'm talking to someone who knows the space well, but it was very obvious it's going to get there.
+[83:13.06 -> 83:19.25] SPEAKER_06: And, you know, there's still more work to do, but we, you know, it's a good example where we always prioritized
+[83:20.04 -> 83:23.65] SPEAKER_06: being ambitious and safety at the same time, right?
+[83:23.85 -> 83:35.89] SPEAKER_06: And equally committed to both and pushed hard and, you know, couldn't be more thrilled with how it's working, how much people love the experience.
+[83:37.07 -> 83:41.64] SPEAKER_06: And this year has definitely, we've scaled up a lot and will continue scaling up in 26.
+[83:42.40 -> 83:43.32] SPEAKER_06: That said,
+[83:43.94 -> 83:45.46] SPEAKER_02: The competition is heating up.
+[83:45.88 -> 83:55.08] SPEAKER_02: You've been friendly with Elon, even though Technic is a competitor, but you've been friendly with a lot of tech CEOs in that way, just showing respect towards them and so on.
+[83:55.46 -> 83:58.42] SPEAKER_02: What do you think about the robotaxi efforts that Tesla is doing?
+[83:58.76 -> 83:59.81] SPEAKER_02: Do you see this competition?
+[83:59.83 -> 84:00.35] SPEAKER_02: What do you think?
+[84:00.37 -> 84:01.49] SPEAKER_02: Do you like the competition?
+[84:02.65 -> 84:08.14] SPEAKER_06: We are one of the earliest and biggest backers of SpaceX as Google.
+[84:08.63 -> 84:09.39] SPEAKER_06: right?
+[84:09.45 -> 84:18.42] SPEAKER_06: So, you know, thrilled with what SpaceX is doing and fortunate to be investors as a company there, right?
+[84:19.62 -> 84:21.56] SPEAKER_06: And look, we don't compete with Tesla directly.
+[84:21.58 -> 84:23.20] SPEAKER_06: We are not making cars, et cetera, right?
+[84:23.22 -> 84:25.86] SPEAKER_06: We are building L45 autonomy.
+[84:25.88 -> 84:31.09] SPEAKER_06: We're building a Waymo driver, which is general purpose and can be used in many settings.
+[84:32.11 -> 84:35.69] SPEAKER_06: They're obviously working on making Tesla self-driving too.
+[84:35.75 -> 84:37.54] SPEAKER_06: I've just assumed it's a
+[84:38.24 -> 84:41.13] SPEAKER_06: de facto that Elon would succeed in whatever he does.
+[84:41.27 -> 84:45.51] SPEAKER_06: So, like, you know, that is not something I question.
+[84:46.07 -> 84:52.00] SPEAKER_06: So, but I think we are so far from these spaces are such vast spaces.
+[84:52.20 -> 84:56.77] SPEAKER_06: Like, I think, think about transportation, the opportunity space.
+[84:57.87 -> 85:02.56] SPEAKER_06: The Waymo Driver is a general purpose technology we can apply in many situations.
+[85:03.60 -> 85:06.62] SPEAKER_06: So you have a vast green space.
+[85:07.20 -> 85:07.30] UNKNOWN: Yeah.
+[85:07.52 -> 85:13.41] SPEAKER_06: In all future scenarios, I see Tesla doing well and Waymo doing well.
+[85:13.87 -> 85:26.82] SPEAKER_02: Like we mentioned with the Neolithic package, I think it's very possible that in the quote-unquote AI package, when the history is written, autonomous vehicles, self-driving cars, is like the big thing that changes everything.
+[85:27.28 -> 85:35.23] SPEAKER_02: Imagine over a period of a decade or two, just the complete transition from manually driven to autonomous,
+[85:35.21 -> 85:40.98] SPEAKER_02: in ways we might not predict, it might change the way we move about the world completely.
+[85:41.34 -> 86:01.75] SPEAKER_02: So the possibility of that, and then the second and third order effects, as you're seeing now with Tesla, very possibly you would see some internally with Alphabet, maybe Waymo, maybe some of the Gemini robotics stuff, it might lead you into the other domains of robotics.
+[86:02.27 -> 86:05.03] SPEAKER_02: Because we should remember that Waymo's a robot.
+[86:05.42 -> 86:07.00] SPEAKER_02: It just happens to be on four wheels.
+[86:07.88 -> 86:17.08] SPEAKER_02: So you said that the next big thing, we can also throw that into AI package, the big aha moment might be in the space of robotics.
+[86:18.00 -> 86:19.60] SPEAKER_02: What do you think that would look like?
+[86:20.58 -> 86:23.77] SPEAKER_06: Demis and the Google DeepMind team is very focused on Gemini robotics, right?
+[86:23.79 -> 86:28.47] SPEAKER_06: So we are definitely building the underlying models well.
+[86:29.27 -> 86:30.86] SPEAKER_06: So we have a lot of investments there.
+[86:31.24 -> 86:34.36] SPEAKER_06: And I think we are also pretty cutting edge in our research there.
+[86:34.95 -> 86:36.85] SPEAKER_06: So we are definitely driving that direction.
+[86:37.75 -> 86:43.69] SPEAKER_06: We obviously are thinking about applications in robotics will kind of work seriously.
+[86:43.70 -> 86:48.13] SPEAKER_06: We are partnering with a few companies today, but it's an area I would say stay tuned.
+[86:48.33 -> 86:52.40] SPEAKER_06: We are, you know, we are yet to fully articulate our plans outside.
+[86:52.82 -> 86:56.34] SPEAKER_06: But it's an area we are definitely committed to driving a lot of progress.
+[86:56.90 -> 87:00.03] SPEAKER_06: But I think AI ends up driving that massive progress in robotics.
+[87:00.07 -> 87:03.81] SPEAKER_06: The field has been held back for a while.
+[87:03.83 -> 87:07.70] SPEAKER_06: I mean, the hardware has made extraordinary progress.
+[87:09.10 -> 87:19.45] SPEAKER_06: The software had been the challenge, but with AI now and the generalized models we are building, we are building these models, getting them to work
+[87:19.82 -> 87:25.41] SPEAKER_06: in the real world, in a safe way, in a generalized way, is the frontier we're pushing pretty hard on.
+[87:26.01 -> 87:32.55] SPEAKER_02: Well, it's really nice to see that the models and the different teams integrated to where all of them are pushing towards one world model that's being built.
+[87:33.21 -> 87:39.80] SPEAKER_02: So from all these different angles, multimodal, you're ultimately trying to get Gemini
+[87:41.45 -> 87:52.35] SPEAKER_02: The same thing that would make AI mode really effective in answering your questions, which requires a kind of world model, is the same kind of thing that would help a robot be useful in the physical world.
+[87:52.83 -> 87:53.91] SPEAKER_02: So everything is aligned.
+[87:54.35 -> 88:04.51] SPEAKER_06: That is what makes this moment so unique because running a company, for the first time, you can do one investment in a very deep, horizontal way.
+[88:04.88 -> 88:09.48] SPEAKER_06: On top of it, you can drive multiple businesses forward, right?
+[88:09.58 -> 88:14.39] SPEAKER_06: And that's effectively what we are doing in Google and Alphabet, right?
+[88:14.41 -> 88:18.07] SPEAKER_02: Yeah, it's all coming together like it was planned ahead of time, but it's not, of course.
+[88:18.11 -> 88:18.91] SPEAKER_02: It's all distributed.
+[88:19.40 -> 88:26.10] SPEAKER_02: I mean, if Gmail and Sheets and all these other incredible services, I can sing Gmail praises for years.
+[88:26.26 -> 88:28.05] SPEAKER_02: I mean, it's just revolutionized email.
+[88:28.31 -> 88:32.35] SPEAKER_02: But the moment you start to integrate AI Gemini into Gmail,
+[88:33.12 -> 88:34.05] SPEAKER_02: I mean, that's the other thing.
+[88:34.45 -> 88:38.19] SPEAKER_02: Speaking of productivity multiplier, people complain about email, but that changed everything.
+[88:38.73 -> 88:40.72] SPEAKER_02: Email, like the invention of email changed everything.
+[88:41.32 -> 88:42.24] SPEAKER_02: And it's been ripe.
+[88:42.48 -> 88:49.41] SPEAKER_02: There's been a few folks trying to revolutionize email, some of them on top of Gmail, but that's like ripe for innovation.
+[88:50.09 -> 88:57.82] SPEAKER_02: Not just spam filtering, but you demoed a really nice demo of personalized responses.
+[88:57.94 -> 88:59.62] SPEAKER_02: And at first I was like,
+[89:00.50 -> 89:03.30] SPEAKER_02: At first, I felt really bad about that.
+[89:04.39 -> 89:16.47] SPEAKER_02: But then I realized that there's nothing wrong to feel bad about because the example you gave is when a friend asks, you went to whatever hiking location, do you have any advice?
+[89:16.53 -> 89:24.24] SPEAKER_02: And they just search us through all your information to give them good advice and then you put the cherry on top, maybe some love or whatever, camaraderie.
+[89:24.72 -> 89:28.59] SPEAKER_02: But the informational aspect, the knowledge transfer it does for you.
+[89:28.91 -> 89:32.07] SPEAKER_06: I think there'll be important moments, like it should be, like today,
+[89:32.88 -> 89:36.82] SPEAKER_06: If you write a card in your own handwriting and send it to someone, that's a special thing.
+[89:37.53 -> 89:43.40] SPEAKER_06: Similarly, there'll be a time, I mean, to your friends, maybe your friend wrote and said he's not doing well or something.
+[89:43.76 -> 89:48.82] SPEAKER_06: You know, those are moments you want to save your times for writing something, reaching out.
+[89:49.48 -> 89:54.43] SPEAKER_06: But, you know, like saying, give me all the details of the trip you took.
+[89:54.95 -> 89:59.22] SPEAKER_06: you know, to me, makes a lot of sense for an AI assistant to help you, right?
+[89:59.24 -> 90:04.92] SPEAKER_06: And so I think both are important, but I think I'm excited about that.
+[90:04.94 -> 90:09.21] SPEAKER_02: Yeah, I think ultimately it gives more time for us humans to do the things we humans find meaningful.
+[90:09.87 -> 90:16.18] SPEAKER_02: And I think it scares a lot of people because we're going to have to ask ourselves the hard question of like, what do we find meaningful?
+[90:16.66 -> 90:17.76] SPEAKER_02: And I'm sure there's answers.
+[90:18.06 -> 90:23.55] SPEAKER_02: I mean, it's the old question of the meaning of existence is you have to try to figure that out.
+[90:23.57 -> 90:24.91] SPEAKER_02: That might be ultimately...
+[90:25.55 -> 90:29.61] SPEAKER_02: parenting or being creative in some domains of art or writing.
+[90:29.67 -> 90:39.47] SPEAKER_02: And it challenges to like, you know, it's a good question of, to ask yourself like in my life, what is the thing that brings me most joy and fulfillment?
+[90:40.13 -> 90:43.54] SPEAKER_02: And if I'm able to actually focus more time on that,
+[90:43.89 -> 90:44.63] SPEAKER_02: That's really powerful.
+[90:45.15 -> 90:48.06] SPEAKER_06: I think that's the, you know, that's the holy grail.
+[90:48.16 -> 90:52.36] SPEAKER_06: If you get this right, I think it allows more people to find that.
+[90:52.92 -> 90:57.15] SPEAKER_02: I have to ask you on the programming front, AI is getting really good at programming.
+[90:57.83 -> 91:00.53] SPEAKER_02: Gemini, both the agentic and just the LLM has been incredible.
+[91:00.65 -> 91:07.36] SPEAKER_02: So a lot of programmers are really worried that their jobs, they will lose their jobs.
+[91:07.45 -> 91:08.85] SPEAKER_02: How worried should they be?
+[91:08.91 -> 91:16.26] SPEAKER_02: And how should they adjust so they can be thriving in this new world where more and more code is written by AI?
+[91:16.88 -> 91:31.94] SPEAKER_06: I think a few things, looking at Google, you know, we've given various stats around like, you know, 30% of code now uses like AI generated suggestions or whatever it is.
+[91:32.46 -> 91:35.58] SPEAKER_06: But the most important metric, and we carefully measure it as like,
+[91:37.43 -> 91:44.12] SPEAKER_06: how much has our engineering velocity increased as a company due to AI, right?
+[91:44.14 -> 91:46.94] SPEAKER_06: And it's like tough to measure and we kind of rigorously try to measure it.
+[91:48.03 -> 91:51.69] SPEAKER_06: And our estimates are that number is now at 10%, right?
+[91:51.71 -> 92:00.84] SPEAKER_06: Like now across the company, we've accomplished a 10% engineering velocity increase using AI.
+[92:02.50 -> 92:02.88] SPEAKER_06: But
+[92:03.74 -> 92:07.03] SPEAKER_06: we plan to hire engineers, more engineers next year, right?
+[92:07.05 -> 92:14.74] SPEAKER_06: So because the opportunity space of what we can do is expanding too, right?
+[92:14.96 -> 92:29.98] SPEAKER_06: And so I think hopefully, at least in the near to midterm, for many engineers, it frees up more and more of the, even in engineering and coding,
+[92:30.99 -> 92:33.06] SPEAKER_06: There are aspects which are so much fun.
+[92:33.12 -> 92:36.02] SPEAKER_06: You're designing, you're architecting, you're solving a problem.
+[92:36.62 -> 92:40.55] SPEAKER_06: There's a lot of grant work, you know, which all goes hand in hand.
+[92:41.37 -> 92:52.24] SPEAKER_06: But it hopefully takes a lot of that away, makes it even more fun to code, frees you up more time to create, problem solve, brainstorm with your fellow colleagues and so on, right?
+[92:52.32 -> 92:55.16] SPEAKER_06: So that's the opportunity there.
+[92:55.20 -> 93:00.85] SPEAKER_06: And second, I think like, you know, it'll attract, it'll put,
+[93:01.84 -> 93:05.97] SPEAKER_06: The creative power in more people's hands, which means people create more.
+[93:06.05 -> 93:08.44] SPEAKER_06: That means there'll be more engineers doing more things.
+[93:09.58 -> 93:10.78] SPEAKER_06: So it's tough to fully predict.
+[93:10.80 -> 93:21.52] SPEAKER_06: But, you know, I think in general in this moment, it feels like, you know, people adopt these tools and be better programmers.
+[93:22.38 -> 93:25.36] SPEAKER_06: There are more people playing chess now than ever before, right?
+[93:25.40 -> 93:32.27] SPEAKER_06: So, you know, it feels positive that way to me, at least speaking from within a Google context.
+[93:33.47 -> 93:36.15] SPEAKER_06: So I would, you know, talk to them about it.
+[93:36.49 -> 93:41.96] SPEAKER_02: I still, I just know anecdotally, a lot of great programmers are generating a lot of code.
+[93:42.50 -> 93:48.49] SPEAKER_02: So their productivity, they're not always using all the code, just, you know, there's still a lot of editing, but like,
+[93:49.50 -> 93:51.98] SPEAKER_02: Even for me, programming is a side thing.
+[93:52.60 -> 93:55.58] SPEAKER_02: I think I'm like five X more productive.
+[93:55.94 -> 94:09.02] SPEAKER_02: I don't, I think that's even for a large code base that's touching a lot of users like Google's does, I'm imagining like very soon that productivity should be going up even more.
+[94:09.20 -> 94:15.40] SPEAKER_06: The big unlock will be as we make the agent capabilities much more robust, right?
+[94:15.68 -> 94:18.20] SPEAKER_06: I think that's what unlocks that next big wave.
+[94:18.81 -> 94:20.82] SPEAKER_06: I think the 10% is like a massive number.
+[94:20.88 -> 94:27.28] SPEAKER_06: Like, you know, tomorrow, like I showed up and said, like, you can improve like a large organization's productivity by 10%.
+[94:28.07 -> 94:32.24] SPEAKER_06: when you have tens of thousands of engineers, that's a phenomenal number.
+[94:32.30 -> 94:40.89] SPEAKER_06: And, you know, that's different than what others cite as statistics saying, like, you know, like this percentage of code is now written by AI.
+[94:41.13 -> 94:44.89] SPEAKER_06: I'm talking more about like overall actual productivity, right?
+[94:45.23 -> 94:47.47] SPEAKER_06: Engineering productivity, which is two different things.
+[94:48.73 -> 94:52.68] SPEAKER_06: And which is the more important metric.
+[94:52.70 -> 94:52.90] SPEAKER_06: And
+[94:53.18 -> 94:54.87] SPEAKER_06: But I think it'll get better, right?
+[94:54.95 -> 95:00.66] SPEAKER_06: And like, you know, I think there's no engineer who tomorrow, if you magically became 2x more productive...
+[95:01.60 -> 95:03.05] SPEAKER_06: you're just going to create more things.
+[95:03.06 -> 95:04.73] SPEAKER_06: You're going to create more value-added things.
+[95:04.83 -> 95:08.61] SPEAKER_06: And so I think you'll find more satisfaction in your job, right?
+[95:08.97 -> 95:09.87] SPEAKER_02: And there's a lot of aspects.
+[95:09.91 -> 95:18.98] SPEAKER_02: I mean, the actual Google code base might just improve because it'll become more standardized, more easier for people to move about the code base because AI will help with that.
+[95:19.34 -> 95:25.32] SPEAKER_02: And therefore, that will also allow the AI to understand the entire code base better, which makes the engineering aspect.
+[95:25.73 -> 95:31.61] SPEAKER_02: And so I've been using Cursor a lot as a way to program with Gemini and other models is like,
+[95:31.59 -> 95:36.32] SPEAKER_02: One of its powerful things is it's aware of the entire code base.
+[95:36.34 -> 95:38.24] SPEAKER_02: And that allows you to ask questions of it.
+[95:38.66 -> 95:42.87] SPEAKER_02: It allows the agents to move about that code base in a really powerful way.
+[95:42.89 -> 95:44.39] SPEAKER_02: I mean, that's a huge unlock.
+[95:44.41 -> 95:49.96] SPEAKER_06: Think about like, you know, migrations, refactoring old code bases.
+[95:49.98 -> 95:50.81] SPEAKER_06: Refactoring, yeah.
+[95:50.82 -> 95:56.76] SPEAKER_06: Yeah, I mean, think about like, you know, once we can do all this in a much better, more robust way than where we are today.
+[95:57.09 -> 96:00.77] SPEAKER_02: I think in the end, everything will be written in JavaScript and running Chrome.
+[96:01.17 -> 96:03.52] SPEAKER_02: I think it's all going to that direction.
+[96:03.92 -> 96:13.03] SPEAKER_02: I mean, just for fun, Google has legendary coding interviews, like rigorous interviews for the engineers.
+[96:14.45 -> 96:17.01] SPEAKER_02: Can you comment on how that has changed in the era of AI?
+[96:17.35 -> 96:21.91] SPEAKER_02: It's just such a weird, you know, the whiteboard interview.
+[96:21.90 -> 96:24.02] SPEAKER_02: I assume it's not allowed to have some prompts.
+[96:24.54 -> 96:26.72] SPEAKER_06: Such a good question.
+[96:26.96 -> 96:40.07] SPEAKER_06: Look, I do think we're making sure we'll introduce at least one round of in-person interviews for people just to make sure the fundamentals are there.
+[96:40.21 -> 96:41.58] SPEAKER_06: I think they'll end up being important.
+[96:42.10 -> 96:43.64] SPEAKER_06: But it's an equally important skill.
+[96:43.66 -> 96:49.38] SPEAKER_06: Look, if you can use these tools to generate better code, I think that's an asset.
+[96:49.44 -> 96:50.27] SPEAKER_06: And so...
+[96:50.67 -> 96:55.57] SPEAKER_06: Uh, you know, I think, uh, so overall, I think it's a, it's a massive positive.
+[96:56.17 -> 96:57.34] SPEAKER_02: Vibe coding engineer.
+[96:57.35 -> 97:05.75] SPEAKER_02: Uh, do you recommend, uh, people, uh, students interested in programming still get an education, uh, in computer science and college education?
+[97:06.31 -> 97:06.71] SPEAKER_02: What do you think?
+[97:07.09 -> 97:07.37] SPEAKER_06: I do.
+[97:07.45 -> 97:12.25] SPEAKER_06: If you have a passion for computer science, I would, you know, computer science is obviously a lot more than programming alone.
+[97:12.48 -> 97:18.96] SPEAKER_06: So I would, I still don't think I would change what you pursue.
+[97:19.00 -> 97:19.86] SPEAKER_06: Um,
+[97:21.06 -> 97:26.07] SPEAKER_06: I think AI will horizontally allow impact every field.
+[97:26.87 -> 97:29.19] SPEAKER_06: It's pretty tough to predict in what ways.
+[97:30.71 -> 97:36.88] SPEAKER_06: So any education in which you're learning good first principles thinking, I think is good education.
+[97:37.76 -> 97:39.34] SPEAKER_02: You've revolutionized web browsing.
+[97:39.38 -> 97:41.53] SPEAKER_02: You've revolutionized a lot of things over the years.
+[97:41.83 -> 97:43.81] SPEAKER_02: Android.
+[97:44.24 -> 97:44.99] SPEAKER_02: Change the game.
+[97:45.03 -> 97:47.31] SPEAKER_02: It's an incredible operating system.
+[97:47.35 -> 97:48.97] SPEAKER_02: We could talk for hours about Android.
+[97:49.49 -> 97:50.95] SPEAKER_02: What does the future of Android look like?
+[97:51.23 -> 98:08.84] SPEAKER_02: Is it possible it becomes more and more AI-centric, especially now that you throw into the mix Android XR with being able to do augmented reality and mixed reality and virtual reality in the physical world?
+[98:09.95 -> 98:15.91] SPEAKER_06: You know, the best innovations in computing have come when you're through a paradigm I-O change, right?
+[98:15.97 -> 98:25.20] SPEAKER_06: Like, you know, when with GUI and then with a graphical user interface and then with multi-touch in the context of mobile voice later on.
+[98:26.38 -> 98:30.73] SPEAKER_06: Similarly, I feel like, you know, AR is that next paradigm.
+[98:32.07 -> 98:38.43] SPEAKER_06: I think it was held back both the system integration challenges of making good AR is very, very hard.
+[98:38.55 -> 98:43.90] SPEAKER_06: The second thing is you need AI to actually kind of... Otherwise, the I.O.
+[98:43.92 -> 98:44.76] SPEAKER_06: is too complicated.
+[98:44.90 -> 98:47.84] SPEAKER_06: For you to have a natural, seamless I.O.
+[98:47.88 -> 98:52.61] SPEAKER_06: to that paradigm, AI ends up being super important.
+[98:52.75 -> 98:59.86] SPEAKER_06: And so this is why Project Astra ends up being super critical for that Android XR world.
+[99:01.40 -> 99:01.92] SPEAKER_06: But it is.
+[99:01.94 -> 99:06.55] SPEAKER_06: I think when you use glasses and, you know, always been amazed...
+[99:06.73 -> 99:09.35] SPEAKER_06: like at how useful these things are going to be.
+[99:10.19 -> 99:13.02] SPEAKER_06: So look, I think it's a real opportunity for Android.
+[99:14.32 -> 99:17.54] SPEAKER_06: I think XR is one way it'll kind of really come to life.
+[99:18.50 -> 99:21.57] SPEAKER_06: But I think there's an opportunity to rethink the mobile OS too, right?
+[99:21.63 -> 99:27.71] SPEAKER_06: I think we've been kind of living in this paradigm of like apps and shortcuts, all that won't go away.
+[99:28.69 -> 99:34.24] SPEAKER_06: But again, like if you're trying to get stuff done at an operating system level,
+[99:35.00 -> 99:45.29] SPEAKER_06: You know, it needs to be more agentic so that you can kind of describe what you want to do or like it proactively understands what you're trying to do, learns from how you're doing things over and over again.
+[99:45.76 -> 99:50.31] SPEAKER_06: and kind of as adapting to you, all that is kind of like the unlock we need to go and do.
+[99:51.19 -> 99:57.77] SPEAKER_02: With a basic, efficient, minimalist UI, I've gotten a chance to try the glasses and they're incredible.
+[99:57.98 -> 99:58.70] SPEAKER_02: It's the little stuff.
+[99:58.74 -> 100:01.78] SPEAKER_02: It's hard to put into words, but no latency.
+[100:01.80 -> 100:02.84] SPEAKER_02: It just works.
+[100:03.62 -> 100:09.83] SPEAKER_02: Even that little map demo where you look down and you look up and there's a very smooth transition between the two.
+[100:10.48 -> 100:15.94] SPEAKER_02: And useful, very small amount of useful information is shown to you.
+[100:16.72 -> 100:21.91] SPEAKER_02: Enough not to distract from the world outside, but enough to provide a bit of context when you need it.
+[100:22.41 -> 100:30.91] SPEAKER_02: And some of that, in order to bring that into reality, you have to solve a lot of the OS problems to make sure it works.
+[100:31.04 -> 100:33.36] SPEAKER_02: when you're integrating the AI into the whole thing.
+[100:33.78 -> 100:38.57] SPEAKER_02: So everything you do launches an agent that answers some basic question.
+[100:39.01 -> 100:40.07] SPEAKER_06: It's a good moonshot, you know.
+[100:40.30 -> 100:41.52] SPEAKER_06: Yeah, it's crazy.
+[100:41.54 -> 100:45.39] SPEAKER_06: But, you know, I think we are, you know, but it's,
+[100:46.82 -> 100:49.60] SPEAKER_06: much closer to reality than other moonshots.
+[100:49.72 -> 100:57.53] SPEAKER_06: You know, we expect to have classes in the hands of developers later this year and, you know, in consumer science next year.
+[100:57.63 -> 100:58.67] SPEAKER_06: So it's an exciting time.
+[100:59.17 -> 100:59.39] SPEAKER_02: Yeah.
+[100:59.49 -> 101:01.10] SPEAKER_02: Well, extremely well executed.
+[101:01.18 -> 101:10.01] SPEAKER_02: Beam, all this stuff, you know, because sometimes you don't know, like somebody commented on a top comment on one of the demos of Beam.
+[101:10.89 -> 101:12.13] SPEAKER_02: They said, yeah,
+[101:12.47 -> 101:18.05] SPEAKER_02: This will either be killed off in five weeks or revolutionize all meetings in five years.
+[101:18.77 -> 101:27.60] SPEAKER_02: And there's very much, Google tries so many things and sometimes sadly kills off very promising projects because there's so many other things to focus on.
+[101:27.62 -> 101:29.41] SPEAKER_02: I use so many Google products.
+[101:29.43 -> 101:30.77] SPEAKER_02: Google Voice I still use.
+[101:31.33 -> 101:33.07] SPEAKER_02: I'm so glad that's not being killed off.
+[101:33.11 -> 101:33.97] SPEAKER_02: That's still alive.
+[101:34.35 -> 101:37.50] SPEAKER_02: Thank you, whoever is defending that because it's awesome.
+[101:38.08 -> 101:39.52] SPEAKER_02: And it's great that you keep innovating.
+[101:39.56 -> 101:42.30] SPEAKER_02: I just want to list off just as a big thank you
+[101:42.28 -> 101:44.71] SPEAKER_02: So search, obviously, Google revolutionized.
+[101:44.81 -> 101:47.75] SPEAKER_02: Chrome, and all of these could be multi-hour conversations.
+[101:48.38 -> 101:52.14] SPEAKER_02: Gmail, I've been singing Gmail praises forever.
+[101:52.32 -> 101:56.59] SPEAKER_02: Maps, incredible technological innovation and revolutionizing mapping.
+[101:56.99 -> 101:58.19] SPEAKER_02: Android, like we talked about.
+[101:58.23 -> 101:59.53] SPEAKER_02: YouTube, like we talked about.
+[101:59.56 -> 102:02.22] SPEAKER_02: AdSense, Google Translate.
+[102:02.62 -> 102:05.31] SPEAKER_02: For the academic mind, a Google scholar.
+[102:06.36 -> 102:16.99] SPEAKER_02: is incredible, and also the scanning of the books, so making all the world's knowledge accessible, even when that knowledge is a kind of niche thing, which Google Scholar is.
+[102:17.03 -> 102:22.50] SPEAKER_02: And then obviously with DeepMind, with AlphaZero, AlphaFold, AlphaEvolve,
+[102:23.22 -> 102:24.98] SPEAKER_02: I could talk forever about Alpha Evolve.
+[102:25.03 -> 102:27.83] SPEAKER_02: That's mind blowing, all of that released.
+[102:27.85 -> 102:36.00] SPEAKER_02: And as part of that set of things you've released in this year, when those brilliant articles were written about Google is done.
+[102:36.04 -> 102:49.72] SPEAKER_02: And like we talked about pioneering self-driving cars and quantum computing, which could be another thing that is low key, is scuba diving, its way to changing the world forever.
+[102:49.70 -> 102:54.47] SPEAKER_02: So another potheads slash micro kitchen question.
+[102:54.94 -> 102:59.53] SPEAKER_02: If you build AGI, what kind of question would you ask it?
+[103:00.75 -> 103:02.61] SPEAKER_02: What would you want to talk about?
+[103:02.65 -> 103:09.34] SPEAKER_02: Definitively, Google has created AGI that can basically answer any question.
+[103:10.14 -> 103:11.26] SPEAKER_02: What topic are you going to?
+[103:11.60 -> 103:14.17] SPEAKER_02: Where are you going?
+[103:14.73 -> 103:16.57] SPEAKER_05: It's a great question.
+[103:18.79 -> 103:23.86] SPEAKER_06: Maybe it's proactive by then and should tell me a few things I should know.
+[103:24.64 -> 103:33.58] SPEAKER_06: But I think if I were to ask it, I think it'll help us understand ourselves much better in a way that will surprise us, I think.
+[103:35.82 -> 103:39.77] SPEAKER_06: And so maybe that's, you already see people do it with the products.
+[103:39.85 -> 103:43.45] SPEAKER_06: And so, but you know, in an AGI context, I think that'll be pretty powerful.
+[103:43.73 -> 103:45.96] SPEAKER_06: At a personal level or a general human nature?
+[103:46.54 -> 103:57.77] SPEAKER_06: At a personal level, like you talking to AGI, I think, I think, you know, uh, there is some chance it'll, it'll kind of understand you, you know, in a very deep way.
+[103:57.80 -> 104:01.74] SPEAKER_06: Uh, I think, uh, you know, in a profound way, that's a possibility.
+[104:02.68 -> 104:15.53] SPEAKER_06: I think there is also the obvious thing of maybe it helps us understand the universe better in a way that expands the frontiers of our understanding of the world.
+[104:16.61 -> 104:17.91] SPEAKER_06: That is something super exciting.
+[104:20.03 -> 104:22.96] SPEAKER_06: But look, I really don't know.
+[104:23.20 -> 104:27.10] SPEAKER_06: I haven't had access to something that powerful yet.
+[104:27.85 -> 104:29.85] SPEAKER_06: but I think those are all possibilities.
+[104:29.87 -> 104:55.24] SPEAKER_02: I think on the personal level, asking questions about yourself could, a sequence of questions like that about what makes me happy, I think we'd be very surprised to learn through those kind of, a sequence of questions and answers, we might explore some profound truths in a way that sometimes art reveals to us, great books reveal to us, great conversations with loved ones reveal.
+[104:55.44 -> 104:59.70] SPEAKER_02: things that are obvious in retrospect, but are nice when they're said.
+[105:00.72 -> 105:04.57] SPEAKER_02: But for me, number one question is about how many alien civilizations are there.
+[105:04.59 -> 105:04.91] SPEAKER_02: 100%.
+[105:04.93 -> 105:06.71] SPEAKER_02: That's going to be your first question.
+[105:07.03 -> 105:10.12] SPEAKER_02: Number one, how many living and dead alien civilizations?
+[105:10.94 -> 105:13.14] SPEAKER_02: Maybe a bunch of follow-ups, like how close are they?
+[105:13.16 -> 105:14.53] SPEAKER_02: Are they dangerous?
+[105:16.39 -> 105:19.19] SPEAKER_02: If there's no alien civilizations, why?
+[105:19.23 -> 105:19.98] SPEAKER_02: Why?
+[105:19.95 -> 105:27.95] SPEAKER_02: or if there's no advanced alien civilizations but bacteria like life everywhere, why, what is the barrier preventing you from getting to that?
+[105:29.01 -> 105:41.03] SPEAKER_02: Is it because that there's, that when you get sufficiently intelligent you end up destroying ourselves because you need competition in order to develop an advanced civilization?
+[105:41.02 -> 106:06.75] SPEAKER_02: when you have competitions going to lead to military conflict and conflict eventually kills everybody i'm gonna have that kind of get an answer to the fermi paradox yeah exactly and like have a real discussion about it i'm not sure it's a um i'm realizing now with your answer is a more productive um answer because i'm not sure what i'm going to do with that information but maybe it speaks to the general human curiosity that list talked about that we're all just really curious and
+[106:06.73 -> 106:14.48] SPEAKER_02: making the world's information accessible allows our curiosity to be satiated some with AI even more.
+[106:15.12 -> 106:18.77] SPEAKER_02: We can be more and more curious and learn more about the world, about ourselves.
+[106:19.29 -> 106:34.98] SPEAKER_02: And in so doing, I always wonder, I don't know if you can comment on, is it possible to measure the, not the GDP productivity increase like we talked about, but maybe whatever that increases,
+[106:36.23 -> 106:47.22] SPEAKER_02: The breadth and depth of human knowledge that Google has unlocked with Google Search and now with AI mode, with Gemini, is a difficult thing to measure.
+[106:47.98 -> 106:50.28] SPEAKER_06: Many years ago, I think it was an MIT study.
+[106:50.32 -> 106:54.83] SPEAKER_06: They just estimated the impact of Google Search.
+[106:55.85 -> 107:03.19] SPEAKER_06: And they basically said it's the equivalent to on a per-person basis, it's a few thousands of dollars per year per person, right?
+[107:03.83 -> 107:06.14] SPEAKER_06: Like it's the value that got created per year.
+[107:06.82 -> 107:07.20] SPEAKER_06: Right.
+[107:07.32 -> 107:11.57] SPEAKER_06: And, and, but it's, yeah, it's tough to capture these things, right?
+[107:11.71 -> 107:22.45] SPEAKER_06: You kind of take it, take it for granted as these things come, uh, and, and the frontier keeps moving, but, uh, you know, how do you measure the value of something like alpha fold over time?
+[107:23.05 -> 107:23.29] SPEAKER_06: Right.
+[107:23.39 -> 107:25.21] SPEAKER_06: And, and, and, and so on.
+[107:25.59 -> 107:35.99] SPEAKER_02: And also the increase in quality of life when you learn more, I have to say like with, uh, some of the programming I do done by AI, for some reason, I'm more excited to program.
+[107:36.03 -> 107:36.63] SPEAKER_05: Yeah.
+[107:36.61 -> 107:50.93] SPEAKER_02: And so the same with knowledge, with discovering things about the world, it makes you more excited to be alive, it makes you more curious, and it keeps, the more curious you are, the more exciting it is to live and experience the world.
+[107:51.05 -> 107:57.99] SPEAKER_02: And it's very hard to, I don't know if that makes you more productive, probably not nearly as much as it makes you happy to be alive.
+[107:58.64 -> 108:03.88] SPEAKER_02: And that's a hard thing to measure, the quality of life increases some of these things do.
+[108:05.78 -> 108:11.86] SPEAKER_02: as AI continues to get better and better at everything that humans do, what do you think is the biggest thing that makes us humans special?
+[108:14.56 -> 108:20.74] SPEAKER_06: Look, I think it's tough to talk about the essence of humanity.
+[108:20.80 -> 108:24.16] SPEAKER_06: There's something about, you know,
+[108:25.53 -> 108:55.18] SPEAKER_06: the consciousness we have, what makes us uniquely human, maybe the lines will blur over time and it's tough to articulate, but I hope, hopefully, you know, we live in a world where if you make resources more plentiful and make the world lesser of a zero-sum game over time, right, which it's not, but, you know, in a resource-constrained environment, people perceive it to be, right, and
+[108:55.77 -> 109:10.94] SPEAKER_06: And so I hope the values of what makes us uniquely human, empathy, kindness, all that surfaces more is the aspirational hope I have.
+[109:11.73 -> 109:19.44] SPEAKER_02: Yeah, it multiplies the compassion, but also the curiosity, just the banter, the debates we'll have about the meaning of it all.
+[109:19.52 -> 109:24.46] SPEAKER_02: And I also think in the scientific domains, all the incredible work that DeepMind is doing,
+[109:25.74 -> 109:39.23] SPEAKER_02: I think we'll still continue to play, to explore scientific questions, mathematical questions, physics questions, even as AI gets better and better at helping us solve some of the questions.
+[109:39.67 -> 109:42.30] SPEAKER_02: Sometimes the question itself is a really difficult thing.
+[109:43.26 -> 109:51.85] SPEAKER_06: Both the right new questions to ask and the answers to them and the self-discovery process, which it'll drive, I think.
+[109:52.20 -> 109:58.39] SPEAKER_06: You know, our early work with both co-scientists and Alpha Evolve, just super exciting to see.
+[109:59.29 -> 110:01.94] SPEAKER_06: What gives you hope about the future of human civilization?
+[110:03.34 -> 110:18.22] SPEAKER_06: I've always, I'm an optimist and, you know, I look at, you know, if you were to say you take the journey of human civilization, it's been, you know, we've relentlessly made the world better.
+[110:18.54 -> 110:20.16] SPEAKER_06: in many ways.
+[110:20.32 -> 110:23.91] SPEAKER_06: At any given moment in time, there are big issues to work through.
+[110:23.95 -> 110:31.05] SPEAKER_06: It may look, but I always ask myself the question, would you have been born now or any other time in the past?
+[110:32.06 -> 110:36.15] SPEAKER_06: I most often, not most often, almost always,
+[110:37.20 -> 110:40.11] SPEAKER_06: would rather be born now, right?
+[110:40.13 -> 110:44.87] SPEAKER_06: And so that's the extraordinary thing the human civilization has accomplished, right?
+[110:44.95 -> 110:49.38] SPEAKER_06: And we've kind of constantly made the world a better place.
+[110:50.52 -> 110:58.27] SPEAKER_06: And so something tells me, as humanity, we always rise collectively to drive that frontier forward.
+[110:58.29 -> 111:00.31] SPEAKER_06: So I expect it to be no different in the future.
+[111:00.98 -> 111:02.12] SPEAKER_02: I agree with you totally.
+[111:02.20 -> 111:04.89] SPEAKER_02: I'm truly grateful to be alive in this moment.
+[111:04.91 -> 111:06.79] SPEAKER_02: And I'm also really excited for the future.
+[111:06.85 -> 111:13.72] SPEAKER_02: And the work you and the incredible teams here are doing is one of the big reasons I'm excited for the future.
+[111:13.78 -> 111:14.42] SPEAKER_02: So thank you.
+[111:14.80 -> 111:16.89] SPEAKER_02: Thank you for all the cool products you've built.
+[111:17.43 -> 111:18.83] SPEAKER_02: And please don't kill Google Voice.
+[111:20.61 -> 111:21.29] SPEAKER_02: Thank you, Sundar.
+[111:21.79 -> 111:22.89] SPEAKER_02: We won't, yeah.
+[111:22.91 -> 111:23.90] SPEAKER_02: Thank you for talking today.
+[111:23.91 -> 111:24.60] SPEAKER_02: This was incredible.
+[111:24.62 -> 111:24.86] SPEAKER_02: Thank you.
+[111:24.88 -> 111:25.32] SPEAKER_02: Real pleasure.
+[111:25.48 -> 111:26.08] SPEAKER_02: Appreciate it.
+[111:27.14 -> 111:29.52] SPEAKER_02: Thanks for listening to this conversation with Sundar Pichai.
+[111:30.10 -> 111:36.93] SPEAKER_02: To support this podcast, please check out our sponsors in the description or at lexfriedman.com slash sponsors.
+[111:37.61 -> 111:43.02] SPEAKER_02: Shortly before this conversation, I got a chance to get a couple of demos that frankly blew my mind.
+[111:43.04 -> 111:46.04] SPEAKER_02: The engineering was really impressive.
+[111:46.69 -> 111:49.03] SPEAKER_02: The first demo was Google Beam.
+[111:49.01 -> 111:52.96] SPEAKER_02: And the second demo was the XR glasses.
+[111:53.56 -> 112:00.69] SPEAKER_02: And some of it was caught on video, so I thought I would include here some of those video clips.
+[112:01.66 -> 112:02.93] SPEAKER_01: Hey, Lex, my name is Andrew.
+[112:03.19 -> 112:05.95] SPEAKER_01: I lead the Google Beam team and we're going to be excited to show you a demo.
+[112:05.97 -> 112:08.23] SPEAKER_01: We're going to show you, I think, a glimpse of something new.
+[112:08.47 -> 112:13.08] SPEAKER_01: So that's the idea, a way to connect, a way to feel present from anywhere with anybody you care about.
+[112:14.72 -> 112:15.60] SPEAKER_01: Here's Google Beam.
+[112:16.00 -> 112:17.84] SPEAKER_01: This is a development platform that we've built.
+[112:18.20 -> 112:20.60] SPEAKER_01: So there's a prototype here of Google Beam.
+[112:20.78 -> 112:22.15] SPEAKER_01: There's one right down the hallway.
+[112:22.21 -> 112:24.43] SPEAKER_01: I'm going to go down and turn that on in a second.
+[112:24.45 -> 112:25.61] SPEAKER_01: We're going to experience it together.
+[112:25.63 -> 112:26.87] SPEAKER_01: We'll be back in the same room.
+[112:27.11 -> 112:27.55] SPEAKER_03: Wonderful.
+[112:29.95 -> 112:31.79] SPEAKER_03: Whoa, okay.
+[112:31.81 -> 112:32.27] SPEAKER_01: Here we are.
+[112:33.27 -> 112:34.37] SPEAKER_03: Okay, this is real already.
+[112:34.79 -> 112:35.43] SPEAKER_03: Wow.
+[112:35.45 -> 112:36.90] SPEAKER_01: This is real.
+[112:36.92 -> 112:37.00] SPEAKER_01: Wow.
+[112:37.02 -> 112:37.72] SPEAKER_01: This is Google Beam.
+[112:38.22 -> 112:43.98] SPEAKER_01: We're trying to make it feel like you and I could be anywhere in the world, but when these magic windows open, we're back together.
+[112:44.55 -> 112:47.15] SPEAKER_01: I see you exactly the same where you see me.
+[112:47.87 -> 112:50.41] SPEAKER_01: It's almost like we're sitting at the table sharing a table together.
+[112:50.73 -> 112:54.64] SPEAKER_01: We could learn from you, talk to you, share a meal with you, get to know you.
+[112:54.92 -> 112:56.32] SPEAKER_01: So you could feel the depth of this.
+[112:57.52 -> 112:58.06] SPEAKER_01: Yeah, great to meet you.
+[112:58.67 -> 112:59.45] SPEAKER_03: Wow.
+[112:59.63 -> 113:03.82] SPEAKER_03: So for people who probably can't even imagine what this looks like, there's a 3D version.
+[113:03.86 -> 113:04.66] SPEAKER_03: It looks real.
+[113:05.46 -> 113:06.04] SPEAKER_03: You look real.
+[113:06.06 -> 113:07.48] SPEAKER_01: It looks real to you.
+[113:07.54 -> 113:08.98] SPEAKER_03: It looks like you're coming out of the screen.
+[113:09.74 -> 113:13.95] SPEAKER_01: We quickly believe, once we're in Beam, that we're just together.
+[113:14.15 -> 113:23.06] SPEAKER_01: You settle into it, you're naturally attuned to seeing the world like this, and you just get used to seeing people this way, but literally from anywhere in the world with these magic screens.
+[113:23.08 -> 113:23.74] SPEAKER_01: This is incredible.
+[113:23.77 -> 113:25.05] SPEAKER_01: It's a neat technology.
+[113:25.03 -> 113:25.59] SPEAKER_02: Wow.
+[113:25.93 -> 113:30.01] SPEAKER_02: So I saw demos of this, but they don't come close to the experience of this.
+[113:30.45 -> 113:34.78] SPEAKER_02: I think one of the top YouTube comments on one of the demos I saw was like, why would I want a high definition?
+[113:34.80 -> 113:42.09] SPEAKER_02: I'm trying to turn off the camera, but this actually is, this feels like the camera has been turned off and we're just in the same room together.
+[113:42.51 -> 113:43.49] SPEAKER_02: This is really compelling.
+[113:44.40 -> 113:44.77] SPEAKER_01: That's right.
+[113:45.04 -> 113:49.48] SPEAKER_01: I know it's kind of late in the day too, so I brought you a snack just in case you're a little bit hungry, but...
+[113:50.19 -> 113:54.63] SPEAKER_03: So can you push it farther and it just becomes... Yeah, let's try to float it between rooms.
+[113:54.65 -> 113:56.72] SPEAKER_01: You know, it kind of fades it from my room into your room.
+[113:56.84 -> 113:59.26] SPEAKER_02: And then you see my hand, the depth of my hand.
+[113:59.40 -> 113:59.90] SPEAKER_01: Of course, yeah.
+[113:59.92 -> 114:00.06] SPEAKER_01: Wow.
+[114:00.08 -> 114:00.56] SPEAKER_01: Of course, yeah.
+[114:00.58 -> 114:01.85] SPEAKER_01: It feels like you... Try this.
+[114:01.86 -> 114:04.53] SPEAKER_01: Try giving me a high five and there's almost a sensation of feeling and touch.
+[114:04.63 -> 114:04.95] SPEAKER_01: Yeah.
+[114:04.97 -> 114:05.71] SPEAKER_01: Almost feel.
+[114:05.75 -> 114:05.97] SPEAKER_03: Yes.
+[114:06.27 -> 114:08.99] SPEAKER_01: Because you're so attuned to, you know, that should be a high five.
+[114:09.62 -> 114:11.48] SPEAKER_01: Feeling like you could connect with somebody that way.
+[114:11.54 -> 114:12.82] SPEAKER_01: So it's kind of a magical experience.
+[114:12.84 -> 114:13.78] SPEAKER_03: Oh, this is really nice.
+[114:14.18 -> 114:14.96] SPEAKER_03: How much does it cost?
+[114:14.98 -> 114:16.03] SPEAKER_01: Yeah, I think...
+[114:16.01 -> 114:18.53] SPEAKER_01: We've got a lot of companies testing it.
+[114:18.55 -> 114:22.07] SPEAKER_01: We just announced that we're going to be bringing it to offices soon as a set of products.
+[114:22.09 -> 114:24.01] SPEAKER_01: We've got some companies helping us build these screens.
+[114:24.85 -> 114:27.04] SPEAKER_01: But eventually, I think this will be in almost every screen.
+[114:27.06 -> 114:27.70] SPEAKER_03: There's nothing.
+[114:28.04 -> 114:29.12] SPEAKER_03: I'm not wearing anything.
+[114:29.66 -> 114:31.80] SPEAKER_03: Well, I'm wearing a suit and tie, to clarify.
+[114:32.36 -> 114:33.12] SPEAKER_03: I am wearing clothes.
+[114:33.26 -> 114:34.35] SPEAKER_03: This is not a CGI.
+[114:35.10 -> 114:36.91] SPEAKER_03: But outside of that, cool.
+[114:36.97 -> 114:38.07] SPEAKER_03: And the audio is really good.
+[114:38.27 -> 114:40.49] SPEAKER_03: And you can see me in the same three-dimensional way.
+[114:40.91 -> 114:42.47] SPEAKER_01: Yeah, the audio is spatialized.
+[114:42.49 -> 114:45.46] SPEAKER_01: So if I'm talking from here, of course it sounds like I'm talking from here.
+[114:45.81 -> 114:48.23] SPEAKER_01: You know, if I move to the other side of the room.
+[114:48.67 -> 114:48.93] SPEAKER_01: Wow.
+[114:48.95 -> 114:52.04] SPEAKER_01: So these little subtle cues, these really matter to bring people together.
+[114:52.28 -> 114:55.22] SPEAKER_01: All the nonverbals, all the emotion, the things that are lost today.
+[114:55.70 -> 114:56.16] SPEAKER_01: Here it is.
+[114:56.32 -> 114:57.81] SPEAKER_01: We put it back into the system.
+[114:57.91 -> 114:58.75] SPEAKER_01: You pulled this off.
+[114:58.83 -> 115:00.49] SPEAKER_03: Holy shit.
+[115:00.65 -> 115:01.37] SPEAKER_03: They pulled it off.
+[115:02.57 -> 115:03.64] SPEAKER_03: And integrated into this.
+[115:03.72 -> 115:05.06] SPEAKER_03: I saw the translation also.
+[115:05.46 -> 115:05.58] SPEAKER_03: Right.
+[115:05.60 -> 115:05.86] SPEAKER_03: This is.
+[115:06.14 -> 115:06.98] SPEAKER_01: We've got a bunch of things.
+[115:07.10 -> 115:08.73] SPEAKER_01: Let me show you a couple kind of cool things.
+[115:08.77 -> 115:10.07] SPEAKER_01: Let's do a little bit of work together.
+[115:10.09 -> 115:11.09] SPEAKER_01: Maybe we could.
+[115:12.11 -> 115:13.32] SPEAKER_01: critique one of your latest.
+[115:15.58 -> 115:17.92] SPEAKER_01: So you know, it's you and I work together.
+[115:17.98 -> 115:19.26] SPEAKER_01: So of course, we're in the same room.
+[115:19.32 -> 115:22.95] SPEAKER_01: But with this superpower, I can bring other things in here with me.
+[115:23.07 -> 115:23.79] SPEAKER_01: And it's nice.
+[115:24.07 -> 115:27.85] SPEAKER_01: You know, it's like we could sit together, we could watch something, we could work.
+[115:28.65 -> 115:30.81] SPEAKER_01: We've shared meals as a team together in the system.
+[115:30.88 -> 115:35.42] SPEAKER_01: But once you do the presence aspect of this, you want to bring some other superpowers to it.
+[115:36.12 -> 115:38.02] SPEAKER_02: And so you could review code together.
+[115:38.66 -> 115:39.66] SPEAKER_01: Yeah, yeah, exactly.
+[115:39.68 -> 115:41.45] SPEAKER_01: I've got some slides I'm working on.
+[115:41.75 -> 115:42.81] SPEAKER_01: Maybe you could help me with this.
+[115:42.95 -> 115:44.21] SPEAKER_01: Keep your eyes on me for a second.
+[115:44.91 -> 115:46.14] SPEAKER_01: I'll slide back into the center.
+[115:46.20 -> 115:49.97] SPEAKER_01: I didn't really move, but the system just kind of puts us in the right spot and knows where we need to be.
+[115:49.99 -> 115:54.90] SPEAKER_03: So you just turn to your laptop, the system moves you, and then it does the overlay automatically.
+[115:55.52 -> 115:59.04] SPEAKER_01: It kind of morphs the room to put things in the spot that they need to be in.
+[115:59.24 -> 116:00.61] SPEAKER_01: Everything has a place in the room.
+[116:00.77 -> 116:03.99] SPEAKER_01: Everything has a sense of presence or spatial consistency.
+[116:04.03 -> 116:06.96] SPEAKER_01: And that kind of makes it feel like we're together with us and other things.
+[116:07.06 -> 116:09.52] SPEAKER_03: I should also say, you're not just three-dimensional.
+[116:09.54 -> 116:13.49] SPEAKER_03: It feels like you're leaning out of the screen.
+[116:13.73 -> 116:16.33] SPEAKER_03: You're coming out of the screen.
+[116:16.43 -> 116:18.94] SPEAKER_03: You're not just in that world three-dimensional.
+[116:18.96 -> 116:19.66] SPEAKER_03: Yeah, exactly.
+[116:20.28 -> 116:21.02] SPEAKER_02: Holy crap.
+[116:22.08 -> 116:24.92] SPEAKER_03: Let me tell you how this works.
+[116:24.96 -> 116:30.41] SPEAKER_01: You probably already have the premise of it, but there's two things, two really hard things that we put together.
+[116:31.17 -> 116:33.11] SPEAKER_01: One is a AI video model.
+[116:33.35 -> 116:34.57] SPEAKER_01: So there's a set of cameras.
+[116:34.63 -> 116:36.01] SPEAKER_01: You asked kind of about those earlier.
+[116:36.43 -> 116:47.36] SPEAKER_01: There's six color cameras, just like webcams that we have today, taking video streams and feeding them into our AI model and turning that into a 3D video of you and I. It's effectively a light field.
+[116:47.48 -> 116:50.35] SPEAKER_01: So it's kind of an interactive 3D video that you can see from any perspective.
+[116:50.99 -> 116:54.49] SPEAKER_01: That's transmitted over to the second thing, and that's a light field display.
+[116:54.93 -> 116:56.15] SPEAKER_01: And it's happening bi-directionally.
+[116:56.40 -> 116:58.62] SPEAKER_01: I see you and you see me both in our light field displays.
+[116:59.24 -> 117:07.84] SPEAKER_01: These are effectively flat televisions or flat displays, but they have the sense of dimensionality, depth, size is correct.
+[117:08.08 -> 117:10.22] SPEAKER_01: You can see shadows and lighting are correct.
+[117:10.60 -> 117:13.00] SPEAKER_01: And everything's correct from your vantage point.
+[117:13.14 -> 117:15.83] SPEAKER_01: So if you move around ever so slightly, and I hold still,
+[117:16.05 -> 117:17.51] SPEAKER_01: You see a different perspective here.
+[117:17.65 -> 117:20.17] SPEAKER_01: You see kind of things that were occluded become revealed.
+[117:20.35 -> 117:23.35] SPEAKER_01: You see shadows that, you know, move in the way they should move.
+[117:23.38 -> 117:27.12] SPEAKER_01: All of that's computed and generated using our AI video model for you.
+[117:27.50 -> 117:28.96] SPEAKER_01: It's based on your eye position.
+[117:29.54 -> 117:33.83] SPEAKER_01: Where does the right scene need to be placed in this light field display for you just to feel present?
+[117:33.91 -> 117:35.37] SPEAKER_03: It's real time, no latency.
+[117:35.39 -> 117:36.09] SPEAKER_03: I'm not seeing latency.
+[117:36.11 -> 117:38.03] SPEAKER_03: You weren't freezing up at all.
+[117:38.06 -> 117:38.74] SPEAKER_01: No, no, I hope not.
+[117:38.76 -> 117:41.10] SPEAKER_01: I think it's you and I together, real time.
+[117:41.12 -> 117:42.70] SPEAKER_01: That's what you need for real communication.
+[117:43.32 -> 117:45.77] SPEAKER_01: And at a quality level... This is awesome.
+[117:46.13 -> 117:46.85] SPEAKER_01: realistic.
+[117:47.30 -> 117:48.60] SPEAKER_03: Is it possible to do three people?
+[117:48.66 -> 117:50.28] SPEAKER_03: Like, is that going to move that way also?
+[117:50.56 -> 117:50.80] SPEAKER_01: Yeah.
+[117:50.82 -> 117:51.82] SPEAKER_01: Let me, let me kind of show you.
+[117:51.96 -> 117:56.19] SPEAKER_01: So if, if she enters the room with us, you can see her, you can see me.
+[117:56.23 -> 118:00.23] SPEAKER_01: And if we had more people, you eventually lose a sense of presence.
+[118:00.25 -> 118:02.74] SPEAKER_01: You kind of shrink people down, you lose a sense of scale.
+[118:03.26 -> 118:06.20] SPEAKER_01: So think of it as the window fits a certain number of people.
+[118:06.48 -> 118:11.71] SPEAKER_01: If you want to fit a big group of people, you want, you know, the boardroom or the big room, you need like a much wider window.
+[118:12.11 -> 118:15.81] SPEAKER_01: If you want to see, you know, just grandma and the kids, you can do smaller windows.
+[118:16.02 -> 118:20.10] SPEAKER_01: So everybody has a seat at the table or everybody has a sense of where they belong.
+[118:20.14 -> 118:21.88] SPEAKER_01: And there's kind of a sense of presence that's obeyed.
+[118:22.34 -> 118:25.52] SPEAKER_01: If you have too many people, you kind of go back to like 2D metaphors that we're used to.
+[118:25.56 -> 118:26.99] SPEAKER_01: People in tiles placed anywhere.
+[118:27.29 -> 118:29.17] SPEAKER_02: For the image I'm seeing, did you have to get scanned?
+[118:29.55 -> 118:31.37] SPEAKER_01: I mean, I see you without being scanned.
+[118:31.39 -> 118:33.47] SPEAKER_01: So it's just so much easier if you don't have to wear anything.
+[118:33.49 -> 118:34.65] SPEAKER_01: You don't have to pre-scan.
+[118:34.73 -> 118:35.07] SPEAKER_01: You just...
+[118:35.39 -> 118:39.14] SPEAKER_01: Do it the way it's supposed to happen without anybody having to learn anything or put anything on.
+[118:39.56 -> 118:42.84] SPEAKER_02: I thought you had to solve the scanning problem, but here you don't.
+[118:43.58 -> 118:44.43] SPEAKER_02: It's just cameras.
+[118:44.69 -> 118:45.55] SPEAKER_02: It's just vision.
+[118:46.61 -> 118:47.45] SPEAKER_01: It's video.
+[118:47.47 -> 118:52.10] SPEAKER_01: Yeah, we're not trying to kind of make an approximation of you because everything you do every day matters.
+[118:52.16 -> 118:54.10] SPEAKER_01: You know, I cut myself caving.
+[118:54.18 -> 118:54.96] SPEAKER_01: I put on a pin.
+[118:55.00 -> 118:59.41] SPEAKER_01: All the little kind of, you know, aspects of you, those just happen.
+[118:59.83 -> 119:02.95] SPEAKER_01: We don't have the time to scan or kind of capture those or dress avatars.
+[119:03.30 -> 119:04.83] SPEAKER_01: We kind of appear as we appear.
+[119:05.14 -> 119:08.34] SPEAKER_01: And so all that's transmitted truthfully as it's happening.
+[119:10.07 -> 119:11.05] SPEAKER_03: Chris, how are you doing?
+[119:11.15 -> 119:11.59] SPEAKER_07: Good to meet you.
+[119:11.79 -> 119:12.27] SPEAKER_07: Nice to meet you.
+[119:12.31 -> 119:14.84] SPEAKER_07: So as Max mentioned, we have glasses here.
+[119:14.88 -> 119:19.10] SPEAKER_07: We start with the foundation of great glasses, something stylish, lightweight, wearable.
+[119:19.44 -> 119:22.24] SPEAKER_07: And we say, how can we build great technology and experiences on top of that?
+[119:23.49 -> 119:29.27] SPEAKER_07: One of the core tenets of the Android XR platform, this idea of a multimodal conversational device, see what you see, hear what you hear.
+[119:29.84 -> 119:33.58] SPEAKER_07: So we've got a camera, you've got speakers, multiple microphones for speaker isolation.
+[119:34.50 -> 119:36.34] SPEAKER_07: I'll give you a chance to try these yourself.
+[119:36.54 -> 119:38.41] SPEAKER_07: Yeah, sorry, I woke it up there.
+[119:39.08 -> 119:39.72] SPEAKER_07: Whoa.
+[119:40.06 -> 119:40.94] SPEAKER_07: Yeah.
+[119:40.96 -> 119:45.47] SPEAKER_07: So the first thing you see is a super simple, straightforward home screen.
+[119:45.49 -> 119:49.04] SPEAKER_07: So you probably see the time, the weather, calendar appointments there.
+[119:49.08 -> 119:53.47] SPEAKER_07: This is designed to be sort of your one-stop shop for quick glanceable information throughout the day.
+[119:53.55 -> 119:54.79] SPEAKER_07: We want to be something that's
+[119:54.77 -> 119:57.68] SPEAKER_07: easy to get what you need and then go back to what you're doing.
+[119:57.70 -> 120:02.72] SPEAKER_07: So you can imagine turning on the display, getting that quick glance, and then continuing on your way.
+[120:02.82 -> 120:04.34] SPEAKER_07: You can be fully conversational at this point.
+[120:04.36 -> 120:06.95] SPEAKER_07: You can ask questions, for example, about the paintings.
+[120:06.99 -> 120:07.65] SPEAKER_07: You can interrupt.
+[120:07.71 -> 120:08.95] SPEAKER_07: You can ask follow-up questions.
+[120:09.27 -> 120:12.07] SPEAKER_07: And as I mentioned before, if you want to at any time pause, you just tap there on the right.
+[120:12.73 -> 120:16.02] SPEAKER_02: Gemini, how much does this painting cost?
+[120:16.04 -> 120:20.91] SPEAKER_00: The painting is called The Bridge of Leef-a-Leef, 1875, by Armand Guillaumet.
+[120:21.23 -> 120:24.07] SPEAKER_00: It appears to be a print, and it would be impossible to know its cost.
+[120:25.60 -> 120:26.91] SPEAKER_03: Okay, so this is fake.
+[120:26.93 -> 120:27.43] SPEAKER_03: I understand.
+[120:27.45 -> 120:30.24] SPEAKER_03: Why do humans pay so much money for paintings?
+[120:30.70 -> 120:33.31] SPEAKER_00: People pay a lot for paintings because of their artistic merit.
+[120:33.57 -> 120:37.06] SPEAKER_00: The artist's fame is a decent rarity and for the appreciation you learn.
+[120:38.07 -> 120:41.06] SPEAKER_07: So a few more things that we want to show you just for sake of time.
+[120:41.10 -> 120:43.85] SPEAKER_07: If you go ahead and long press on the side again to sleep Gemini there.
+[120:44.63 -> 120:45.01] SPEAKER_07: There you go.
+[120:46.85 -> 120:47.71] SPEAKER_07: Did you catch Google I.O.
+[120:47.85 -> 120:48.80] SPEAKER_07: last week by any chance?
+[120:48.82 -> 120:52.62] SPEAKER_07: So you might have seen on stage the Google Maps experience very briefly.
+[120:52.97 -> 120:55.53] SPEAKER_07: Wanted to give you a chance to get a sense of what that feels like today.
+[120:55.57 -> 120:57.41] SPEAKER_07: You can imagine you're walking down the street.
+[120:57.80 -> 121:01.74] SPEAKER_07: If you look up, like you're walking straight ahead, you get quick turn-by-turn directions.
+[121:02.15 -> 121:04.61] SPEAKER_07: So you have a sense of what the next turn is like.
+[121:04.83 -> 121:05.23] SPEAKER_03: Nice.
+[121:05.25 -> 121:06.57] SPEAKER_07: Taking your phone in your pocket.
+[121:06.59 -> 121:07.69] SPEAKER_03: Oh, that's so intuitive.
+[121:08.01 -> 121:10.79] SPEAKER_07: Sometimes you need that quick sense of which way is the right way.
+[121:10.89 -> 121:11.41] SPEAKER_03: Sometimes.
+[121:11.64 -> 121:11.98] SPEAKER_07: Yeah.
+[121:12.00 -> 121:14.30] SPEAKER_07: So let's say you're coming out of a subway, getting out of a cab.
+[121:14.58 -> 121:15.76] SPEAKER_07: You can just glance down at your feet.
+[121:16.14 -> 121:18.56] SPEAKER_07: We have it set up to translate from Russian to English.
+[121:19.04 -> 121:22.27] SPEAKER_07: I think I get to wear the glasses and speak to me if you don't mind.
+[121:23.97 -> 121:24.63] SPEAKER_03: I can speak Russian.
+[121:26.15 -> 121:26.89] SPEAKER_03: Hi, friend.
+[121:26.93 -> 121:27.77] SPEAKER_03: How are you?
+[121:29.52 -> 121:33.13] SPEAKER_07: I'm doing well, how are you doing?
+[121:33.15 -> 121:39.02] SPEAKER_03: Tempted to swear, tempted to say inappropriate things.
+[121:39.64 -> 121:44.10] SPEAKER_07: I see it transcribed in real time.
+[121:44.12 -> 121:52.67] SPEAKER_07: And so obviously, you know, based on the different languages and the sequence of subjects and verbs, there's a slight delay sometimes, but it's really just like subtitles for the real world.
+[121:53.15 -> 121:53.73] SPEAKER_02: Thank you for this.
+[121:54.45 -> 121:57.46] SPEAKER_02: All right, back to me, hopefully watching videos
+[121:57.44 -> 122:05.17] SPEAKER_02: of me having my mind blown like the apes in 2001 Space Odyssey playing with a monolith was somewhat interesting.
+[122:05.97 -> 122:07.31] SPEAKER_02: Like I said, I was very impressed.
+[122:07.83 -> 122:13.30] SPEAKER_02: And now I thought if it's okay, I could make a few additional comments about the episode and just in general.
+[122:13.43 -> 122:35.81] SPEAKER_02: In this conversation with Sundar Pichai, I discussed the concept of the Neolithic package, which is the set of innovations that came along with the first agricultural revolution about 12,000 years ago, which included the formation of social hierarchies, the early primitive forms of government, labor specialization, domestication of plants and animals,
+[122:35.79 -> 122:46.78] SPEAKER_02: early forms of trade, large-scale cooperations of humans, like that required to build, yes, the pyramids and temples, like Gobekli Tepe.
+[122:47.14 -> 122:52.64] SPEAKER_02: I think this may be the right way to actually talk about the inventions that changed human history.
+[122:52.99 -> 123:01.34] SPEAKER_02: not just as a single invention, but as a kind of network of innovations and transformations that came along with it.
+[123:02.38 -> 123:12.99] SPEAKER_02: And the productivity multiplier framework that I mentioned in the episode, I think is a nice way to try to concretize the impact of each of these inventions under consideration.
+[123:13.51 -> 123:22.98] SPEAKER_02: And we have to remember that each node in the network of the sort of fast follow-on inventions is in itself a productivity multiplier.
+[123:22.96 -> 123:25.54] SPEAKER_02: Some are additive, some are multiplicative.
+[123:26.39 -> 123:40.70] SPEAKER_02: So in some sense, the size of the network in the package is the thing that matters when you're trying to rank the impact of inventions on human history.
+[123:40.68 -> 123:54.51] SPEAKER_02: The easy picks for the period of biggest transformation, at least in sort of modern-day discourse, is the Industrial Revolution or even in the 20th century, the computer or the internet.
+[123:55.65 -> 124:05.08] SPEAKER_02: I think it's because it's easiest to intuit for modern-day humans the impact, the exponential impact of those technologies.
+[124:05.14 -> 124:09.70] SPEAKER_02: But recently, I suppose this changes week to week, but I have been doing a lot of
+[124:09.69 -> 124:23.28] SPEAKER_02: a reading on ancient human history, so recently my pick for the number one invention would have to be the first agricultural revolution, the Neolithic package that led to the formation of human civilizations.
+[124:24.00 -> 124:37.08] SPEAKER_02: That's what enabled the scaling of the collective intelligence machine of humanity, and for us to become the early bootloader for the next 10,000 years of technological progress, which, yes, includes AI.
+[124:37.06 -> 124:39.46] SPEAKER_02: and the tech that builds on top of AI.
+[124:40.36 -> 124:46.63] SPEAKER_02: And of course, it could be argued that the word invention doesn't properly apply to the agricultural revolution.
+[124:47.09 -> 124:59.77] SPEAKER_02: I think actually Yuval Noah Harari argues that it wasn't the humans who were the inventors, but a handful of plant species, namely wheat, rice, and potatoes.
+[125:00.85 -> 125:06.78] SPEAKER_02: This is strictly a fair perspective, but I'm having fun, like I said, with this discussion.
+[125:06.76 -> 125:10.78] SPEAKER_02: Here, I just think of the entire Earth as a system that continuously transforms.
+[125:11.43 -> 125:22.93] SPEAKER_02: And I'm using the term invention in that context, asking the question of when was the biggest leap on the log scale plot of human progress?
+[125:23.73 -> 125:27.81] SPEAKER_02: Will AI, AGI, ASI eventually take the number one spot in this ranking?
+[125:28.49 -> 125:36.81] SPEAKER_02: I think it has a very good chance to do so, due again to the size of the network of inventions that will come along with it.
+[125:37.81 -> 125:54.65] SPEAKER_02: I think we discuss in this podcast the kind of things that would be included in the so-called AI package, but I think there's a lot more possibilities, including discussed in previous podcasts, in many previous podcasts, including with Dari Al-Madei.
+[125:54.63 -> 125:58.78] SPEAKER_02: talking on the biological innovation side, the science progress side.
+[125:59.36 -> 126:22.17] SPEAKER_02: In this podcast, I think we talk about something that I'm particularly excited about in the near term, which is unlocking the cognitive capacity of the entire landscape of brains that is the human species, making it more accessible through education and through machine translation, making information, knowledge, and the rapid
+[126:22.49 -> 126:29.79] SPEAKER_02: learning and innovation process accessible to more humans, to the entire eight billion, if you will.
+[126:30.55 -> 126:39.51] SPEAKER_02: So I do think language or machine translation apply to all the different methods that we use on the internet to discover knowledge.
+[126:39.48 -> 126:41.59] SPEAKER_02: is a big unlock.
+[126:42.37 -> 126:48.28] SPEAKER_02: But there are a lot of other stuff in the so-called AI package, like discussed with Dario curing all major human diseases.
+[126:48.86 -> 126:53.58] SPEAKER_02: He really focuses on that in the Machines of Love and Grace essay.
+[126:54.16 -> 127:04.50] SPEAKER_02: I think there will be huge leaps in productivity for human programmers and semi-autonomous human programmers, so humans in the loop, but most of the programming is done by AI agents.
+[127:04.48 -> 127:14.95] SPEAKER_02: and then moving that towards a superhuman AI researcher that's doing the research that develops and programs the AI system in itself.
+[127:15.53 -> 127:18.61] SPEAKER_02: I think it would be huge transformative effects from autonomous vehicles.
+[127:19.48 -> 127:25.30] SPEAKER_02: These are the things that we maybe don't immediately understand or we understand from an economics perspective.
+[127:25.28 -> 127:43.09] SPEAKER_02: But there will be a point when AI systems are able to interpret, understand, interact with the human world to a sufficient degree to where many of the manually controlled human-in-the-loop systems we rely on become fully autonomous.
+[127:43.95 -> 127:52.98] SPEAKER_02: And I think mobility is such a big part of human civilization that there will be effects on that, that they're not just economic.
+[127:52.96 -> 127:55.23] SPEAKER_02: but are social, cultural, and so on.
+[127:56.15 -> 127:58.76] SPEAKER_02: And there's a lot more things I could talk about for a long time.
+[127:58.80 -> 128:01.11] SPEAKER_02: So obviously the...
+[128:01.23 -> 128:06.09] SPEAKER_02: integration, utilization of AI in the creation of art, film, music.
+[128:07.40 -> 128:22.20] SPEAKER_02: I think the digitalization and automating basic functions of government and then integrating AI into that process, thereby decreasing corruption and cost and increasing transparency and efficiency.
+[128:23.06 -> 128:30.93] SPEAKER_02: I think we as humans, individual humans will continue to transition further and further into cyborgs.
+[128:30.91 -> 128:43.05] SPEAKER_02: There's already an AI in the loop of the human condition, and that will become increasingly so as the AI becomes more powerful.
+[128:43.61 -> 128:55.43] SPEAKER_02: The thing I'm obviously really excited about is major breakthroughs in science, and not just on the medical front, but on physics, fundamental physics, which would then lead to energy breakthroughs
+[128:55.92 -> 129:00.23] SPEAKER_02: increasing the chance that we become, we actually become a Kardashev type one civilization.
+[129:00.89 -> 129:07.56] SPEAKER_02: And then enabling us in so doing to do interstellar exploration of space and colonization of space.
+[129:08.19 -> 129:11.09] SPEAKER_02: I think they're also in the near term,
+[129:12.37 -> 129:24.27] SPEAKER_02: much like with the industrial revolution that led to rapid specialization of skills and expertise, there might be a great sort of despecialization.
+[129:25.01 -> 129:35.29] SPEAKER_02: So as the AI system become superhuman experts of particular fields, there might be greater and greater value to being the integrator.
+[129:36.03 -> 129:42.12] SPEAKER_02: of AIs, for humans to be sort of generalists.
+[129:42.23 -> 129:48.18] SPEAKER_02: And so the great value of the human mind will come from the generalists, not the specialists.
+[129:48.20 -> 129:54.73] SPEAKER_02: That's a real possibility that that changes the way we are about the world, that we wanna know a little bit of a lot of things.
+[129:54.71 -> 129:56.25] SPEAKER_02: and move about the world in that way.
+[129:56.87 -> 130:05.70] SPEAKER_02: That could have, when passing a certain threshold, a complete shift in who we are as a collective intelligence, as a human species.
+[130:06.56 -> 130:24.50] SPEAKER_02: Also, as an aside, when thinking about the invention that was the greatest in human history, again, for a bit of fun, we have to remember that all of them build on top of each other, and so we need to look at the delta, the step change, on the, I would say, impossibly to perfectly measure plot of exponential human progress.
+[130:24.48 -> 130:48.31] SPEAKER_02: Really, we can go back to the entire history of life on Earth and a previous podcast guest, Nick Lane, does a great job of this in his book, Life Ascending, listing these 10 major inventions throughout the evolution of life on Earth like DNA, photosynthesis, complex cells, sex, movement, sight, all those kinds of things.
+[130:48.91 -> 130:50.91] SPEAKER_02: I forget the full list that's on there, but
+[130:50.89 -> 131:07.99] SPEAKER_02: I think that's so far from the human experience that my intuition about, let's say, productivity multipliers of those particular inventions completely breaks down, and a different framework is needed to understand the impact of these inventions of evolution.
+[131:09.04 -> 131:18.97] SPEAKER_02: The origin of life on Earth, or even the Big Bang itself, of course, is the OG invention that set the stage for all the rest of it.
+[131:18.95 -> 131:25.54] SPEAKER_02: And there are probably many more turtles under that, which are yet to be discovered.
+[131:26.70 -> 131:30.13] SPEAKER_02: So anyway, we live in interesting times, fellow humans.
+[131:31.41 -> 131:38.22] SPEAKER_02: I do believe the set of positive trajectories for humanity outnumber the set of negative trajectories, but not by much.
+[131:39.28 -> 131:41.02] SPEAKER_02: So let's not mess this up.
+[131:42.02 -> 131:47.17] SPEAKER_02: And now, let me leave you with some words from French philosopher Jean de la Bruyère.
+[131:48.01 -> 131:51.02] SPEAKER_05: Out of difficulties, grow miracles.
+[131:52.41 -> 131:55.56] SPEAKER_05: Thank you for listening and hope to see you next time.

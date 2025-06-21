@@ -1,0 +1,58 @@
+{
+  "total_speakers": 8,
+  "total_duration": 7113.325999999996,
+  "speakers": {
+    "SPEAKER_06": {
+      "total_duration": 3642.9360000000006,
+      "segment_count": 854,
+      "text_length": 58296,
+      "percentage": 51.21283630189313
+    },
+    "SPEAKER_02": {
+      "total_duration": 2956.7940000000035,
+      "segment_count": 601,
+      "text_length": 47430,
+      "percentage": 41.56696881318254
+    },
+    "SPEAKER_05": {
+      "total_duration": 25.488999999999976,
+      "segment_count": 10,
+      "text_length": 345,
+      "percentage": 0.3583274546955951
+    },
+    "SPEAKER_00": {
+      "total_duration": 18.463000000000648,
+      "segment_count": 6,
+      "text_length": 371,
+      "percentage": 0.25955509419926287
+    },
+    "UNKNOWN": {
+      "total_duration": 0.0999999999994543,
+      "segment_count": 1,
+      "text_length": 5,
+      "percentage": 0.0014058121334443881
+    },
+    "SPEAKER_01": {
+      "total_duration": 284.2459999999983,
+      "segment_count": 124,
+      "text_length": 6317,
+      "percentage": 3.995964756852117
+    },
+    "SPEAKER_03": {
+      "total_duration": 76.89599999999973,
+      "segment_count": 50,
+      "text_length": 1417,
+      "percentage": 1.081013298139292
+    },
+    "SPEAKER_07": {
+      "total_duration": 108.40199999999459,
+      "segment_count": 42,
+      "text_length": 2366,
+      "percentage": 1.5239284689046255
+    }
+  },
+  "processing_info": {
+    "language": "unknown",
+    "total_segments": 1688
+  }
+}
