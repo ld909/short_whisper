@@ -70,6 +70,9 @@ class BookProcessingController:
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         self.system = platform.system()
         
+        # 配置正确的媒体路径
+        self.audio_base_dir = self._get_audio_base_dir()
+        
         # 定义流水线步骤
         self.pipeline_steps = {
             1: {
@@ -139,8 +142,24 @@ class BookProcessingController:
 
         print(f"🖥️  系统类型: {self.system}")
         print(f"📁 脚本目录: {self.script_dir}")
+        print(f"🎵 音频路径: {self.audio_base_dir}")
         if self.target_uuid:
             print(f"🎯 目标UUID: {self.target_uuid}")
+
+    def _get_audio_base_dir(self) -> str:
+        """获取音频基础目录路径"""
+        if self.system == "Linux":  # Ubuntu
+            return "/media/dhl/audio"
+        elif self.system == "Darwin":  # macOS
+            # 检测Mac芯片类型
+            machine = platform.machine()
+            if machine == "x86_64":  # Intel Mac
+                return "/Volumes/dhl/audio"
+            else:  # Apple Silicon
+                return "/Users/donghaoliu/Documents/audio"
+        else:
+            # 默认使用当前目录的audio子目录
+            return os.path.join(os.path.expanduser("~"), "Documents", "audio")
 
     def _get_chunk_args(self) -> List[str]:
         """获取chunk_book_summaries.py的参数"""
@@ -213,6 +232,8 @@ class BookProcessingController:
             args.extend(["--uuid", self.target_uuid])
         if self.force:
             args.append("--force")
+        if self.debug:
+            args.append("--debug")
         return args
 
     def _get_hashtag_args(self) -> List[str]:
@@ -270,6 +291,7 @@ class BookProcessingController:
         print(f"🚀 执行步骤 {step_number}: {step['name']}")
         print(f"📄 脚本: {step['script']}")
         print(f"📝 描述: {step['description']}")
+        print(f"📁 音频路径: {self.audio_base_dir}")
         print(f"{'='*60}")
 
         script_path = os.path.join(self.script_dir, step["script"])
@@ -288,6 +310,10 @@ class BookProcessingController:
         start_time = datetime.now()
         
         try:
+            # 设置环境变量
+            env = os.environ.copy()
+            env['AUDIO_BASE_DIR'] = self.audio_base_dir
+            
             # 执行脚本
             result = subprocess.run(
                 cmd,
@@ -295,6 +321,7 @@ class BookProcessingController:
                 capture_output=False,  # 让输出直接显示在终端
                 text=True,
                 check=False,
+                env=env,  # 传递环境变量
             )
             
             end_time = datetime.now()

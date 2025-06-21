@@ -59,7 +59,11 @@ except ImportError:
 
 def get_base_media_path():
     """根据系统类型返回基础媒体路径"""
-    if platform.system() == "Darwin":  # macOS
+    system = platform.system()
+    
+    if system == "Linux":  # Ubuntu/Linux
+        return "/media/dhl/audio"
+    elif system == "Darwin":  # macOS
         machine = platform.machine().lower()
         processor = platform.processor().lower()
         # Apple Silicon (M芯片)
@@ -76,7 +80,9 @@ def get_base_media_path():
         else:
             # Intel Mac
             return "/Volumes/dhl/audio"
-    return "/Users/donghaoliu/Documents/audio"  # 默认
+    else:
+        # 默认使用环境变量或默认路径
+        return os.environ.get("AUDIO_BASE_DIR", "/Users/donghaoliu/Documents/audio")
 
 
 def setup_gemini_client():
