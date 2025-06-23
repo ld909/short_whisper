@@ -5,6 +5,49 @@ YouTube频道音频下载脚本
 从channel.txt文件读取YouTube频道URL，下载所有频道的最高质量音频
 支持断点续传，不重复下载已存在的文件
 处理中文频道名和视频名
+
+使用方法：
+=========
+
+1. 准备工作：
+   - 确保已安装依赖：pip install yt-dlp
+   - 确保系统已安装 ffmpeg
+   - 准备频道列表文件（默认为 channel.txt）
+
+2. 创建频道列表文件：
+   创建一个文本文件（如 channel.txt），每行一个YouTube频道URL，例如：
+
+   https://www.youtube.com/@channelname1
+   https://www.youtube.com/c/channelname2
+   https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxxxxx
+
+3. 运行脚本：
+   # 使用默认的 channel.txt 文件
+   python youtube_channel_audio_downloader.py
+
+   # 使用自定义频道列表文件
+   python youtube_channel_audio_downloader.py my_channels.txt
+
+4. 输出位置：
+   音频文件将保存到：/Volumes/dhl/buda_videos_youtube/channel_mp3_raw/频道名/
+
+5. 功能特点：
+   - 下载 192k 质量的 MP3 音频
+   - 自动为每个频道创建独立目录
+   - 支持断点续传，已存在的文件不会重复下载
+   - 自动清理非MP3文件和系统meta文件
+   - 完整的进度显示和日志记录
+   - 支持中文频道名和视频标题
+
+6. 注意事项：
+   - 确保有足够的磁盘空间
+   - 下载期间保持网络连接稳定
+   - 可以随时使用 Ctrl+C 中断下载
+   - 日志文件保存为 youtube_download.log
+
+示例命令：
+python youtube_channel_audio_downloader.py
+python youtube_channel_audio_downloader.py channels_tech.txt
 """
 
 import os
