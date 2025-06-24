@@ -12,7 +12,7 @@
 /test_tts_mp3/
 /test_ssml/
 # ignore all mp3 files
-*.mp3
+
 *.mp4secret_json/
 
 # Sensitive directories
