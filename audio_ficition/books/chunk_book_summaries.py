@@ -49,6 +49,9 @@ python chunk_book_summaries.py --preview --lang en
 # 禁用断点续传
 python chunk_book_summaries.py --no-resume --lang zh
 
+# 强制重新处理所有文件（推荐用于确保清理功能正常工作）
+python chunk_book_summaries.py --force --lang zh
+
 # 指定输入目录
 python chunk_book_summaries.py --input-dir /custom/path/to/summaries --lang en
 
@@ -253,6 +256,106 @@ def get_processed_books(output_dir):
     return processed_books
 
 
+def clean_text_content(text, language="en", debug=False):
+    """
+    根据语言清理文本内容，去除不需要的符号
+    
+    Args:
+        text (str): 原始文本
+        language (str): 语言类型 (en/zh)
+        debug (bool): 是否启用调试模式
+        
+    Returns:
+        str: 清理后的文本
+    """
+    original_text = text
+    
+    # 统一处理所有引号（中文和英文主题都去除引号）
+    # 定义所有可能的引号字符
+    quote_chars = [
+        '"',    # 标准英文双引号 (U+0022)
+        "'",    # 标准英文单引号 (U+0027)
+        "'",    # 左单引号 (U+2018)
+        "'",    # 右单引号 (U+2019)  
+        """,    # 左双引号 (U+201C)
+        """,    # 右双引号 (U+201D)
+        "`",    # 反引号 (U+0060)
+        "´",    # 重音符 (U+00B4)
+        "„",    # 德文双引号下标 (U+201E)
+        "‚",    # 德文单引号下标 (U+201A)
+        "«",    # 法文左引号 (U+00AB)
+        "»",    # 法文右引号 (U+00BB)
+        "‹",    # 单角引号左 (U+2039)
+        "›",    # 单角引号右 (U+203A)
+        "〈",   # 中文角括号左 (U+3008)
+        "〉",   # 中文角括号右 (U+3009)
+        "《",   # 中文书名号左 (U+300A)
+        "》",   # 中文书名号右 (U+300B)
+        "「",   # 日文角引号左 (U+300C)
+        "」",   # 日文角引号右 (U+300D)
+        "『",   # 日文双角引号左 (U+300E)
+        "』",   # 日文双角引号右 (U+300F)
+        "〝",   # 中文引号上标左 (U+301D)
+        "〞",   # 中文引号上标右 (U+301E)
+        "〟",   # 中文引号下标 (U+301F)
+    ]
+    
+    # 统计清理的字符
+    removed_quotes = 0
+    
+    # 去除所有引号
+    for quote in quote_chars:
+        if quote in text:
+            count = text.count(quote)
+            text = text.replace(quote, "")
+            removed_quotes += count
+            if debug and count > 0:
+                print(f"         🔍 移除了 {count} 个 '{quote}' 字符")
+    
+    # 破折号处理
+    dash_chars = [
+        "—",    # 长破折号 (em dash, U+2014)
+        "–",    # 短破折号 (en dash, U+2013)
+        "-",    # 连字符 (hyphen, U+002D)
+        "−",    # 减号 (U+2212)
+        "‐",    # 短连字符 (U+2010)
+        "‑",    # 不断行连字符 (U+2011)
+        "⁃",    # 三角连字符 (U+2043)
+        "﹣",   # 全角连字符 (U+FE63)
+        "－",   # 全角减号 (U+FF0D)
+    ]
+    
+    removed_dashes = 0
+    
+    if language == "zh":
+        # 中文处理：完全去除破折号和连字符
+        for dash in dash_chars:
+            if dash in text:
+                count = text.count(dash)
+                text = text.replace(dash, "")
+                removed_dashes += count
+                if debug and count > 0:
+                    print(f"         🔍 移除了 {count} 个 '{dash}' 字符")
+    else:
+        # 英文处理：破折号和连字符替换为空格
+        for dash in dash_chars:
+            if dash in text:
+                count = text.count(dash)
+                text = text.replace(dash, " ")
+                removed_dashes += count
+                if debug and count > 0:
+                    print(f"         🔍 替换了 {count} 个 '{dash}' 为空格")
+    
+    # 清理多余空格
+    text = " ".join(text.split())
+    
+    if debug:
+        total_removed = len(original_text) - len(text)
+        print(f"         📊 清理统计: 引号{removed_quotes}个, 破折号{removed_dashes}个, 总计{total_removed}个字符")
+    
+    return text.strip()
+
+
 def extract_uuid_from_filename(filename):
     """
     从文件名中提取UUID
@@ -272,7 +375,7 @@ def extract_uuid_from_filename(filename):
     return None
 
 
-def process_single_summary(input_file, output_base_dir, max_chars=3000):
+def process_single_summary(input_file, output_base_dir, max_chars=3000, language="en"):
     """
     处理单个书籍总结文件，分割成块并保存
 
@@ -280,6 +383,7 @@ def process_single_summary(input_file, output_base_dir, max_chars=3000):
         input_file (str): 输入总结文件路径
         output_base_dir (str): 输出基础目录
         max_chars (int): 每个块的最大字符数
+        language (str): 语言类型，用于不同的文本处理规则
 
     Returns:
         tuple: (成功标志, 块数量)
@@ -315,33 +419,72 @@ def process_single_summary(input_file, output_base_dir, max_chars=3000):
 
         # 保存每个块并显示每个块的信息
         chunk_sizes = []
+        total_chars_cleaned = 0
+        
         for chunk_index, chunk_content in enumerate(chunks, 1):
             chunk_filename = f"{chunk_index}.txt"
             chunk_filepath = os.path.join(book_output_dir, chunk_filename)
 
-            # 去掉换行符，变成一大段话，并替换所有"-"为空格
-            chunk_content_no_newlines = (
-                chunk_content.replace("\n", " ").replace("-", " ").strip()
-            )
+            # 去掉换行符，变成一大段话
+            chunk_content_no_newlines = chunk_content.replace("\n", " ").strip()
+            
+            # 清理文本内容，去除各种引号和符号
+            chunk_content_cleaned = clean_text_content(chunk_content_no_newlines, language, debug=True)
+            
+            # 显示清理前后的详细对比
+            original_length = len(chunk_content_no_newlines)
+            cleaned_length = len(chunk_content_cleaned)
+            chars_removed = original_length - cleaned_length
+            
+            # 总是显示每个chunk的处理信息
+            print(f"      📝 块 {chunk_index}: {original_length} → {cleaned_length} 字符 (清理了 {chars_removed} 个)")
+            
+            # 如果有字符被清理，显示更详细的信息
+            if chars_removed > 0:
+                print(f"         ✂️  成功清理了 {chars_removed} 个标点符号和特殊字符")
+                # 显示清理前后的片段对比（前50个字符）
+                before_preview = chunk_content_no_newlines[:100] + ("..." if len(chunk_content_no_newlines) > 100 else "")
+                after_preview = chunk_content_cleaned[:100] + ("..." if len(chunk_content_cleaned) > 100 else "")
+                print(f"         📄 清理前片段: {before_preview}")
+                print(f"         ✨ 清理后片段: {after_preview}")
+            
+            # 确保写入文件
+            try:
+                with open(chunk_filepath, "w", encoding="utf-8") as f:
+                    f.write(chunk_content_cleaned)
+                print(f"         💾 已保存到: {chunk_filepath}")
+                
+                # 验证文件确实被写入
+                if os.path.exists(chunk_filepath):
+                    actual_size = os.path.getsize(chunk_filepath)
+                    print(f"         ✅ 文件大小: {actual_size} bytes")
+                else:
+                    print(f"         ❌ 文件未找到: {chunk_filepath}")
+                    
+            except Exception as write_error:
+                print(f"         ❌ 写入文件失败: {write_error}")
+                return False, 0
 
-            with open(chunk_filepath, "w", encoding="utf-8") as f:
-                f.write(chunk_content_no_newlines)
-
-            chunk_sizes.append(len(chunk_content_no_newlines))
+            chunk_sizes.append(len(chunk_content_cleaned))
+            total_chars_cleaned += chars_removed
 
         total_chars = len(content)
         avg_chunk_size = sum(chunk_sizes) / len(chunk_sizes)
         chunk_sizes_str = ", ".join([str(size) for size in chunk_sizes])
 
         print(f"✅ {filename}: {len(chunks)} 个块 (总计 {total_chars} 字符)")
-        print(f"   UUID: {uuid_val}")
-        print(f"   块大小: [{chunk_sizes_str}] 字符, 平均: {avg_chunk_size:.0f} 字符")
+        print(f"   📁 UUID: {uuid_val}")
+        print(f"   📊 块大小: [{chunk_sizes_str}] 字符, 平均: {avg_chunk_size:.0f} 字符")
+        print(f"   🧹 总共清理了: {total_chars_cleaned} 个字符")
+        print(f"   📂 输出目录: {book_output_dir}")
 
         return True, len(chunks)
 
     except Exception as e:
         filename = os.path.basename(input_file)
         print(f"❌ 处理文件 {filename} 时出错: {e}")
+        import traceback
+        traceback.print_exc()
         return False, 0
 
 
@@ -351,6 +494,7 @@ def process_book_summaries(
     max_chars=3000,
     preview_mode=False,
     resume_mode=True,
+    language="en",
 ):
     """
     处理所有书籍总结文件
@@ -361,6 +505,7 @@ def process_book_summaries(
         max_chars (int): 每个块的最大字符数
         preview_mode (bool): 是否为预览模式
         resume_mode (bool): 是否启用断点续传
+        language (str): 语言类型，用于不同的文本处理规则
 
     Returns:
         dict: 处理结果统计
@@ -458,7 +603,7 @@ def process_book_summaries(
 
         print(f"\n处理第 {i}/{len(files_to_process)} 个总结: {filename}")
 
-        success, chunk_count = process_single_summary(input_file, output_dir, max_chars)
+        success, chunk_count = process_single_summary(input_file, output_dir, max_chars, language)
 
         if success:
             successful_count += 1
@@ -488,6 +633,7 @@ def main():
   python chunk_book_summaries.py --max-chars 2500 --lang en # 设置最大字符数
   python chunk_book_summaries.py --preview --lang zh      # 预览模式
   python chunk_book_summaries.py --no-resume --lang en    # 禁用断点续传
+  python chunk_book_summaries.py --force --lang zh        # 强制重新处理（推荐）
         """,
     )
 
@@ -526,13 +672,16 @@ def main():
     parser.add_argument(
         "--no-resume", action="store_true", help="禁用断点续传，重新处理所有书籍"
     )
+    parser.add_argument(
+        "--force", action="store_true", help="强制重新处理所有文件，即使已存在（等同于--no-resume）"
+    )
 
     args = parser.parse_args()
 
     input_dir = args.input_dir
     output_dir = args.output_dir
     max_chars = args.max_chars
-    resume_mode = not args.no_resume
+    resume_mode = not (args.no_resume or args.force)
     language = args.lang
 
     # 如果用户没有手动指定input_dir或output_dir，重新计算正确的路径
@@ -551,7 +700,10 @@ def main():
     print(f"📁 输出目录: {output_dir}")
     print(f"📊 最大字符数: {max_chars} 字符/块")
     print(f"🔄 断点续传: {'启用' if resume_mode else '禁用'}")
+    if args.force:
+        print(f"💪 强制模式: 重新处理所有文件，确保清理功能正常执行")
     print(f"🚫 自动排除Mac系统文件 (.DS_Store等)")
+    print(f"🧹 文本清理: 自动去除引号、破折号等标点符号")
 
     if args.preview:
         print(f"👁️  预览模式：只显示将要处理的文件")
@@ -569,6 +721,7 @@ def main():
             max_chars,
             args.preview,
             resume_mode,
+            language,
         )
 
         # 最终统计

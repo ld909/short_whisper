@@ -14,7 +14,7 @@
 # ignore all mp3 files
 
 *.mp4secret_json/
-
+*.mp3
 # Sensitive directories
 secret_json/
 youtube_credentials.sh
