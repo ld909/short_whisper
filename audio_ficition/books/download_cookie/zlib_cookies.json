@@ -1,0 +1,92 @@
+[
+  {
+    "name": "siteLanguage",
+    "value": "en",
+    "domain": ".zlib.fi",
+    "path": "/",
+    "expires": 1785234030.135199,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "refuseChangeDomain",
+    "value": "1",
+    "domain": ".zlib.fi",
+    "path": "/",
+    "expires": -1,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "domainsNotWorking",
+    "value": "librarium.us%2Cforthriver.xyz%2Chomeonet.tech%2Clibrerialibre.eu%2Cwesinx.com",
+    "domain": ".zlib.fi",
+    "path": "/",
+    "expires": 1750681246,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "VID",
+    "value": "28972_1XkfP21eMIfn0039R6",
+    "domain": ".yadro.ru",
+    "path": "/",
+    "expires": 1782162000.774453,
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "remix_userkey",
+    "value": "4b77353f54459d8774456b1a5e7475c8",
+    "domain": ".zlib.fi",
+    "path": "/",
+    "expires": 1754274045.059773,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "remix_userid",
+    "value": "42912062",
+    "domain": ".zlib.fi",
+    "path": "/",
+    "expires": 1754274045.059823,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "selectedSiteMode",
+    "value": "books",
+    "domain": ".zlib.fi",
+    "path": "/",
+    "expires": 1753352444.639927,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "redirects_count",
+    "value": "%7B%22auth%22%3A1%2C%22hide-auth-params%22%3A1%7D",
+    "domain": ".zlib.fi",
+    "path": "/",
+    "expires": 1750674055.059867,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "WMF-Uniq",
+    "value": "HFiw_eKngiIcL44ffiJnGwIbAAEBAFvdw8NH-1Sd7SMV4fKEd3ErvUpCqiBpfP-d",
+    "domain": ".upload.wikimedia.org",
+    "path": "/",
+    "expires": 1782219147.344795,
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "None"
+  }
+]

@@ -13,14 +13,15 @@
 - 提取 MP4 clip 的第一帧作为 YouTube 封面图片
 - 支持断点续传，跳过已存在的有效文件
 - 自动排除Mac系统产生的点文件
+- 支持中文(zh)和英文(en)两种语言主题
 
 📥 输入信息:
-- MP4 Clip目录: /Volumes/dhl/audio/books/en/1080_clips/{uuid}.mp4
-- 音频文件目录: /Volumes/dhl/audio/books/en/mp3/{uuid}.mp3
+- MP4 Clip目录: /Volumes/dhl/audio/books/{language}/1080_clips/{uuid}.mp4
+- 音频文件目录: /Volumes/dhl/audio/books/{language}/mp3/{uuid}.mp3
 
 📤 输出信息:
-- 合并视频: /Volumes/dhl/audio/books/en/mp4_with_audio/{uuid}.mp4
-- YouTube封面: /Volumes/dhl/audio/books/en/ytb_cover/{uuid}.png (1280x720像素)
+- 合并视频: /Volumes/dhl/audio/books/{language}/mp4_with_audio/{uuid}.mp4
+- YouTube封面: /Volumes/dhl/audio/books/{language}/ytb_cover/{uuid}.png (1280x720像素)
 
 🔄 处理规则:
 1. 在macOS系统上运行（适配Intel和Apple Silicon）
@@ -31,17 +32,20 @@
 6. YouTube封面使用标准尺寸 1280x720 (16:9比例)
 
 💡 使用示例:
-# 处理所有书籍
-python merge_clips_with_audio.py
+# 处理英文书籍
+python merge_clips_with_audio.py --lang en
+
+# 处理中文书籍
+python merge_clips_with_audio.py --lang zh
 
 # 处理指定UUID的书籍
-python merge_clips_with_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012
+python merge_clips_with_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012 --lang en
 
 # 预览模式
-python merge_clips_with_audio.py --preview
+python merge_clips_with_audio.py --preview --lang zh
 
 # 强制重新生成
-python merge_clips_with_audio.py --force
+python merge_clips_with_audio.py --force --lang en
 """
 
 import os
@@ -86,10 +90,10 @@ def get_base_media_path():
         return "/mnt/dhl/audio"
 
 
-def get_directories():
+def get_directories(language="en"):
     """获取所有相关目录路径"""
     base_media_path = get_base_media_path()
-    books_path = os.path.join(base_media_path, "books", "en")
+    books_path = os.path.join(base_media_path, "books", language)
 
     return {
         "clips": os.path.join(books_path, "1080_clips"),
@@ -786,239 +790,180 @@ def check_dependencies():
 
 def main():
     """主函数"""
-    # 检查系统
-    if not check_macos_system():
-        print("⚠️  此脚本主要为macOS系统设计，其他系统可能需要调整路径")
-
-    print("✅ 系统检测完成")
-
-    # 检查依赖
-    if not check_dependencies():
-        return
-
     parser = argparse.ArgumentParser(
-        description="书籍视频音频合并器 - 将clip与音频合并并提取YouTube封面（支持断点续传）",
+        description="📚 书籍视频音频合并器",
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 使用示例:
-  python merge_clips_with_audio.py                                # 处理所有书籍
-  python merge_clips_with_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012  # 处理指定UUID的书籍
-  python merge_clips_with_audio.py --preview                      # 预览模式
-  python merge_clips_with_audio.py --force                        # 强制重新生成
-  python merge_clips_with_audio.py --debug                        # 启用调试模式
+  python merge_clips_with_audio.py --lang en                      # 处理英文书籍
+  python merge_clips_with_audio.py --lang zh                      # 处理中文书籍
+  python merge_clips_with_audio.py --uuid abc123 --lang en        # 处理指定UUID
+  python merge_clips_with_audio.py --preview --lang zh            # 预览模式
+  python merge_clips_with_audio.py --force --lang en              # 强制重新生成
 
-输出说明:
-  - 合并视频: /Volumes/dhl/audio/books/en/mp4_with_audio/{uuid}.mp4
-  - YouTube封面: /Volumes/dhl/audio/books/en/ytb_cover/{uuid}.png (1280x720)
+注意:
+- 需要FFmpeg支持
+- 会生成合并视频和YouTube封面图片
+- 自动排除Mac系统文件
         """,
     )
-    parser.add_argument("--uuid", "-u", help="要处理的书籍UUID，不指定则处理所有书籍")
+
+    # 语言参数
     parser.add_argument(
-        "--preview",
-        action="store_true",
-        help="预览模式，只显示会处理哪些文件，不实际处理",
+        "--lang",
+        "-l",
+        choices=["en", "zh"],
+        default="en",
+        help="语言主题: en(英文) 或 zh(中文) [默认: en]",
+    )
+
+    parser.add_argument("--uuid", help="只处理指定UUID的书籍")
+    parser.add_argument(
+        "--force", "-f", action="store_true", help="强制重新生成所有文件"
     )
     parser.add_argument(
-        "--force",
-        action="store_true",
-        help="强制重新生成所有文件，忽略已存在的文件",
+        "--preview", "-p", action="store_true", help="预览模式，只显示要处理的文件"
     )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="启用调试模式，显示详细信息",
-    )
+    parser.add_argument("--debug", "-d", action="store_true", help="启用调试模式")
 
     args = parser.parse_args()
 
-    # 获取目录配置
-    directories = get_directories()
+    print("📚 书籍视频音频合并器")
+    print("=" * 50)
 
-    print(f"\n📚 书籍视频音频合并器")
+    # 检查系统
+    if not check_macos_system():
+        print("⚠️  警告: 此脚本主要为macOS设计，在其他系统上可能需要调整路径")
+
+    # 检查依赖
+    if not check_dependencies():
+        print("❌ 依赖检查失败，退出")
+        sys.exit(1)
+
+    language = args.lang
+    lang_name = "中文" if language == "zh" else "English"
+
+    print(f"🌍 语言主题: {lang_name}")
+
+    # 获取目录配置
+    directories = get_directories(language)
+
     print(f"📁 Clips目录: {directories['clips']}")
     print(f"📁 音频目录: {directories['audio']}")
-    print(f"📁 输出视频目录: {directories['output']}")
-    print(f"📁 YouTube封面目录: {directories['covers']}")
-    print(f"📁 临时目录: {directories['temp']}")
-    print(f"🚫 自动排除Mac系统文件 (.DS_Store等)")
+    print(f"📁 输出目录: {directories['output']}")
+    print(f"📁 封面目录: {directories['covers']}")
 
+    # 确保输出目录存在
+    os.makedirs(directories["output"], exist_ok=True)
+    os.makedirs(directories["covers"], exist_ok=True)
+    os.makedirs(directories["temp"], exist_ok=True)
+
+    # 获取可用的书籍
     if args.uuid:
-        print(f"📚 处理模式: 仅处理指定UUID书籍 ({args.uuid[:8]}...{args.uuid[-8:]})")
-    else:
-        print(f"📚 处理模式: 处理所有发现的书籍")
+        # 处理单个UUID
+        print(f"🎯 目标UUID: {args.uuid}")
 
-    if args.force:
-        print(f"🔄 强制重新生成模式: 将重新生成所有文件")
-    else:
-        print(f"⚡ 断点续传模式: 将跳过已存在的有效文件")
-
-    if args.preview:
-        print(f"👁️  预览模式：只显示将要处理的文件")
-
-    if args.debug:
-        print(f"🐛 调试模式：启用详细日志")
-
-    # 检查YouTube封面尺寸设置
-    print(
-        f"🖼️  YouTube封面尺寸: {YOUTUBE_COVER_WIDTH}x{YOUTUBE_COVER_HEIGHT} (16:9比例)"
-    )
-
-    # 获取可用书籍列表
-    if args.uuid:
-        # 检查指定UUID的文件
-        directories_paths = directories
-        clip_path = os.path.join(directories_paths["clips"], f"{args.uuid}.mp4")
-        audio_path = os.path.join(directories_paths["audio"], f"{args.uuid}.mp3")
+        clip_path = os.path.join(directories["clips"], f"{args.uuid}.mp4")
+        audio_path = os.path.join(directories["audio"], f"{args.uuid}.mp3")
 
         if not os.path.exists(clip_path):
-            print(f"❌ 指定UUID的clip文件不存在: {clip_path}")
-            return
+            print(f"❌ Clip文件不存在: {clip_path}")
+            sys.exit(1)
 
         if not os.path.exists(audio_path):
-            print(f"❌ 指定UUID的音频文件不存在: {audio_path}")
-            return
-
-        if not is_valid_file(clip_path, MIN_CLIP_SIZE):
-            print(f"❌ Clip文件无效: {clip_path}")
-            return
-
-        if not is_valid_file(audio_path, MIN_AUDIO_SIZE):
-            print(f"❌ 音频文件无效: {audio_path}")
-            return
+            print(f"❌ 音频文件不存在: {audio_path}")
+            sys.exit(1)
 
         available_books = [(args.uuid, clip_path, audio_path)]
     else:
+        # 处理所有可用书籍
         available_books = get_available_books(directories)
 
     if not available_books:
-        print("❌ 未找到可处理的书籍（需要同时有clip和音频文件）")
+        print("❌ 未找到可处理的书籍文件")
+        sys.exit(1)
+
+    print(f"📊 统计信息:")
+    print(f"   - 找到书籍: {len(available_books)} 个")
+
+    # 预览模式
+    if args.preview:
+        print(f"\n📋 预览模式 - 将要处理的书籍:")
+        for i, (uuid, clip_path, audio_path) in enumerate(available_books, 1):
+            output_path = os.path.join(directories["output"], f"{uuid}.mp4")
+            cover_path = os.path.join(directories["covers"], f"{uuid}.png")
+
+            clip_size = os.path.getsize(clip_path) if os.path.exists(clip_path) else 0
+            audio_size = (
+                os.path.getsize(audio_path) if os.path.exists(audio_path) else 0
+            )
+
+            print(f"  {i:2d}. UUID: {uuid}")
+            print(f"      Clip: {os.path.basename(clip_path)} ({clip_size:,} 字节)")
+            print(f"      音频: {os.path.basename(audio_path)} ({audio_size:,} 字节)")
+            print(f"      输出视频: {os.path.basename(output_path)}")
+            print(f"      封面图片: {os.path.basename(cover_path)}")
         return
 
-    # 获取已存在的输出文件
-    existing_videos, existing_covers = get_existing_outputs(directories)
+    # 处理书籍
+    print(f"\n🔄 开始处理 {len(available_books)} 个书籍...")
 
-    # 过滤需要处理的书籍
-    books_to_process = []
-    for uuid, clip_path, audio_path in available_books:
-        needs_video = args.force or uuid not in existing_videos
-        needs_cover = args.force or uuid not in existing_covers
-
-        if needs_video or needs_cover:
-            books_to_process.append((uuid, clip_path, audio_path))
-        elif args.debug:
-            print(f"⏭️  跳过已完成的书籍: {uuid[:8]}...{uuid[-8:]}")
-
-    if not books_to_process and not args.preview:
-        print("✅ 所有书籍都已完成处理")
-        return
-
-    # 显示处理统计
-    print(f"\n=== 📊 处理统计 ===")
-    print(f"📹 总书籍数量: {len(available_books)}")
-    print(f"✅ 已有视频文件: {len(existing_videos)}")
-    print(f"🖼️  已有封面文件: {len(existing_covers)}")
-    print(f"🎯 需要处理: {len(books_to_process)}")
-
-    # 处理所有书籍
-    all_results = []
+    success_count = 0
+    failed_count = 0
+    skipped_count = 0
 
     try:
-        for uuid, clip_path, audio_path in tqdm(books_to_process, desc="📚 处理进度"):
-            try:
-                result = process_single_book(
-                    uuid,
-                    clip_path,
-                    audio_path,
-                    directories,
-                    args.force,
-                    args.preview,
-                    args.debug,
-                )
-                all_results.append(result)
-            except Exception as e:
-                print(f"❌ 处理书籍 UUID:{uuid[:8]}... 时出错: {e}")
-                import traceback
+        for i, (uuid, clip_path, audio_path) in enumerate(available_books, 1):
+            print(f"\n{'='*60}")
+            print(f"处理第 {i}/{len(available_books)} 个书籍: {uuid}")
+            print(f"{'='*60}")
 
-                if args.debug:
-                    traceback.print_exc()
-
-        # 统计最终结果
-        if all_results:
-            print(f"\n=== 🎉 处理完成总结 ===")
-
-            total_books = len(all_results)
-            success_count = sum(1 for r in all_results if r["status"] == "success")
-            partial_count = sum(
-                1 for r in all_results if r["status"] == "partial_success"
+            result = process_single_book(
+                uuid=uuid,
+                clip_path=clip_path,
+                audio_path=audio_path,
+                directories=directories,
+                force=args.force,
+                preview=False,
+                debug=args.debug,
             )
-            failed_count = sum(1 for r in all_results if r["status"] == "failed")
-            skipped_count = sum(1 for r in all_results if r["status"] == "skipped")
-            preview_count = sum(1 for r in all_results if r["status"] == "preview")
 
-            if args.preview:
-                print(f"📊 预览统计:")
-                print(f"  - 发现书籍总数: {total_books} 本")
-                print(f"  - 需要处理: {preview_count} 本")
-                print(f"  - 已完成跳过: {skipped_count} 本")
-
-                # 统计需要处理的类型
-                need_video = sum(1 for r in all_results if r.get("needs_video", False))
-                need_cover = sum(1 for r in all_results if r.get("needs_cover", False))
-                print(f"  - 需要生成视频: {need_video} 本")
-                print(f"  - 需要生成封面: {need_cover} 本")
+            if result["success"]:
+                success_count += 1
+                print(f"✅ 成功处理: {uuid}")
+            elif result.get("skipped"):
+                skipped_count += 1
+                print(f"⏭️  跳过已存在: {uuid}")
             else:
-                print(f"📊 处理统计:")
-                print(f"  - 书籍总数: {total_books} 本")
-                print(f"  - 完全成功: {success_count} 本")
-                print(f"  - 部分成功: {partial_count} 本")
-                print(f"  - 处理失败: {failed_count} 本")
-                print(f"  - 跳过文件: {skipped_count} 本")
-
-                if total_books > 0:
-                    success_rate = ((success_count + partial_count) / total_books) * 100
-                    print(f"  - 成功率: {success_rate:.1f}%")
-
-                print(f"\n📋 详细结果:")
-                for result in all_results:
-                    uuid = result["uuid"]
-                    status = result["status"]
-                    if status == "success":
-                        print(
-                            f"  ✅ UUID:{uuid[:8]}...{uuid[-8:]}: 完全成功（视频+封面）"
-                        )
-                    elif status == "partial_success":
-                        video_ok = result.get("video_success", False)
-                        cover_ok = result.get("cover_success", False)
-                        parts = []
-                        if video_ok:
-                            parts.append("视频")
-                        if cover_ok:
-                            parts.append("封面")
-                        print(
-                            f"  ⚠️  UUID:{uuid[:8]}...{uuid[-8:]}: 部分成功（{'+'.join(parts)}）"
-                        )
-                    elif status == "failed":
-                        error = result.get("error", "未知错误")
-                        print(f"  ❌ UUID:{uuid[:8]}...{uuid[-8:]}: 失败 ({error})")
-                    elif status == "skipped":
-                        print(f"  ⏭️  UUID:{uuid[:8]}...{uuid[-8:]}: 已存在，跳过")
-
-                if success_count > 0 or partial_count > 0:
-                    print(f"\n📝 输出文件位置:")
-                    print(f"📁 合并视频: {directories['output']}")
-                    print(f"📁 YouTube封面: {directories['covers']}")
-                    print(
-                        f"💡 YouTube封面规格: {YOUTUBE_COVER_WIDTH}x{YOUTUBE_COVER_HEIGHT} (16:9比例)"
-                    )
+                failed_count += 1
+                print(f"❌ 处理失败: {uuid}")
 
     except KeyboardInterrupt:
-        print(f"\n⚠️  用户中断了程序执行")
-    except Exception as e:
-        print(f"\n❌ 程序执行出错: {e}")
-        if args.debug:
-            import traceback
+        print("\n⏹️ 用户中断，正在清理...")
+    finally:
+        # 清理临时目录
+        if os.path.exists(directories["temp"]):
+            try:
+                shutil.rmtree(directories["temp"])
+                print(f"🧹 已清理临时目录: {directories['temp']}")
+            except Exception as e:
+                print(f"⚠️  清理临时目录失败: {e}")
 
-            traceback.print_exc()
+    # 最终统计
+    print(f"\n📊 处理完成统计:")
+    print(f"  ✅ 成功: {success_count} 个")
+    print(f"  ❌ 失败: {failed_count} 个")
+    print(f"  ⏭️  跳过: {skipped_count} 个")
+    print(
+        f"  📈 成功率: {success_count/(success_count+failed_count)*100:.1f}%"
+        if (success_count + failed_count) > 0
+        else "N/A"
+    )
+
+    if success_count > 0:
+        print(f"\n📁 输出文件已保存到:")
+        print(f"  🎬 合并视频: {directories['output']}")
+        print(f"  🖼️ YouTube封面: {directories['covers']}")
 
 
 if __name__ == "__main__":

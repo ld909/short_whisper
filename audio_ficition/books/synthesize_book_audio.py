@@ -3,13 +3,14 @@
 """
 书籍音频合成脚本
 使用 f5-tts CLI 将 chunk_book_summaries.py 输出的文本块合成为音频文件
-支持断点续传功能和UUID目录结构
+支持断点续传功能、UUID目录结构和多语言自动检测
 
 📚 功能说明:
 - 读取 chunk_book_summaries.py 输出的书籍文本块
 - 使用 f5-tts 合成高质量音频文件
 - 支持断点续传，跳过已存在的有效音频文件
 - 自动排除Mac系统产生的点文件
+- 🌏 自动检测文本语言，选择合适的参考音频
 
 📥 输入信息:
 - 默认输入目录: /home/dhl/Documents/book/
@@ -22,14 +23,20 @@
 - 输出目录结构: mp3_clips/book/{uuid}/{chunk_index}.mp3
 - 自动排除Mac系统产生的点文件
 
+🎤 参考音频:
+- 英文参考音频: /home/dhl/Documents/short_whisper/audio_ficition/audio_ref/11_normalized_2.mp3
+- 中文参考音频: /home/dhl/Documents/short_whisper/audio_ficition/books/assets/zh-audio.mp3
+- 🤖 自动根据文本内容检测语言并选择对应的参考音频
+
 🔄 处理规则:
 1. 只在Ubuntu系统上运行
 2. 支持断点续传，跳过已存在的有效音频文件
 3. 自动排除以点开头的Mac系统文件
 4. 按UUID和块索引有序处理
+5. 自动检测文本语言（中文/英文），智能选择参考音频
 
 💡 使用示例:
-# 处理所有书籍
+# 处理所有书籍（自动语言检测）
 python synthesize_book_audio.py
 
 # 处理指定UUID的书籍
@@ -61,8 +68,14 @@ DEFAULT_INPUT_BASE_DIR = "/home/dhl/Documents/book"
 DEFAULT_OUTPUT_BASE_DIR = "/home/dhl/Documents/audio/mp3_clips/book"
 
 # 参考音频文件：用于语音克隆的参考音频
-REF_AUDIO = (
+# 英文参考音频
+REF_AUDIO_EN = (
     "/home/dhl/Documents/short_whisper/audio_ficition/audio_ref/11_normalized_2.mp3"
+)
+
+# 中文参考音频
+REF_AUDIO_ZH = (
+    "/home/dhl/Documents/short_whisper/audio_ficition/books/assets/zh-audio.mp3"
 )
 
 # 默认使用的模型
@@ -77,7 +90,7 @@ PROXY_HTTPS = "http://127.0.0.1:7897"
 def check_ubuntu_system():
     """
     检查是否为Ubuntu系统
-    
+
     Returns:
         bool: 是否为Ubuntu系统
     """
@@ -85,13 +98,13 @@ def check_ubuntu_system():
         # 检查系统类型
         if platform.system() != "Linux":
             return False
-        
+
         # 检查是否为Ubuntu
-        with open('/etc/os-release', 'r') as f:
+        with open("/etc/os-release", "r") as f:
             content = f.read()
-            if 'Ubuntu' in content or 'ubuntu' in content:
+            if "Ubuntu" in content or "ubuntu" in content:
                 return True
-        
+
         return False
     except:
         return False
@@ -153,6 +166,57 @@ def read_text_content(file_path):
     except Exception as e:
         print(f"❌ 读取文件失败 {file_path}: {e}")
         return None
+
+
+def detect_text_language(text_content):
+    """
+    检测文本内容的语言类型
+
+    Args:
+        text_content (str): 文本内容
+
+    Returns:
+        str: 语言类型，'zh' 表示中文，'en' 表示英文
+    """
+    if not text_content:
+        return "en"  # 默认返回英文
+
+    # 统计中文字符数量
+    chinese_char_count = 0
+    total_char_count = len(
+        text_content.replace(" ", "").replace("\n", "").replace("\t", "")
+    )
+
+    for char in text_content:
+        # 检查是否为中文字符（包括中文标点符号）
+        if (
+            "\u4e00" <= char <= "\u9fff"
+            or "\u3000" <= char <= "\u303f"
+            or "\uff00" <= char <= "\uffef"
+        ):
+            chinese_char_count += 1
+
+    # 如果中文字符占比超过30%，认为是中文文本
+    if total_char_count > 0 and chinese_char_count / total_char_count > 0.3:
+        return "zh"
+    else:
+        return "en"
+
+
+def get_ref_audio_for_language(language):
+    """
+    根据语言类型获取对应的参考音频文件路径
+
+    Args:
+        language (str): 语言类型，'zh' 或 'en'
+
+    Returns:
+        str: 参考音频文件路径
+    """
+    if language == "zh":
+        return REF_AUDIO_ZH
+    else:
+        return REF_AUDIO_EN
 
 
 def synthesize_audio(source_file, ref_audio, output_file, model="F5TTS_v1_Base"):
@@ -275,7 +339,9 @@ def synthesize_audio_fallback(
         print(f"🔄 回退方案执行命令（使用 --gen_text）")
 
         # 执行命令
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)  # 30分钟超时
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=1800
+        )  # 30分钟超时
 
         if result.returncode == 0:
             print(f"✅ 音频合成成功（回退方案）: {output_file}")
@@ -312,13 +378,13 @@ def get_book_directories(input_base_dir):
     # 收集所有书籍目录
     for item in os.listdir(input_base_dir):
         item_path = os.path.join(input_base_dir, item)
-        
+
         if os.path.isdir(item_path):
             # 排除以点开头的目录（如.DS_Store等）
             if item.startswith("."):
                 skipped_dirs.append(item)
                 continue
-            
+
             # 简单验证UUID格式（36字符，包含4个连字符）
             if len(item) == 36 and item.count("-") == 4:
                 book_dirs.append((item, item_path))
@@ -330,7 +396,7 @@ def get_book_directories(input_base_dir):
 
     # 按UUID排序
     book_dirs.sort(key=lambda x: x[0])
-    
+
     print(f"📊 找到 {len(book_dirs)} 个书籍目录")
     return book_dirs
 
@@ -358,13 +424,13 @@ def get_chunk_files_by_uuid(book_directory, uuid):
     # 过滤掉以点开头的文件
     chunk_files = []
     skipped_files = []
-    
+
     for chunk_file in all_txt_files:
         filename = os.path.basename(chunk_file)
         if filename.startswith(".") or filename.startswith("._"):
             skipped_files.append(filename)
             continue
-        
+
         # 确保是txt文件
         if filename.endswith(".txt"):
             chunk_files.append(chunk_file)
@@ -372,7 +438,9 @@ def get_chunk_files_by_uuid(book_directory, uuid):
             skipped_files.append(filename)
 
     if skipped_files:
-        print(f"🚫 [UUID:{uuid[:8]}...] 跳过 {len(skipped_files)} 个Mac系统文件: {', '.join(skipped_files)}")
+        print(
+            f"🚫 [UUID:{uuid[:8]}...] 跳过 {len(skipped_files)} 个Mac系统文件: {', '.join(skipped_files)}"
+        )
 
     # 按块索引排序
     def extract_chunk_number(filepath):
@@ -383,7 +451,7 @@ def get_chunk_files_by_uuid(book_directory, uuid):
             return 0
 
     chunk_files.sort(key=extract_chunk_number)
-    
+
     print(f"📚 [UUID:{uuid[:8]}...] 找到 {len(chunk_files)} 个文本块文件")
     return chunk_files
 
@@ -414,12 +482,12 @@ def scan_existing_audio_files(output_base_dir, uuid):
     skipped_files = []
     for audio_file in audio_files:
         filename = os.path.basename(audio_file)
-        
+
         # 排除以点开头的文件
         if filename.startswith(".") or filename.startswith("._"):
             skipped_files.append(filename)
             continue
-        
+
         chunk_index = filename.split(".")[0]
 
         # 检查文件是否有效
@@ -434,7 +502,9 @@ def scan_existing_audio_files(output_base_dir, uuid):
                 print(f"❌ [UUID:{uuid[:8]}...] 删除无效文件失败: {e}")
 
     if skipped_files:
-        print(f"🚫 [UUID:{uuid[:8]}...] 跳过 {len(skipped_files)} 个Mac系统音频文件: {', '.join(skipped_files)}")
+        print(
+            f"🚫 [UUID:{uuid[:8]}...] 跳过 {len(skipped_files)} 个Mac系统音频文件: {', '.join(skipped_files)}"
+        )
 
     print(f"📊 [UUID:{uuid[:8]}...] 找到 {len(existing_files)} 个有效的音频文件")
     return existing_files
@@ -456,7 +526,7 @@ def process_single_chunk(
         chunk_file (str): 文本块文件路径
         uuid (str): 书籍UUID
         chunk_index (str): 块索引
-        ref_audio (str): 参考音频文件路径
+        ref_audio (str): 参考音频文件路径（可能会被语言检测覆盖）
         output_base_dir (str): 输出基础目录
         model (str): 使用的模型名称
         force_regenerate (bool): 是否强制重新生成
@@ -476,8 +546,26 @@ def process_single_chunk(
     # 检查文件是否已存在且有效（除非强制重新生成）
     if not force_regenerate and is_valid_audio_file(output_file):
         file_size = os.path.getsize(output_file)
-        print(f"⏭️  [UUID:{uuid[:8]}...] 文件已存在且有效，跳过: 块{chunk_index} ({file_size} 字节)")
+        print(
+            f"⏭️  [UUID:{uuid[:8]}...] 文件已存在且有效，跳过: 块{chunk_index} ({file_size} 字节)"
+        )
         return True
+
+    # 读取文本内容并检测语言
+    text_content = read_text_content(chunk_file)
+    if text_content:
+        detected_language = detect_text_language(text_content)
+        actual_ref_audio = get_ref_audio_for_language(detected_language)
+
+        # 显示语言检测结果
+        lang_name = "中文" if detected_language == "zh" else "英文"
+        print(f"🔍 [UUID:{uuid[:8]}...] 检测到语言: {lang_name}")
+        print(
+            f"🎤 [UUID:{uuid[:8]}...] 使用参考音频: {os.path.basename(actual_ref_audio)}"
+        )
+    else:
+        actual_ref_audio = ref_audio  # 如果无法读取文本，使用传入的默认参考音频
+        print(f"⚠️  [UUID:{uuid[:8]}...] 无法读取文本内容，使用默认参考音频")
 
     # 获取文件大小用于显示
     try:
@@ -489,13 +577,15 @@ def process_single_chunk(
         print(f"⚠️  [UUID:{uuid[:8]}...] 无法获取文件大小: {e}")
 
     # 合成音频
-    success = synthesize_audio(chunk_file, ref_audio, output_file, model)
+    success = synthesize_audio(chunk_file, actual_ref_audio, output_file, model)
 
     if success:
         # 检查输出文件是否真的生成了且有效
         if is_valid_audio_file(output_file):
             file_size = os.path.getsize(output_file)
-            print(f"✅ [UUID:{uuid[:8]}...] 音频文件生成成功: 块{chunk_index} ({file_size} 字节)")
+            print(
+                f"✅ [UUID:{uuid[:8]}...] 音频文件生成成功: 块{chunk_index} ({file_size} 字节)"
+            )
             return True
         else:
             print(f"❌ [UUID:{uuid[:8]}...] 音频文件未生成或无效: {output_file}")
@@ -516,7 +606,7 @@ def process_book_by_uuid(
 ):
     """
     处理指定UUID书籍的所有文本块文件
-    
+
     Args:
         uuid (str): 书籍UUID
         book_directory (str): 书籍目录路径
@@ -526,34 +616,28 @@ def process_book_by_uuid(
         preview_mode (bool): 是否为预览模式
         resume_mode (bool): 是否启用断点续传
         force_regenerate (bool): 是否强制重新生成
-        
+
     Returns:
         dict: 处理结果统计
     """
     print(f"\n=== 📚 处理书籍 UUID: {uuid[:8]}...{uuid[-8:]} ===")
     print(f"📁 输入目录: {book_directory}")
     print(f"📁 输出目录: {os.path.join(output_base_dir, uuid)}")
-    
+
     # 获取所有文本块文件
     chunk_files = get_chunk_files_by_uuid(book_directory, uuid)
-    
+
     if not chunk_files:
         print(f"❌ [UUID:{uuid[:8]}...] 在目录中未找到任何文本块文件")
-        return {
-            'uuid': uuid,
-            'total': 0,
-            'successful': 0,
-            'failed': 0,
-            'skipped': 0
-        }
-    
+        return {"uuid": uuid, "total": 0, "successful": 0, "failed": 0, "skipped": 0}
+
     print(f"📊 [UUID:{uuid[:8]}...] 找到 {len(chunk_files)} 个文本块文件")
 
     # 扫描已存在的文件（除非强制重新生成）
     existing_files = {}
     if not force_regenerate and resume_mode:
         existing_files = scan_existing_audio_files(output_base_dir, uuid)
-    
+
     # 获取进度统计
     total_files = len(chunk_files)
     completed_files = 0
@@ -570,41 +654,43 @@ def process_book_by_uuid(
 
     remaining_files = total_files - completed_files
     completion_rate = (completed_files / total_files * 100) if total_files > 0 else 0
-    
+
     print(f"\n📈 [UUID:{uuid[:8]}...] 进度统计:")
     print(f"   总文件数: {total_files}")
     print(f"   已完成: {completed_files} ({completion_rate:.1f}%)")
     print(f"   待处理: {remaining_files}")
-    
+
     if preview_mode:
         print(f"\n📋 [UUID:{uuid[:8]}...] 预览模式 - 将要处理的文件:")
-        for i, (chunk_file, chunk_index) in enumerate(pending_files[:10], 1):  # 只显示前10个
+        for i, (chunk_file, chunk_index) in enumerate(
+            pending_files[:10], 1
+        ):  # 只显示前10个
             output_file = os.path.join(output_base_dir, uuid, f"{chunk_index}.mp3")
             print(f"  {i:3d}. 块 {chunk_index}")
             print(f"       输入: {chunk_file}")
             print(f"       输出: {output_file}")
-        
+
         if len(pending_files) > 10:
             print(f"       ... 还有 {len(pending_files) - 10} 个文件")
-        
+
         return {
-            'uuid': uuid,
-            'total': total_files,
-            'successful': 0,
-            'failed': 0,
-            'skipped': completed_files,
-            'preview': len(pending_files)
+            "uuid": uuid,
+            "total": total_files,
+            "successful": 0,
+            "failed": 0,
+            "skipped": completed_files,
+            "preview": len(pending_files),
         }
 
     # 如果没有待处理的文件
     if not pending_files:
         print(f"\n🎉 [UUID:{uuid[:8]}...] 所有文件都已完成！无需处理。")
         return {
-            'uuid': uuid,
-            'total': total_files,
-            'successful': total_files,
-            'failed': 0,
-            'skipped': 0
+            "uuid": uuid,
+            "total": total_files,
+            "successful": total_files,
+            "failed": 0,
+            "skipped": 0,
         }
 
     # 确保输出目录存在
@@ -655,37 +741,39 @@ def process_book_by_uuid(
         print(f"✅ [UUID:{uuid[:8]}...] 本次成功合成: {successful_count} 个音频文件")
         print(f"❌ [UUID:{uuid[:8]}...] 本次合成失败: {failed_count} 个音频文件")
         print(f"⏭️  [UUID:{uuid[:8]}...] 之前已完成: {completed_files} 个音频文件")
-        print(f"⏱️  [UUID:{uuid[:8]}...] 本次耗时: {total_time:.1f} 秒 ({total_time/60:.1f} 分钟)")
+        print(
+            f"⏱️  [UUID:{uuid[:8]}...] 本次耗时: {total_time:.1f} 秒 ({total_time/60:.1f} 分钟)"
+        )
 
         if successful_count > 0:
             avg_time = total_time / successful_count
             print(f"📊 [UUID:{uuid[:8]}...] 平均每个文件: {avg_time:.1f} 秒")
 
         return {
-            'uuid': uuid,
-            'total': total_files,
-            'successful': successful_count,
-            'failed': failed_count,
-            'skipped': completed_files
+            "uuid": uuid,
+            "total": total_files,
+            "successful": successful_count,
+            "failed": failed_count,
+            "skipped": completed_files,
         }
 
     except KeyboardInterrupt:
         print(f"\n⚠️  [UUID:{uuid[:8]}...] 用户中断了程序执行")
         return {
-            'uuid': uuid,
-            'total': total_files,
-            'successful': successful_count,
-            'failed': failed_count,
-            'skipped': completed_files
+            "uuid": uuid,
+            "total": total_files,
+            "successful": successful_count,
+            "failed": failed_count,
+            "skipped": completed_files,
         }
     except Exception as e:
         print(f"\n❌ [UUID:{uuid[:8]}...] 程序执行出错: {e}")
         return {
-            'uuid': uuid,
-            'total': total_files,
-            'successful': successful_count,
-            'failed': failed_count,
-            'skipped': completed_files
+            "uuid": uuid,
+            "total": total_files,
+            "successful": successful_count,
+            "failed": failed_count,
+            "skipped": completed_files,
         }
 
 
@@ -702,9 +790,9 @@ def main():
         print("❌ 此脚本只能在Ubuntu系统上运行！")
         print("🖥️  当前系统: " + platform.system())
         exit(1)
-    
+
     print("✅ Ubuntu系统检测通过")
-    
+
     parser = argparse.ArgumentParser(
         description="书籍音频合成器 - 使用 f5-tts 将书籍文本块合成为音频（支持断点续传）",
         formatter_class=argparse.RawTextHelpFormatter,
@@ -715,26 +803,23 @@ def main():
   python synthesize_book_audio.py --preview                      # 预览模式
   python synthesize_book_audio.py --no-resume                    # 禁用断点续传
   python synthesize_book_audio.py --force-regenerate             # 强制重新生成
-        """
+        """,
+    )
+    parser.add_argument("--uuid", "-u", help="要处理的书籍UUID，不指定则处理所有书籍")
+    parser.add_argument(
+        "--input-base-dir",
+        default=DEFAULT_INPUT_BASE_DIR,
+        help=f"输入基础目录路径 (默认: {DEFAULT_INPUT_BASE_DIR})",
     )
     parser.add_argument(
-        "--uuid", "-u",
-        help="要处理的书籍UUID，不指定则处理所有书籍"
+        "--output-base-dir",
+        default=DEFAULT_OUTPUT_BASE_DIR,
+        help=f"输出基础目录路径 (默认: {DEFAULT_OUTPUT_BASE_DIR})",
     )
     parser.add_argument(
-        "--input-base-dir", 
-        default=DEFAULT_INPUT_BASE_DIR, 
-        help=f"输入基础目录路径 (默认: {DEFAULT_INPUT_BASE_DIR})"
-    )
-    parser.add_argument(
-        "--output-base-dir", 
-        default=DEFAULT_OUTPUT_BASE_DIR, 
-        help=f"输出基础目录路径 (默认: {DEFAULT_OUTPUT_BASE_DIR})"
-    )
-    parser.add_argument(
-        "--ref-audio", 
-        default=REF_AUDIO, 
-        help=f"参考音频文件路径 (默认: {REF_AUDIO})"
+        "--ref-audio",
+        default=REF_AUDIO_EN,
+        help=f"参考音频文件路径 (默认: {REF_AUDIO_EN}，中文自动使用: {REF_AUDIO_ZH})",
     )
     parser.add_argument(
         "--model",
@@ -802,9 +887,18 @@ def main():
 
     # 检查参考音频文件是否存在
     if not os.path.exists(ref_audio):
-        print(f"❌ 参考音频文件不存在: {ref_audio}")
+        print(f"❌ 英文参考音频文件不存在: {ref_audio}")
         cleanup_and_exit(use_proxy)
         return
+
+    if not os.path.exists(REF_AUDIO_ZH):
+        print(f"❌ 中文参考音频文件不存在: {REF_AUDIO_ZH}")
+        cleanup_and_exit(use_proxy)
+        return
+
+    print(f"✅ 参考音频文件检查通过:")
+    print(f"   英文参考音频: {ref_audio}")
+    print(f"   中文参考音频: {REF_AUDIO_ZH}")
 
     # 获取要处理的书籍列表
     if args.uuid:
@@ -818,7 +912,7 @@ def main():
     else:
         # 获取所有书籍目录
         book_dirs = get_book_directories(input_base_dir)
-        
+
         if not book_dirs:
             print(f"❌ 在目录 {input_base_dir} 中未找到任何书籍")
             print("💡 请确保 chunk_book_summaries.py 已经运行并生成了文本块文件")
@@ -827,49 +921,52 @@ def main():
 
     # 处理所有书籍
     all_results = []
-    
+
     try:
         for uuid, book_directory in book_dirs:
             try:
                 result = process_book_by_uuid(
-                    uuid, 
-                    book_directory, 
-                    ref_audio, 
-                    output_base_dir, 
-                    model, 
-                    args.preview, 
-                    resume_mode, 
-                    args.force_regenerate
+                    uuid,
+                    book_directory,
+                    ref_audio,
+                    output_base_dir,
+                    model,
+                    args.preview,
+                    resume_mode,
+                    args.force_regenerate,
                 )
                 all_results.append(result)
             except Exception as e:
                 print(f"❌ 处理书籍 UUID:{uuid[:8]}... 时出错: {e}")
                 import traceback
+
                 traceback.print_exc()
 
         # 统计总结果
         if all_results:
             print(f"\n=== 🎉 处理完成总结 ===")
-            
+
             total_books = len(all_results)
-            total_files = sum(r['total'] for r in all_results)
-            total_successful = sum(r['successful'] for r in all_results)
-            total_failed = sum(r['failed'] for r in all_results)
-            total_skipped = sum(r['skipped'] for r in all_results)
-            
+            total_files = sum(r["total"] for r in all_results)
+            total_successful = sum(r["successful"] for r in all_results)
+            total_failed = sum(r["failed"] for r in all_results)
+            total_skipped = sum(r["skipped"] for r in all_results)
+
             if args.preview:
-                total_preview = sum(r.get('preview', 0) for r in all_results)
+                total_preview = sum(r.get("preview", 0) for r in all_results)
                 print(f"📊 预览统计:")
                 print(f"  - 发现书籍总数: {total_books} 本")
                 print(f"  - 发现文件总数: {total_files} 个")
                 print(f"  - 需要处理: {total_preview} 个")
                 print(f"  - 已处理跳过: {total_skipped} 个")
-                
+
                 print(f"\n📋 各书籍详情:")
                 for result in all_results:
-                    uuid = result['uuid']
-                    preview_count = result.get('preview', 0)
-                    print(f"  - UUID:{uuid[:8]}...{uuid[-8:]}: 发现 {result['total']} 个，需处理 {preview_count} 个，跳过 {result['skipped']} 个")
+                    uuid = result["uuid"]
+                    preview_count = result.get("preview", 0)
+                    print(
+                        f"  - UUID:{uuid[:8]}...{uuid[-8:]}: 发现 {result['total']} 个，需处理 {preview_count} 个，跳过 {result['skipped']} 个"
+                    )
             else:
                 print(f"📊 处理统计:")
                 print(f"  - 书籍总数: {total_books} 本")
@@ -877,16 +974,22 @@ def main():
                 print(f"  - 成功处理: {total_successful} 个")
                 print(f"  - 处理失败: {total_failed} 个")
                 print(f"  - 跳过文件: {total_skipped} 个")
-                
+
                 if total_files > 0:
-                    success_rate = (total_successful / (total_successful + total_failed)) * 100 if (total_successful + total_failed) > 0 else 0
+                    success_rate = (
+                        (total_successful / (total_successful + total_failed)) * 100
+                        if (total_successful + total_failed) > 0
+                        else 0
+                    )
                     print(f"  - 成功率: {success_rate:.1f}%")
-                
+
                 print(f"\n📋 各书籍详情:")
                 for result in all_results:
-                    uuid = result['uuid']
-                    print(f"  - UUID:{uuid[:8]}...{uuid[-8:]}: 成功 {result['successful']} 个，失败 {result['failed']} 个，跳过 {result['skipped']} 个")
-                
+                    uuid = result["uuid"]
+                    print(
+                        f"  - UUID:{uuid[:8]}...{uuid[-8:]}: 成功 {result['successful']} 个，失败 {result['failed']} 个，跳过 {result['skipped']} 个"
+                    )
+
                 if total_successful > 0:
                     print(f"\n📝 音频文件已保存到: {output_base_dir}")
                     print(f"📁 目录结构: mp3_clips/book/{uuid}/{chunk_index}.mp3")
@@ -901,4 +1004,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()

@@ -1,36 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-YouTube Hashtag生成脚本
+YouTube视频标签生成脚本
 
 功能说明：
-1. 读取 generate_youtube_descriptions.py 生成的YouTube视频描述文件
-2. 使用 Google Gemini AI 基于专业的SEO策略生成10个优化的hashtag
-3. 遵循特定的hashtag策略和格式要求
-4. 自动保存生成的hashtag到对应目录
-5. 支持断点续传，动态检查已存在的文件
+1. 读取 generate_youtube_descriptions.py 生成的YouTube描述文件
+2. 使用 Google Gemini AI 生成SEO优化的hashtag标签
+3. 自动保存生成的标签到对应目录
+4. 支持中文(zh)和英文(en)两种语言主题
 
 输入依赖文件：
 • YouTube描述文件（由generate_youtube_descriptions.py生成）：
-  - Intel Mac: /Volumes/dhl/audio/books/en/youtube_description/{uuid}.txt
-  - Apple Silicon: /Users/donghaoliu/Documents/audio/books/en/youtube_description/{uuid}.txt
+  - Intel Mac: /Volumes/dhl/audio/books/{language}/youtube_description/{uuid}.txt
+  - Apple Silicon: /Users/donghaoliu/Documents/audio/books/{language}/youtube_description/{uuid}.txt
 
 输出目标文件：
-• YouTube Hashtag文件：
-  - Intel Mac: /Volumes/dhl/audio/books/en/youtube_hashtags/{uuid}.txt
-  - Apple Silicon: /Users/donghaoliu/Documents/audio/books/en/youtube_hashtags/{uuid}.txt
-
-处理逻辑：
-• 只有当YouTube描述文件存在时，才会为对应的UUID生成hashtag
-• 自动排除Mac产生的点开头文件（如.DS_Store等）
-• 支持断点续传，跳过已生成的hashtag文件
-• 确保描述文件内容有效后再生成对应的hashtag
+• YouTube hashtag文件：
+  - Intel Mac: /Volumes/dhl/audio/books/{language}/youtube_hashtags/{uuid}.txt
+  - Apple Silicon: /Users/donghaoliu/Documents/audio/books/{language}/youtube_hashtags/{uuid}.txt
 
 使用方法：
-python generate_youtube_hashtags.py                    # 处理所有有描述的书籍
-python generate_youtube_hashtags.py --count 10         # 处理10个文件
-python generate_youtube_hashtags.py --force            # 强制重新生成
-python generate_youtube_hashtags.py --uuid abc123      # 处理指定UUID
+python generate_youtube_hashtags.py --lang en               # 处理英文书籍
+python generate_youtube_hashtags.py --lang zh               # 处理中文书籍
+python generate_youtube_hashtags.py --count 10 --lang en    # 处理10个文件
+python generate_youtube_hashtags.py --force --lang zh       # 强制重新生成
+python generate_youtube_hashtags.py --uuid abc123 --lang en # 处理指定UUID
 
 前置条件：
 • 环境变量UNI_API_KEY: 必须设置有效的API密钥
@@ -60,7 +54,7 @@ except ImportError:
 def get_base_media_path():
     """根据系统类型返回基础媒体路径"""
     system = platform.system()
-    
+
     if system == "Linux":  # Ubuntu/Linux
         return "/media/dhl/audio"
     elif system == "Darwin":  # macOS
@@ -111,44 +105,42 @@ def setup_gemini_client():
 
 
 class YouTubeHashtagGenerator:
-    """YouTube Hashtag生成器"""
+    """YouTube标签生成器"""
 
-    def __init__(self, debug=False):
+    def __init__(self, debug=False, language="en"):
         self.debug = debug
+        self.language = language
         self.base_media_path = get_base_media_path()
-        self.books_base_path = os.path.join(self.base_media_path, "books", "en")
+        self.books_base_path = os.path.join(self.base_media_path, "books", language)
+
+        # 设置语言配置
+        self.setup_language_config()
 
         # 目录结构
         self.youtube_desc_dir = os.path.join(
             self.books_base_path, "youtube_description"
         )  # 描述文件目录（输入依赖）
-        self.youtube_hashtags_dir = os.path.join(
+        self.youtube_hashtag_dir = os.path.join(
             self.books_base_path, "youtube_hashtags"
-        )  # Hashtag保存目录
+        )  # hashtag文件目录（输出）
 
         # 创建输出目录
-        os.makedirs(self.youtube_hashtags_dir, exist_ok=True)
+        os.makedirs(self.youtube_hashtag_dir, exist_ok=True)
 
         # 设置Gemini客户端
         self.client = setup_gemini_client()
 
-        # 系统提示词 - YouTube SEO专家
-        self.system_instruction = [
-            "You are a YouTube SEO and growth strategist. Your sole function is to generate a strategically curated group of 10 YouTube hashtags based on a video topic I provide.",
-            "You must follow a specific hashtag strategy for every request. The 10 hashtags should be a mix of the following types:",
-            "CORE TAGS: Directly related to the video topic or title.",
-            "AUTHORITY TAGS: Related to the creator or main promoter of the core idea.",
-            "CATEGORY TAGS: Broader, searchable categories the topic falls into.",
-            "BENEFIT TAGS: Related to the positive outcome or feeling the viewer will get.",
-            "TRENDING TAGS: Connect the topic to relevant, current cultural conversations or popular terms.",
-            "You must follow these output rules with absolute precision:",
-            "RULE 1: COUNT",
-            "You must generate exactly 10 hashtags.",
-            "RULE 2: FORMAT",
-            "Each hashtag must start with the # symbol. Each hashtag must be separated by a single space.",
-            "RULE 3: OUTPUT",
-            'Your response must ONLY be the single line of hashtags. Do not include any introductory text like "Here are your hashtags", any explanations, or any other words before or after the hashtag list.',
-        ]
+        print(f"🌍 语言主题: {self.language_name}")
+        print(f"📁 书籍目录: {self.books_base_path}")
+
+    def setup_language_config(self):
+        """根据语种设置配置"""
+        if self.language == "zh":
+            # 中文配置
+            self.language_name = "中文"
+        else:
+            # 英文配置（默认）
+            self.language_name = "English"
 
     def get_available_description_files(self):
         """获取所有可用的YouTube描述文件"""
@@ -193,8 +185,8 @@ class YouTubeHashtagGenerator:
         """获取已存在的hashtag文件"""
         existing_uuids = set()
 
-        if os.path.exists(self.youtube_hashtags_dir):
-            hashtag_files = glob.glob(os.path.join(self.youtube_hashtags_dir, "*.txt"))
+        if os.path.exists(self.youtube_hashtag_dir):
+            hashtag_files = glob.glob(os.path.join(self.youtube_hashtag_dir, "*.txt"))
             for hashtag_file in hashtag_files:
                 basename = os.path.basename(hashtag_file)
                 # 排除以点开头的文件
@@ -295,7 +287,7 @@ class YouTubeHashtagGenerator:
             print(f"⚠️ 警告: {uuid_val} 的hashtag内容为空，跳过保存")
             return False
 
-        file_path = os.path.join(self.youtube_hashtags_dir, f"{uuid_val}.txt")
+        file_path = os.path.join(self.youtube_hashtag_dir, f"{uuid_val}.txt")
 
         try:
             with open(file_path, "w", encoding="utf-8") as f:
@@ -320,7 +312,7 @@ class YouTubeHashtagGenerator:
         """批量处理描述文件，生成YouTube hashtag"""
         print("🏷️ YouTube Hashtag生成器")
         print(f"📄 描述文件目录: {self.youtube_desc_dir}")
-        print(f"💾 Hashtag保存目录: {self.youtube_hashtags_dir}")
+        print(f"💾 Hashtag保存目录: {self.youtube_hashtag_dir}")
 
         # 获取可用的描述文件
         description_files = self.get_available_description_files()
@@ -451,42 +443,46 @@ class YouTubeHashtagGenerator:
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(
-        description="🏷️ YouTube Hashtag生成脚本",
+        description="🏷️ YouTube 标签生成器",
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 使用示例:
-  python generate_youtube_hashtags.py                    # 处理所有有描述的书籍
-  python generate_youtube_hashtags.py --count 10         # 处理10个文件
-  python generate_youtube_hashtags.py --force            # 强制重新生成
-  python generate_youtube_hashtags.py --uuid abc123      # 处理指定UUID
-  python generate_youtube_hashtags.py --check-status     # 检查当前状态（不执行生成）
+  python generate_youtube_hashtags.py --lang en               # 处理英文书籍
+  python generate_youtube_hashtags.py --lang zh               # 处理中文书籍
+  python generate_youtube_hashtags.py --count 10 --lang en    # 处理10个文件
+  python generate_youtube_hashtags.py --force --lang zh       # 强制重新生成
+  python generate_youtube_hashtags.py --uuid abc123 --lang en # 处理指定UUID
 
-注意：脚本会读取 generate_youtube_descriptions.py 生成的描述文件，
-     基于专业的YouTube SEO策略生成10个优化的hashtag
+注意:
+- 需要设置环境变量 UNI_API_KEY
+- 确保已运行 generate_youtube_descriptions.py 生成描述文件
         """,
     )
 
-    parser.add_argument("--count", "-c", type=int, help="要处理的文件数量")
+    # 语言参数
     parser.add_argument(
-        "--force", "-f", action="store_true", help="强制重新生成所有hashtag"
+        "--lang",
+        "-l",
+        choices=["en", "zh"],
+        default="en",
+        help="语言主题: en(英文) 或 zh(中文) [默认: en]",
     )
-    parser.add_argument("--uuid", help="处理指定UUID的文件")
+
+    parser.add_argument(
+        "--count", "-c", type=int, help="要处理的标签数量（默认处理所有）"
+    )
+    parser.add_argument(
+        "--force", "-f", action="store_true", help="强制重新生成已存在的标签"
+    )
+    parser.add_argument("--uuid", "-u", help="只处理指定UUID的书籍")
     parser.add_argument("--debug", "-d", action="store_true", help="启用调试模式")
-    parser.add_argument(
-        "--check-status", action="store_true", help="检查当前状态（不执行生成）"
-    )
 
     args = parser.parse_args()
 
     # 创建生成器实例
-    generator = YouTubeHashtagGenerator(debug=args.debug)
+    generator = YouTubeHashtagGenerator(debug=args.debug, language=args.lang)
 
-    # 检查状态
-    if args.check_status:
-        generator.check_status()
-        return
-
-    print("🏷️ YouTube Hashtag生成器")
+    print("🏷️ YouTube标签生成器")
     print("=" * 50)
 
     # 检查API密钥

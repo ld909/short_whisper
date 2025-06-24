@@ -10,10 +10,11 @@
 - 将每个总结分割成指定字符数的块
 - 自动排除Mac系统产生的点开头文件
 - 支持断点续传，跳过已处理的文件
+- 支持中文(zh)和英文(en)两种语言主题
 
 📥 输入信息:
-- Intel Mac输入目录: /Volumes/dhl/audio/books/en/summary/
-- Apple Silicon Mac输入目录: /Users/donghaoliu/Documents/audio/books/en/summary/
+- Intel Mac输入目录: /Volumes/dhl/audio/books/{language}/summary/
+- Apple Silicon Mac输入目录: /Users/donghaoliu/Documents/audio/books/{language}/summary/
 - 支持文件格式: .txt 文件
 - 文件编码: UTF-8
 - 文件命名规则: {uuid}.txt
@@ -32,23 +33,26 @@
 4. 支持断点续传，跳过已处理的书籍
 
 💡 使用示例:
-# 处理所有书籍总结
-python chunk_book_summaries.py
+# 处理英文书籍总结
+python chunk_book_summaries.py --lang en
+
+# 处理中文书籍总结
+python chunk_book_summaries.py --lang zh
 
 # 设置最大字符数
-python chunk_book_summaries.py --max-chars 2500
+python chunk_book_summaries.py --max-chars 2500 --lang zh
 
 # 预览模式（不实际处理，只显示会处理哪些文件）
-python chunk_book_summaries.py --preview
+python chunk_book_summaries.py --preview --lang en
 
 # 禁用断点续传
-python chunk_book_summaries.py --no-resume
+python chunk_book_summaries.py --no-resume --lang zh
 
 # 指定输入目录
-python chunk_book_summaries.py --input-dir /custom/path/to/summaries
+python chunk_book_summaries.py --input-dir /custom/path/to/summaries --lang en
 
 # 指定输出目录
-python chunk_book_summaries.py --output-dir /custom/output/path
+python chunk_book_summaries.py --output-dir /custom/output/path --lang zh
 """
 
 import os
@@ -83,10 +87,10 @@ def get_base_media_path():
     return "/Users/donghaoliu/Documents/audio"  # 默认
 
 
-def get_default_input_dir():
+def get_default_input_dir(language="en"):
     """获取默认输入目录"""
     base_path = get_base_media_path()
-    return os.path.join(base_path, "books", "en", "summary")
+    return os.path.join(base_path, "books", language, "summary")
 
 
 def split_content_into_chunks(content, max_chars=3000):
@@ -113,7 +117,7 @@ def split_content_into_chunks(content, max_chars=3000):
         line = line.strip()
         if not line:  # 跳过空行
             continue
-            
+
         # 如果单行就超过限制，需要分割这一行
         if len(line) > max_chars:
             # 先保存当前块（如果有内容）
@@ -123,28 +127,28 @@ def split_content_into_chunks(content, max_chars=3000):
                     chunks.append(chunk_text)
                 current_chunk = []
                 current_char_count = 0
-            
+
             # 分割长行
             while len(line) > max_chars:
                 # 尝试在句号、感叹号、问号处分割
                 split_pos = max_chars
-                for punct in ['。', '！', '？', '.', '!', '?']:
+                for punct in ["。", "！", "？", ".", "!", "?"]:
                     pos = line.rfind(punct, 0, max_chars)
                     if pos > max_chars * 0.7:  # 至少要有70%的长度
                         split_pos = pos + 1
                         break
-                
+
                 # 如果没找到合适的标点，就在空格处分割
                 if split_pos == max_chars:
-                    space_pos = line.rfind(' ', 0, max_chars)
+                    space_pos = line.rfind(" ", 0, max_chars)
                     if space_pos > max_chars * 0.7:
                         split_pos = space_pos
-                
+
                 chunk_part = line[:split_pos].strip()
                 if chunk_part:
                     chunks.append(chunk_part)
                 line = line[split_pos:].strip()
-            
+
             # 处理剩余部分
             if line:
                 current_chunk = [line]
@@ -287,7 +291,7 @@ def process_single_summary(input_file, output_base_dir, max_chars=3000):
         # 从文件名提取UUID
         filename = os.path.basename(input_file)
         uuid_val = extract_uuid_from_filename(filename)
-        
+
         if not uuid_val:
             print(f"⚠️  无法从文件名提取UUID: {filename}")
             return False, 0
@@ -309,8 +313,10 @@ def process_single_summary(input_file, output_base_dir, max_chars=3000):
             chunk_filename = f"{chunk_index}.txt"
             chunk_filepath = os.path.join(book_output_dir, chunk_filename)
 
-            # 去掉换行符，变成一大段话
-            chunk_content_no_newlines = chunk_content.replace("\n", " ").strip()
+            # 去掉换行符，变成一大段话，并替换所有"-"为空格
+            chunk_content_no_newlines = (
+                chunk_content.replace("\n", " ").replace("-", " ").strip()
+            )
 
             with open(chunk_filepath, "w", encoding="utf-8") as f:
                 f.write(chunk_content_no_newlines)
@@ -386,11 +392,11 @@ def process_book_summaries(
     for input_file in summary_files:
         filename = os.path.basename(input_file)
         uuid_val = extract_uuid_from_filename(filename)
-        
+
         if not uuid_val:
             print(f"⚠️  跳过无效文件名: {filename}")
             continue
-            
+
         if resume_mode and uuid_val in processed_books:
             skipped_count += 1
             if not preview_mode:
@@ -399,7 +405,9 @@ def process_book_summaries(
             files_to_process.append(input_file)
 
     if skipped_count > 0:
-        print(f"📋 跳过 {skipped_count} 个已处理书籍，还需处理 {len(files_to_process)} 个")
+        print(
+            f"📋 跳过 {skipped_count} 个已处理书籍，还需处理 {len(files_to_process)} 个"
+        )
 
     if not files_to_process:
         print(f"✅ 所有书籍总结都已处理完成")
@@ -444,9 +452,7 @@ def process_book_summaries(
 
         print(f"\n处理第 {i}/{len(files_to_process)} 个总结: {filename}")
 
-        success, chunk_count = process_single_summary(
-            input_file, output_dir, max_chars
-        )
+        success, chunk_count = process_single_summary(input_file, output_dir, max_chars)
 
         if success:
             successful_count += 1
@@ -471,15 +477,26 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 使用示例:
-  python chunk_book_summaries.py                      # 处理所有书籍总结
-  python chunk_book_summaries.py --max-chars 2500     # 设置最大字符数
-  python chunk_book_summaries.py --preview            # 预览模式
-  python chunk_book_summaries.py --no-resume          # 禁用断点续传
+  python chunk_book_summaries.py --lang en                # 处理英文书籍总结
+  python chunk_book_summaries.py --lang zh                # 处理中文书籍总结
+  python chunk_book_summaries.py --max-chars 2500 --lang en # 设置最大字符数
+  python chunk_book_summaries.py --preview --lang zh      # 预览模式
+  python chunk_book_summaries.py --no-resume --lang en    # 禁用断点续传
         """,
     )
 
-    # 获取默认输入和输出目录
-    default_input_dir = get_default_input_dir()
+    # 语言参数
+    parser.add_argument(
+        "--lang",
+        "-l",
+        choices=["en", "zh"],
+        default="en",
+        help="语言主题: en(英文) 或 zh(中文) [默认: en]",
+    )
+
+    # 获取默认输入和输出目录（现在需要语言参数，所以先解析参数）
+    args_preview = parser.parse_known_args()[0]
+    default_input_dir = get_default_input_dir(args_preview.lang)
     default_output_dir = "/home/dhl/Documents/book"
 
     parser.add_argument(
@@ -510,8 +527,16 @@ def main():
     output_dir = args.output_dir
     max_chars = args.max_chars
     resume_mode = not args.no_resume
+    language = args.lang
+
+    # 如果用户没有手动指定input_dir，重新计算正确的路径
+    if args.input_dir == default_input_dir:
+        input_dir = get_default_input_dir(language)
+
+    lang_name = "中文" if language == "zh" else "English"
 
     print(f"\n🎯 书籍总结分块器")
+    print(f"🌍 语言主题: {lang_name}")
     print(f"🖥️  系统类型: {platform.system()}")
     print(f"📁 输入目录: {input_dir}")
     print(f"📁 输出目录: {output_dir}")
@@ -553,27 +578,29 @@ def main():
             print(f"  - 跳过书籍: {result['skipped']} 个")
             print(f"  - 生成块数: {result['total_chunks']} 个")
 
-            if result['total'] > 0:
+            if result["total"] > 0:
                 success_rate = (
-                    (result['successful'] / (result['successful'] + result['failed'])) * 100
-                    if (result['successful'] + result['failed']) > 0
+                    (result["successful"] / (result["successful"] + result["failed"]))
+                    * 100
+                    if (result["successful"] + result["failed"]) > 0
                     else 0
                 )
                 print(f"  - 成功率: {success_rate:.1f}%")
 
-                if result['successful'] > 0:
-                    avg_chunks_per_book = result['total_chunks'] / result['successful']
+                if result["successful"] > 0:
+                    avg_chunks_per_book = result["total_chunks"] / result["successful"]
                     print(f"  - 平均块数/书籍: {avg_chunks_per_book:.1f} 个")
 
-            if result['successful'] > 0:
+            if result["successful"] > 0:
                 print(f"\n📝 分块后的文件已保存到: {output_dir}")
                 print("📁 目录结构: book/<uuid>/<chunk_index>.txt")
 
     except Exception as e:
         print(f"❌ 处理过程中出错: {e}")
         import traceback
+
         traceback.print_exc()
 
 
 if __name__ == "__main__":
-    main() 
+    main()

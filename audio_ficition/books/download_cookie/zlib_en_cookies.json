@@ -1,0 +1,82 @@
+[
+  {
+    "name": "siteLanguage",
+    "value": "en",
+    "domain": ".zlib.fi",
+    "path": "/",
+    "expires": 1785252589.266863,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "FTID",
+    "value": "1eMNBy3d9mv21eMNBy001CmQ",
+    "domain": ".yadro.ru",
+    "path": "/",
+    "expires": 1782162000.411685,
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "VID",
+    "value": "29HxeP0WQW921eMNBy001Vzw",
+    "domain": ".yadro.ru",
+    "path": "/",
+    "expires": 1782162000.774783,
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "remix_userkey",
+    "value": "4b77353f54459d8774456b1a5e7475c8",
+    "domain": ".zlib.fi",
+    "path": "/",
+    "expires": 1754292629.709149,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "remix_userid",
+    "value": "42912062",
+    "domain": ".zlib.fi",
+    "path": "/",
+    "expires": 1754292629.709199,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "selectedSiteMode",
+    "value": "books",
+    "domain": ".zlib.fi",
+    "path": "/",
+    "expires": 1753371029.174784,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "WMF-Uniq",
+    "value": "mgXd2X-py4S5SyLCJqHJEAIbAAEBAFvdFtLp5Fz87AqZUmyPtuJiRi9GZo8nQf14",
+    "domain": ".upload.wikimedia.org",
+    "path": "/",
+    "expires": 1782252818.494549,
+    "httpOnly": true,
+    "secure": true,
+    "sameSite": "None"
+  },
+  {
+    "name": "domainsNotWorking",
+    "value": "fudanedu.ru%2Clibrarium.us%2Cforthriver.xyz%2Clibrerialibre.eu%2Chomeonet.tech%2Cwesinx.com",
+    "domain": ".zlib.fi",
+    "path": "/",
+    "expires": 1750699842,
+    "httpOnly": false,
+    "secure": true,
+    "sameSite": "None"
+  }
+]

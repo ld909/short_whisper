@@ -2,21 +2,30 @@
 # -*- coding: utf-8 -*-
 """
 Z-Library 电子书信息抓取工具
-支持断点续传、自动重试和智能错误处理
+支持中文和英文主题、断点续传、自动重试和智能错误处理
 
-新功能：文件完整性检查和自动修复
-- 检查JSON和封面文件的完整性
-- 自动修复损坏或不一致的文件
-- 支持断点续传时的智能跳过
+主要功能：
+- 🌍 多语言主题支持：英文(en)和中文(zh)
+- 📥 智能信息抓取：标题、作者、描述、出版年份、封面图片
+- 🔄 断点续传：自动跳过已处理的书籍
+- 🛠️ 文件完整性检查和自动修复
+- 🖼️ 封面图片下载和管理
+- 📊 进度跟踪和统计报告
 
 使用方法：
-1. 正常爬取: python book_info_scraper.py
-2. 检查完整性: python book_info_scraper.py --check
-3. 自动修复: python book_info_scraper.py --fix
-4. 限制数量: python book_info_scraper.py -m 10
-5. 调试模式: python book_info_scraper.py -d --fix
-6. 强制重新抓取封面: python book_info_scraper.py --redownload-covers
-7. 限制重新抓取数量: python book_info_scraper.py --redownload-covers -m 5
+基本功能：
+1. 英文爬取: python book_info_scraper.py --lang en
+2. 中文爬取: python book_info_scraper.py --lang zh
+3. 限制数量: python book_info_scraper.py -m 10 --lang en
+4. 调试模式: python book_info_scraper.py -d --lang zh
+
+完整性检查：
+5. 检查完整性: python book_info_scraper.py --check --lang en
+6. 自动修复: python book_info_scraper.py --fix --lang zh
+
+封面重新抓取：
+7. 重新抓取封面: python book_info_scraper.py --redownload-covers --lang en
+8. 限制重新抓取数量: python book_info_scraper.py --redownload-covers -m 5 --lang zh
 
 文件完整性检查项目：
 - JSON文件是否存在且格式正确
@@ -107,8 +116,8 @@ class BookInfoScraper:
     def setup_language_config(self):
         """根据语种设置配置"""
         if self.language == "zh":
-            # 中文配置
-            self.base_path = os.path.join(self.base_media_path, "books_zh", "zh")
+            # 中文配置 - 与 book_pdf_downloader.py 保持一致
+            self.base_path = os.path.join(self.base_media_path, "books", "zh")
             self.default_urls_file = "book_url_zh.txt"
             self.language_name = "中文"
         else:
@@ -123,9 +132,11 @@ class BookInfoScraper:
         self.uuid_mapping_file = os.path.join(self.base_path, "uuid_mapping.json")
         self.progress_file = os.path.join(self.base_path, "scraper_progress.json")
 
-        logger.info(f"🌍 语种设置: {self.language_name}")
+        logger.info(f"🌍 语言主题: {self.language_name}")
         logger.info(f"📁 目标路径: {self.base_path}")
         logger.info(f"📄 默认URL文件: {self.default_urls_file}")
+        logger.info(f"🖼️ 封面目录: {self.thumbnails_dir}")
+        logger.info(f"📋 信息目录: {self.info_dir}")
 
     def _create_directories(self):
         """创建必要的目录结构"""
@@ -1005,10 +1016,8 @@ class BookInfoScraper:
 
     def get_pdf_directory(self):
         """获取PDF文件目录路径"""
-        if self.language == "zh":
-            return os.path.join(self.base_media_path, "books_zh", "zh", "pdf")
-        else:
-            return os.path.join(self.base_media_path, "books", "en", "pdf")
+        # 与 book_pdf_downloader.py 保持一致的路径结构
+        return os.path.join(self.base_path, "pdf")
 
     def has_corresponding_pdf(self, book_uuid):
         """检查是否有对应的PDF文件"""
@@ -1188,11 +1197,11 @@ def main():
         "--fix", action="store_true", help="检查并自动修复文件完整性问题"
     )
     parser.add_argument(
-        "--language",
+        "--lang",
         "-l",
         choices=["en", "zh"],
         default="en",
-        help="选择语种: en(英文) 或 zh(中文) [默认: en]",
+        help="语言主题: en(英文) 或 zh(中文) [默认: en]",
     )
     parser.add_argument(
         "--redownload-covers",
@@ -1206,15 +1215,13 @@ def main():
     print(f"📁 媒体路径: {get_base_media_path()}")
 
     # 显示语言配置
-    lang_name = "中文" if args.language == "zh" else "English"
-    print(f"🌍 语种: {lang_name}")
+    lang_name = "中文" if args.lang == "zh" else "English"
+    print(f"🌍 语言主题: {lang_name}")
 
     # 处理完整性检查/修复模式
     if args.check or args.fix:
         try:
-            scraper = BookInfoScraper(
-                args.file, debug=args.debug, language=args.language
-            )
+            scraper = BookInfoScraper(args.file, debug=args.debug, language=args.lang)
             if args.fix:
                 print("🛠️ 模式: 检查并修复文件完整性")
                 scraper.scan_and_fix_integrity(fix_issues=True)
@@ -1228,9 +1235,7 @@ def main():
     # 处理强制重新抓取封面模式
     if args.redownload_covers:
         try:
-            scraper = BookInfoScraper(
-                args.file, debug=args.debug, language=args.language
-            )
+            scraper = BookInfoScraper(args.file, debug=args.debug, language=args.lang)
             print("🔄 模式: 强制重新抓取封面")
             if args.max:
                 print(f"🔢 限制数量: {args.max}")
@@ -1240,7 +1245,7 @@ def main():
         return
 
     # 正常爬取模式
-    scraper = BookInfoScraper(args.file, debug=args.debug, language=args.language)
+    scraper = BookInfoScraper(args.file, debug=args.debug, language=args.lang)
     print(f"📄 URL文件: {scraper.urls_file}")
 
     if args.max:

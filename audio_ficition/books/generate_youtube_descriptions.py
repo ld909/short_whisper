@@ -9,19 +9,20 @@ YouTube视频描述生成脚本
 3. 使用 Google Gemini AI 生成专业的YouTube视频描述
 4. 遵循特定的写作风格和结构要求
 5. 自动保存生成的描述到对应目录
+6. 支持中文(zh)和英文(en)两种语言主题
 
 输入依赖文件：
 • 合并视频文件（由merge_clips_with_audio.py生成）：
-  - Intel Mac: /Volumes/dhl/audio/books/en/mp4_with_audio/{uuid}.mp4
-  - Apple Silicon: /Users/donghaoliu/Documents/audio/books/en/mp4_with_audio/{uuid}.mp4
+  - Intel Mac: /Volumes/dhl/audio/books/{language}/mp4_with_audio/{uuid}.mp4
+  - Apple Silicon: /Users/donghaoliu/Documents/audio/books/{language}/mp4_with_audio/{uuid}.mp4
 • 书籍总结文件（由generate_book_summary.py生成）：
-  - Intel Mac: /Volumes/dhl/audio/books/en/summary/{uuid}.txt
-  - Apple Silicon: /Users/donghaoliu/Documents/audio/books/en/summary/{uuid}.txt
+  - Intel Mac: /Volumes/dhl/audio/books/{language}/summary/{uuid}.txt
+  - Apple Silicon: /Users/donghaoliu/Documents/audio/books/{language}/summary/{uuid}.txt
 
 输出目标文件：
 • YouTube描述文件：
-  - Intel Mac: /Volumes/dhl/audio/books/en/youtube_description/{uuid}.txt
-  - Apple Silicon: /Users/donghaoliu/Documents/audio/books/en/youtube_description/{uuid}.txt
+  - Intel Mac: /Volumes/dhl/audio/books/{language}/youtube_description/{uuid}.txt
+  - Apple Silicon: /Users/donghaoliu/Documents/audio/books/{language}/youtube_description/{uuid}.txt
 
 处理逻辑：
 • 只有当MP4视频文件存在时，才会为对应的UUID生成YouTube描述
@@ -29,10 +30,11 @@ YouTube视频描述生成脚本
 • 确保视频制作完成后再生成对应的YouTube描述
 
 使用方法：
-python generate_youtube_descriptions.py                    # 处理所有有MP4的书籍
-python generate_youtube_descriptions.py --count 10         # 处理10个文件
-python generate_youtube_descriptions.py --force            # 强制重新生成
-python generate_youtube_descriptions.py --uuid abc123      # 处理指定UUID
+python generate_youtube_descriptions.py --lang en                # 处理英文书籍
+python generate_youtube_descriptions.py --lang zh                # 处理中文书籍
+python generate_youtube_descriptions.py --count 10 --lang en     # 处理10个文件
+python generate_youtube_descriptions.py --force --lang zh        # 强制重新生成
+python generate_youtube_descriptions.py --uuid abc123 --lang en  # 处理指定UUID
 
 前置条件：
 • 环境变量UNI_API_KEY: 必须设置有效的API密钥
@@ -63,7 +65,7 @@ except ImportError:
 def get_base_media_path():
     """根据系统类型返回基础媒体路径"""
     system = platform.system()
-    
+
     if system == "Linux":  # Ubuntu/Linux
         return "/media/dhl/audio"
     elif system == "Darwin":  # macOS
@@ -116,10 +118,14 @@ def setup_gemini_client():
 class YouTubeDescriptionGenerator:
     """YouTube视频描述生成器"""
 
-    def __init__(self, debug=False):
+    def __init__(self, debug=False, language="en"):
         self.debug = debug
+        self.language = language
         self.base_media_path = get_base_media_path()
-        self.books_base_path = os.path.join(self.base_media_path, "books", "en")
+        self.books_base_path = os.path.join(self.base_media_path, "books", language)
+
+        # 设置语言配置
+        self.setup_language_config()
 
         # 目录结构
         self.mp4_dir = os.path.join(
@@ -157,6 +163,18 @@ class YouTubeDescriptionGenerator:
             "RULE 5: Return content",
             "Direct return your description. No others.",
         ]
+
+        print(f"🌍 语言主题: {self.language_name}")
+        print(f"📁 书籍目录: {self.books_base_path}")
+
+    def setup_language_config(self):
+        """根据语种设置配置"""
+        if self.language == "zh":
+            # 中文配置
+            self.language_name = "中文"
+        else:
+            # 英文配置（默认）
+            self.language_name = "English"
 
     def get_available_mp4_files(self):
         """获取所有可用的MP4视频文件"""
@@ -501,72 +519,82 @@ class YouTubeDescriptionGenerator:
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(
-        description="🎬 YouTube视频描述生成脚本",
+        description="🎬 YouTube 视频描述生成器",
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 使用示例:
-  python generate_youtube_descriptions.py                    # 处理所有有MP4的书籍
-  python generate_youtube_descriptions.py --count 10         # 处理10个文件
-  python generate_youtube_descriptions.py --force            # 强制重新生成
-  python generate_youtube_descriptions.py --uuid abc123      # 处理指定UUID
-  python generate_youtube_descriptions.py --check-status     # 检查当前状态（不执行生成）
+  python generate_youtube_descriptions.py --lang en               # 处理英文书籍
+  python generate_youtube_descriptions.py --lang zh               # 处理中文书籍
+  python generate_youtube_descriptions.py --count 10 --lang en    # 处理10个文件
+  python generate_youtube_descriptions.py --force --lang zh       # 强制重新生成
+  python generate_youtube_descriptions.py --uuid abc123 --lang en # 处理指定UUID
+  python generate_youtube_descriptions.py --status --lang zh      # 检查处理状态
 
-注意：脚本会检查 merge_clips_with_audio.py 生成的MP4文件，
-     并读取 generate_book_summary.py 生成的总结文件来生成描述
+注意:
+- 需要设置环境变量 UNI_API_KEY
+- 确保已运行 merge_clips_with_audio.py 生成MP4文件
+- 确保已运行 generate_book_summary.py 生成总结文件
         """,
     )
 
-    parser.add_argument("--count", "-c", type=int, help="要处理的文件数量")
+    # 语言参数
     parser.add_argument(
-        "--force", "-f", action="store_true", help="强制重新生成所有描述"
+        "--lang",
+        "-l",
+        choices=["en", "zh"],
+        default="en",
+        help="语言主题: en(英文) 或 zh(中文) [默认: en]",
     )
-    parser.add_argument("--uuid", help="处理指定UUID的文件")
+
+    parser.add_argument(
+        "--count", "-c", type=int, help="要处理的描述数量（默认处理所有）"
+    )
+    parser.add_argument(
+        "--force", "-f", action="store_true", help="强制重新生成已存在的描述"
+    )
+    parser.add_argument("--uuid", "-u", help="只处理指定UUID的书籍")
     parser.add_argument("--debug", "-d", action="store_true", help="启用调试模式")
-    parser.add_argument(
-        "--check-status", action="store_true", help="检查当前状态（不执行生成）"
-    )
+    parser.add_argument("--status", "-s", action="store_true", help="检查当前处理状态")
 
     args = parser.parse_args()
 
     # 创建生成器实例
-    generator = YouTubeDescriptionGenerator(debug=args.debug)
-
-    # 检查状态
-    if args.check_status:
-        generator.check_status()
-        return
+    generator = YouTubeDescriptionGenerator(debug=args.debug, language=args.lang)
 
     print("🎬 YouTube视频描述生成器")
     print("=" * 50)
 
-    # 检查API密钥
-    if not os.environ.get("UNI_API_KEY"):
-        print("❌ 未设置UNI_API_KEY环境变量")
+    # 状态检查模式
+    if args.status:
+        generator.check_status()
         return
 
-    # 确定处理参数
-    max_count = args.count
-    force = args.force
-    target_uuid = args.uuid
-
-    if max_count:
-        print(f"🎯 处理数量: {max_count}")
-    if force:
-        print(f"🔄 强制重新生成模式")
-    if target_uuid:
-        print(f"🎯 目标UUID: {target_uuid}")
-
+    # 处理书籍描述
     try:
-        generator.process_books(
-            max_count=max_count, force=force, target_uuid=target_uuid
+        stats = generator.process_books(
+            max_count=args.count, force=args.force, target_uuid=args.uuid
         )
-    except KeyboardInterrupt:
-        print("👋 程序已停止")
-    except Exception as e:
-        print(f"❌ 程序出错: {e}")
-        import traceback
 
-        traceback.print_exc()
+        print(f"\n📊 处理完成统计:")
+        print(f"  🎯 目标文件: {stats.get('total_targets', 0)} 个")
+        print(f"  ✅ 成功生成: {stats.get('successful', 0)} 个")
+        print(f"  ❌ 生成失败: {stats.get('failed', 0)} 个")
+        print(f"  ⏭️ 跳过处理: {stats.get('skipped', 0)} 个")
+
+        if stats.get("total_targets", 0) > 0:
+            success_rate = (
+                stats.get("successful", 0) / stats.get("total_targets", 1) * 100
+            )
+            print(f"  📈 成功率: {success_rate:.1f}%")
+
+    except KeyboardInterrupt:
+        print("\n⏹️ 用户中断处理")
+    except Exception as e:
+        print(f"\n❌ 处理过程中出错: {e}")
+        if args.debug:
+            import traceback
+
+            traceback.print_exc()
 
 
 if __name__ == "__main__":

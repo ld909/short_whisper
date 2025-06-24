@@ -1,23 +1,41 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-书籍总结生成脚本 - 使用浏览器自动化抓取
+书籍总结生成脚本 - 支持多语言主题的浏览器自动化抓取
+
+核心特性：
+🌐 多语言主题支持：完全独立处理英文(en)和中文(zh)书籍
+📚 智能书籍处理：自动识别并处理对应语言的书籍数据
+🤖 AI生成总结：使用AI Studio生成高质量30分钟音频讲稿
 
 功能说明：
-1. 从 book_info_scraper.py 抓取的书籍信息中读取数据
+1. 从 book_info_scraper.py 抓取的书籍信息中读取数据（按语言分类）
 2. 使用 AdsPower + Playwright 浏览器自动化
 3. 支持PDF文件上传到 AI Studio（先点击Insert assets按钮，等待激活后上传）
 4. 发送书籍信息到 AI Studio 生成讲稿总结（发送前按两次ESC确保按钮可见）
 5. 每次启动动态检查已生成的总结（不依赖进度文件）
-6. 保存总结到 /Volumes/dhl/audio/books/en/summary/[uuid].txt
+6. 多语言目录结构：
+   - 英文主题：/Volumes/dhl/audio/books/en/
+   - 中文主题：/Volumes/dhl/audio/books/zh/
+7. 智能保存到对应语言目录：{基础路径}/books/{语言}/summary/[uuid].txt
 
 使用方法：
-python generate_book_summary.py --count 10          # 生成10个总结
+# 基础操作
+python generate_book_summary.py --count 10          # 生成10个总结（默认英文主题）
 python generate_book_summary.py --all               # 生成所有可用的总结
 python generate_book_summary.py --ads-id your_id    # 指定浏览器ID
 python generate_book_summary.py --check-status      # 检查当前状态
 
-注意：脚本会自动检测 book_pdf_downloader.py 输出的PDF文件并上传到AI Studio
+# 多语言主题支持
+python generate_book_summary.py --count 10 --lang en  # 生成英文主题总结
+python generate_book_summary.py --count 10 --lang zh  # 生成中文主题总结
+python generate_book_summary.py --all --lang zh       # 生成所有中文主题总结
+python generate_book_summary.py --check-status --lang zh  # 检查中文主题状态
+
+注意：
+- 脚本会自动检测 book_pdf_downloader.py 输出的PDF文件并上传到AI Studio
+- 不同语言主题完全独立，拥有独立的目录结构和数据源
+- 默认使用英文主题(en)，中文主题需要明确指定 --lang zh
 """
 
 import os
@@ -96,11 +114,12 @@ def get_adspower_info(ads_id):
 class BookSummaryGenerator:
     """书籍总结生成器 - 使用浏览器自动化"""
 
-    def __init__(self, ads_id="kq316tr", debug=False):
+    def __init__(self, ads_id="k10i5y1s", debug=False, lang="en"):
         self.ads_id = ads_id
         self.debug = debug
+        self.lang = lang
         self.base_media_path = get_base_media_path()
-        self.books_base_path = os.path.join(self.base_media_path, "books", "en")
+        self.books_base_path = os.path.join(self.base_media_path, "books", lang)
         # 自动设置 PDF 目录（与 book_pdf_downloader.py 保持一致）
         self.pdf_dir = os.path.join(self.books_base_path, "pdf")
 
@@ -111,13 +130,52 @@ class BookSummaryGenerator:
         # 创建目录
         os.makedirs(self.summary_dir, exist_ok=True)
 
+        # 输出语言主题信息
+        print(f"🌐 语言主题: {self.lang}")
+        print(f"📁 基础路径: {self.books_base_path}")
+
         # 浏览器相关
         self.playwright = None
         self.browser = None
         self.page = None
 
-        # 生成讲稿的提示词模板
-        self.prompt_template = """
+        # 根据语言主题选择对应的提示词模板
+        if self.lang == "zh":
+            # 中文提示词模板
+            self.prompt_template = """
+你是一位世界级的故事叙述者和畅销书营销专家，专门为一个广受欢迎的YouTube频道创作深度、富有洞察力的书籍总结。你的观众聪明、好奇，正在寻找下一本能够改变人生的好书。你的使命是将提供的书籍内容转化为引人入胜的30分钟音频讲稿。最终的讲稿应该生动、深刻、令人信服，让听众产生强烈的购买欲望，想要亲自体验这本书。总字数应约为4500字，以满足30分钟的目标时长。
+你的分析和讲稿必须按照以下五个部分的框架来构建。
+第一部分：无法抗拒的开场白（目标时长：0到45秒，约125字）
+你的频道以其不可预测和引人入胜的开场白而闻名。为了保持这一声誉，你必须有意识地在不同的书籍总结中变换开场白的风格。避免陷入总是问问题的可预测模式。你的首要任务是用专为这本书独特灵魂量身定制的开场白抓住观众的注意力。选择以下方法之一：
+惊人的陈述或统计数据：直接将听众带入一个令人惊讶的现实。一个大胆的、反直觉的说法，打破常见的信念。例如："现在听这句话的人中，超过一半将无法实现他们最大的人生目标。今天，我们要谈论真正掌控一切的隐藏力量。"这会立即引起好奇心。
+简短而富有感召力的小故事：用几句话描绘一个小故事。介绍一个角色、一个场景、一个紧张或顿悟的时刻。例如："想象一位孤独的船长，在狂风暴雨中迷失方向，只有一个坏掉的指南针作为向导。那个船长就是你，暴风雨就是你的日常生活。但如果我告诉你有一张地图..."这会立即建立情感连接。
+深刻的悖论：提出一个既奇特又真实的心理谜题。两个看似矛盾的想法，这本书将揭开谜底。例如："我们建造用来连接彼此的工具，往往是让我们感到最孤独的东西。这怎么可能，我们能做些什么？"这会吸引听众的理智。
+深度个人化的问题：如果必须使用问题，那就提一个能迫使立即内省的问题，而不是一般性的询问。例如："你上一次真正、根本性地改变对某个重要事物的看法是什么时候？不仅仅是你的观点，而是你的核心信念？"
+目标是令人难忘，让听众感觉这个总结是有意图和创造性地制作的，而不是从模板中来的。
+第二部分：核心问题和宏伟承诺（目标时长：45秒到3分钟，约500字）
+在开场白之后，立即介绍这本书要解决的核心问题、疑问或冲突。为什么这本书需要存在？它针对什么根本的人类斗争、社会问题或深度好奇心？以让听众个人感受到利害关系的方式来表述。然后，将这本书及其作者介绍为向导或深刻启示的来源。呈现这本书的宏伟承诺：它为读者提供什么样的转变、理解或体验？这一部分设定了舞台，告诉听众为什么这30分钟的投资将是一个游戏规则改变者。
+第三部分：问题的核心 - 深度探讨（目标时长：3分钟到25分钟，约3300字）
+这是你总结的核心，你作为故事叙述者的天赋在这里闪闪发光。你的方法必须适应书籍的类型。
+对于非小说类（哲学、科学、自助、历史等）：
+识别书中3到5个最强大、最基础的想法或原则。不要只是列出它们。对于每个想法，你必须：
+首先，以简单、引人入胜的方式清楚地解释概念。
+其次，用作者在文本中提供的最令人信服的故事、轶事或证据使其栩栩如生。这对于使抽象变得有形至关重要。
+第三，将这个想法直接与听众的生活联系起来。使用修辞问题和相关场景，帮助他们看到这个概念如何适用于他们自己的经历、挑战和抱负。
+对于小说类（小说、短篇故事）和叙述性非小说：
+不要简单地列出情节要点。你的目标是传达情感旅程和书籍的氛围。追踪中心叙事弧线，专注于主人公的发展、他们面临的道德或哲学困境，以及总体主题。唤起书籍独特的感觉——是令人毛骨悚然、激动人心、鼓舞人心，还是令人心碎？捕捉作者散文的语调和风格。你可以暗示主要情节发展和高潮来建立紧张感和好奇心，但你不能透露会毁掉阅读体验的关键剧透。专注于事件背后的"为什么"，而不仅仅是"什么"。
+第四部分：独特本质和营销亮点（目标时长：25分钟到28分钟，约450字）
+现在，完全进入你作为营销大师的角色。要有主见和直接。在这一部分中，你必须明确说明为什么这本书是必读的。在你的讲稿中直接回答这些问题：是什么让这本书与其类别中的任何其他书籍根本不同？它提供了什么在其他地方找不到的独特视角或感受？这本书适合谁？要具体。是雄心勃勃的企业家、从失落中康复的人、内心的冒险家，还是真理的寻求者？同样重要的是，这本书不适合谁？这种诚实建立了信任和权威。通过阐述读者在读完最后一页很久之后仍会保留的最有价值的收获来结束这一部分。
+第五部分：强有力的行动号召（目标时长：28分钟到30分钟，约125字）
+以强有力、鼓舞人心和紧迫的结论结束。不要只说"链接在描述中"。再次总结书籍的变革性承诺，回到最初的开场白。将购买和阅读这本书的行为定义为听众成长、理解或娱乐旅程中的重要下一步。使用引人注目的语言，如："这个总结只是地图；阅读这本书才是旅程本身"，或"要真正理解这一点，你必须让作者的话语冲刷你。"让听众感觉他们不仅仅是在买一本书，而是在投资一种深刻的体验。然后，也只有到那时，才发出最终的后勤行动号召，要求点赞、订阅和购买这本书。
+只返回单一的、连续的纯文本块。
+不要包含任何舞台指示、音效或语调或音乐的括号描述。
+这个文本必须能够直接被音频引擎读取，无需任何进一步修改。
+确保故事足够长，成为一个完整的有声书，至少15分钟长。
+确保总字数至少达到5000字。
+"""
+        else:
+            # 英文提示词模板（保持原有内容不变）
+            self.prompt_template = """
 You are a world-class storyteller and a master book marketer for a highly popular YouTube channel specializing in deep, insightful book summaries. Your audience is intelligent, curious, and looking for their next life-changing read. Your mission is to take the provided book content and transform it into a captivating 30-minute audio script. The final script should be so vivid, profound, and compelling that it creates a powerful urge in the listener to purchase and experience the book firsthand. The total word count should be approximately 4500 words to meet the 30-minute target.
 Your analysis and script must be structured according to the following five-part framework.
 Part 1: The Irresistible Hook (Target length: 0 to 45 seconds, approx. 125 words)
@@ -637,7 +695,103 @@ Ensure the total word count reaches at least 2500 words.
 
                 # 第三步：上传文件
                 print("📤 正在上传PDF文件...")
-                file_input.set_input_files(pdf_file_path)
+
+                # 优先使用CDP方法上传大文件，绕过50MB限制
+                upload_success_cdp = False
+                try:
+                    # 检查文件大小
+                    file_size = os.path.getsize(pdf_file_path)
+                    file_size_mb = file_size / (1024 * 1024)
+                    print(f"📊 PDF文件大小: {file_size_mb:.2f} MB")
+
+                    if file_size_mb > 50:
+                        print(f"🔧 文件大于50MB，使用CDP方法上传...")
+                    else:
+                        print(f"📁 文件小于50MB，但优先尝试CDP方法...")
+
+                    # 获取文件输入选择器
+                    file_input_selectors = [
+                        'input[type="file"][multiple]',
+                        'input[type="file"]',
+                        'input[type="file"][style*="display: none"]',
+                    ]
+
+                    # 找到有效的文件输入选择器
+                    active_file_selector = None
+                    for selector in file_input_selectors:
+                        try:
+                            if self.page.locator(selector).count() > 0:
+                                active_file_selector = selector
+                                print(f"✅ 找到文件输入选择器: {selector}")
+                                break
+                        except:
+                            continue
+
+                    if not active_file_selector:
+                        print("❌ 未找到文件输入选择器")
+                        raise Exception("无法找到文件输入选择器")
+
+                    # 创建CDP会话
+                    print("🔗 创建CDP会话...")
+                    cdp_session = self.page.context.new_cdp_session(self.page)
+
+                    # 启用DOM
+                    cdp_session.send("DOM.enable")
+
+                    # 获取DOM文档
+                    print("📄 获取DOM文档...")
+                    dom_snapshot = cdp_session.send("DOM.getDocument", {"depth": -1})
+
+                    # 查找文件输入节点
+                    print("🔍 查找文件输入节点...")
+                    node_result = cdp_session.send(
+                        "DOM.querySelector",
+                        {
+                            "nodeId": dom_snapshot["root"]["nodeId"],
+                            "selector": active_file_selector,
+                        },
+                    )
+
+                    if not node_result.get("nodeId"):
+                        print("❌ 无法找到文件输入节点!")
+                        cdp_session.detach()
+                        raise Exception("无法找到文件输入节点")
+
+                    # 使用CDP设置文件
+                    print("📁 使用CDP方法设置文件...")
+                    cdp_session.send(
+                        "DOM.setFileInputFiles",
+                        {
+                            "nodeId": node_result["nodeId"],
+                            "files": [pdf_file_path],
+                        },
+                    )
+
+                    # 关闭CDP会话
+                    cdp_session.detach()
+                    print("✅ PDF文件上传完成（使用CDP方法）")
+                    upload_success_cdp = True
+
+                except Exception as cdp_error:
+                    print(f"❌ CDP上传方法失败: {cdp_error}")
+                    print("🔄 尝试使用标准Playwright方法...")
+
+                    # 如果CDP方法失败，回退到标准方法
+                    try:
+                        file_input.set_input_files(pdf_file_path)
+                        print("✅ PDF文件上传完成（使用标准方法）")
+                        upload_success_cdp = True
+                    except Exception as standard_error:
+                        print(f"❌ 标准上传方法也失败: {standard_error}")
+                        upload_success_cdp = False
+
+                if not upload_success_cdp:
+                    print(f"❌ 第 {attempt} 次上传失败（所有方法都失败）")
+                    if attempt < max_attempts:
+                        print(f"💫 等待5秒后重试...")
+                        time.sleep(5)
+                        continue
+                    return False
 
                 # 等待上传完成，并检查token计数
                 print("⏳ 等待PDF上传和处理完成...")
@@ -647,7 +801,7 @@ Ensure the total word count reaches at least 2500 words.
                     print("✅ PDF文件上传并处理成功")
                     return True
                 else:
-                    print(f"❌ 第 {attempt} 次上传失败")
+                    print(f"❌ 第 {attempt} 次上传失败（上传成功但token验证失败）")
                     if attempt < max_attempts:
                         print(f"💫 等待5秒后重试...")
                         time.sleep(5)
@@ -1045,6 +1199,8 @@ def main():
   python generate_book_summary.py --all               # 生成所有可用的总结  
   python generate_book_summary.py --ads-id your_id    # 指定浏览器ID
   python generate_book_summary.py --check-status      # 检查当前状态
+  python generate_book_summary.py --count 10 --lang zh  # 生成中文主题总结
+  python generate_book_summary.py --count 10 --lang en  # 生成英文主题总结
 
 注意：脚本会自动检测并使用 book_pdf_downloader.py 下载的PDF文件
         """,
@@ -1053,17 +1209,22 @@ def main():
     parser.add_argument("--count", "-c", type=int, help="要生成的总结数量")
     parser.add_argument("--all", action="store_true", help="生成所有可用的总结")
     parser.add_argument(
-        "--ads-id", default="kq316tr", help="AdsPower 浏览器ID (默认: kq316tr)"
+        "--ads-id", default="k10i5y1s", help="AdsPower 浏览器ID (默认: k10i5y1s)"
     )
     parser.add_argument("--debug", "-d", action="store_true", help="启用调试模式")
     parser.add_argument(
         "--check-status", action="store_true", help="检查当前状态（不执行生成）"
     )
+    parser.add_argument(
+        "--lang", "-l", default="en", help="语言主题 (en: 英文, zh: 中文) (默认: en)"
+    )
 
     args = parser.parse_args()
 
     # 创建生成器实例
-    generator = BookSummaryGenerator(ads_id=args.ads_id, debug=args.debug)
+    generator = BookSummaryGenerator(
+        ads_id=args.ads_id, debug=args.debug, lang=args.lang
+    )
 
     # 检查断点续传状态
     if args.check_status:
@@ -1079,6 +1240,7 @@ def main():
         max_count = 5
 
     print(f"🌐 使用 AdsPower ID: {args.ads_id}")
+    print(f"🗣️ 语言主题: {args.lang}")
 
     # 检查PDF目录状态
     pdf_dir = os.path.join(generator.books_base_path, "pdf")
