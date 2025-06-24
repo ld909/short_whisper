@@ -3,53 +3,59 @@
 """
 书籍音频合成脚本
 使用 f5-tts CLI 将 chunk_book_summaries.py 输出的文本块合成为音频文件
-支持断点续传功能、UUID目录结构和多语言自动检测
+支持断点续传功能、UUID目录结构和多语言支持
 
 📚 功能说明:
 - 读取 chunk_book_summaries.py 输出的书籍文本块
 - 使用 f5-tts 合成高质量音频文件
 - 支持断点续传，跳过已存在的有效音频文件
 - 自动排除Mac系统产生的点文件
-- 🌏 自动检测文本语言，选择合适的参考音频
+- 🌏 支持多语言处理：英文(en)、中文(zh)
+- 🤖 自动检测文本语言，选择合适的参考音频
+- 🔗 与chunk_book_summaries.py输出目录完全对接
 
 📥 输入信息:
-- 默认输入目录: /home/dhl/Documents/book/
-- 输入目录结构: book/{uuid}/{chunk_index}.txt
+- 输入目录结构（与chunk_book_summaries.py输出对接）: 
+  * 输入根目录: /home/dhl/Documents/book/{lang}/
+  * 完整路径格式: /home/dhl/Documents/book/{lang}/{uuid}/{chunk_index}.txt
+- 输入目录结构: {uuid}/{chunk_index}.txt
 - 支持文件格式: .txt 文件
 - 文件编码: UTF-8
 
 📤 输出信息:
-- 默认输出目录: /home/dhl/Documents/audio/mp3_clips/book/
-- 输出目录结构: mp3_clips/book/{uuid}/{chunk_index}.mp3
+- 多语言输出目录结构:
+  * Ubuntu: /media/dhl/audio/books/{lang}/mp3_clips/
+  * macOS: /Volumes/dhl/audio/books/{lang}/mp3_clips/
+- 输出目录结构: mp3_clips/{uuid}/{chunk_index}.mp3
 - 自动排除Mac系统产生的点文件
 
 🎤 参考音频:
 - 英文参考音频: /home/dhl/Documents/short_whisper/audio_ficition/audio_ref/11_normalized_2.mp3
 - 中文参考音频: /home/dhl/Documents/short_whisper/audio_ficition/books/assets/zh-audio.mp3
-- 🤖 自动根据文本内容检测语言并选择对应的参考音频
+- 🤖 自动根据指定语言和文本内容检测选择对应的参考音频
 
 🔄 处理规则:
-1. 只在Ubuntu系统上运行
+1. 支持Ubuntu和macOS系统
 2. 支持断点续传，跳过已存在的有效音频文件
 3. 自动排除以点开头的Mac系统文件
 4. 按UUID和块索引有序处理
-5. 自动检测文本语言（中文/英文），智能选择参考音频
+5. 支持指定语言或自动检测文本语言（中文/英文），智能选择参考音频
 
 💡 使用示例:
-# 处理所有书籍（自动语言检测）
-python synthesize_book_audio.py
+# 处理英文书籍
+python synthesize_book_audio.py --lang en
+
+# 处理中文书籍
+python synthesize_book_audio.py --lang zh
 
 # 处理指定UUID的书籍
-python synthesize_book_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012
+python synthesize_book_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012 --lang en
 
 # 预览模式
-python synthesize_book_audio.py --preview
-
-# 禁用断点续传
-python synthesize_book_audio.py --no-resume
+python synthesize_book_audio.py --preview --lang zh
 
 # 强制重新生成
-python synthesize_book_audio.py --force-regenerate
+python synthesize_book_audio.py --force-regenerate --lang en
 """
 
 import os
@@ -61,11 +67,29 @@ import platform
 from pathlib import Path
 
 # ============ 配置参数 ============
-# 输入目录：存放文本块的目录（chunk_book_summaries.py的输出目录）
-DEFAULT_INPUT_BASE_DIR = "/home/dhl/Documents/book"
 
-# 输出目录：生成的音频文件保存目录
-DEFAULT_OUTPUT_BASE_DIR = "/home/dhl/Documents/audio/mp3_clips/book"
+def get_base_media_path():
+    """根据操作系统返回适当的媒体路径"""
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        return "/Volumes/dhl/audio"
+    else:  # 默认为Linux/Ubuntu
+        return "/media/dhl/audio"
+
+
+def get_paths_for_language(lang="en"):
+    """根据语言获取输入和输出路径"""
+    base_media_path = get_base_media_path()
+    
+    # 输入目录：从chunk_book_summaries.py的输出目录读取
+    input_dir = f"/home/dhl/Documents/book/{lang}"
+    
+    # 输出目录：保持原有的输出路径结构
+    base_path = os.path.join(base_media_path, "books", lang)
+    output_dir = os.path.join(base_path, "mp3_clips")
+    
+    return input_dir, output_dir
+
 
 # 参考音频文件：用于语音克隆的参考音频
 # 英文参考音频
@@ -87,27 +111,34 @@ PROXY_HTTPS = "http://127.0.0.1:7897"
 # ===================================
 
 
-def check_ubuntu_system():
+def check_supported_system():
     """
-    检查是否为Ubuntu系统
+    检查是否为支持的系统（Ubuntu或macOS）
 
     Returns:
-        bool: 是否为Ubuntu系统
+        bool: 是否为支持的系统
+        str: 系统类型信息
     """
     try:
-        # 检查系统类型
-        if platform.system() != "Linux":
-            return False
-
-        # 检查是否为Ubuntu
-        with open("/etc/os-release", "r") as f:
-            content = f.read()
-            if "Ubuntu" in content or "ubuntu" in content:
-                return True
-
-        return False
+        system = platform.system()
+        
+        if system == "Darwin":  # macOS
+            return True, "macOS"
+        elif system == "Linux":
+            # 检查是否为Ubuntu
+            try:
+                with open("/etc/os-release", "r") as f:
+                    content = f.read()
+                    if "Ubuntu" in content or "ubuntu" in content:
+                        return True, "Ubuntu"
+                    else:
+                        return True, "Linux"  # 其他Linux发行版也支持
+            except:
+                return True, "Linux"  # 默认认为是Linux
+        else:
+            return False, system
     except:
-        return False
+        return False, "Unknown"
 
 
 def set_clash_proxy():
@@ -518,6 +549,7 @@ def process_single_chunk(
     output_base_dir,
     model="F5TTS_v1_Base",
     force_regenerate=False,
+    specified_lang=None,
 ):
     """
     处理单个文本块，合成音频
@@ -530,6 +562,7 @@ def process_single_chunk(
         output_base_dir (str): 输出基础目录
         model (str): 使用的模型名称
         force_regenerate (bool): 是否强制重新生成
+        specified_lang (str): 指定的语言（en/zh），如果提供则优先使用
 
     Returns:
         bool: 处理是否成功
@@ -551,21 +584,31 @@ def process_single_chunk(
         )
         return True
 
-    # 读取文本内容并检测语言
-    text_content = read_text_content(chunk_file)
-    if text_content:
-        detected_language = detect_text_language(text_content)
-        actual_ref_audio = get_ref_audio_for_language(detected_language)
-
-        # 显示语言检测结果
-        lang_name = "中文" if detected_language == "zh" else "英文"
-        print(f"🔍 [UUID:{uuid[:8]}...] 检测到语言: {lang_name}")
+    # 选择语言和参考音频
+    if specified_lang:
+        # 如果指定了语言，直接使用
+        actual_ref_audio = get_ref_audio_for_language(specified_lang)
+        lang_name = "中文" if specified_lang == "zh" else "英文"
+        print(f"🌐 [UUID:{uuid[:8]}...] 使用指定语言: {lang_name}")
         print(
             f"🎤 [UUID:{uuid[:8]}...] 使用参考音频: {os.path.basename(actual_ref_audio)}"
         )
     else:
-        actual_ref_audio = ref_audio  # 如果无法读取文本，使用传入的默认参考音频
-        print(f"⚠️  [UUID:{uuid[:8]}...] 无法读取文本内容，使用默认参考音频")
+        # 如果没有指定语言，则读取文本内容并检测语言
+        text_content = read_text_content(chunk_file)
+        if text_content:
+            detected_language = detect_text_language(text_content)
+            actual_ref_audio = get_ref_audio_for_language(detected_language)
+
+            # 显示语言检测结果
+            lang_name = "中文" if detected_language == "zh" else "英文"
+            print(f"🔍 [UUID:{uuid[:8]}...] 自动检测到语言: {lang_name}")
+            print(
+                f"🎤 [UUID:{uuid[:8]}...] 使用参考音频: {os.path.basename(actual_ref_audio)}"
+            )
+        else:
+            actual_ref_audio = ref_audio  # 如果无法读取文本，使用传入的默认参考音频
+            print(f"⚠️  [UUID:{uuid[:8]}...] 无法读取文本内容，使用默认参考音频")
 
     # 获取文件大小用于显示
     try:
@@ -603,6 +646,7 @@ def process_book_by_uuid(
     preview_mode=False,
     resume_mode=True,
     force_regenerate=False,
+    specified_lang=None,
 ):
     """
     处理指定UUID书籍的所有文本块文件
@@ -616,6 +660,7 @@ def process_book_by_uuid(
         preview_mode (bool): 是否为预览模式
         resume_mode (bool): 是否启用断点续传
         force_regenerate (bool): 是否强制重新生成
+        specified_lang (str): 指定的语言（en/zh），如果提供则优先使用
 
     Returns:
         dict: 处理结果统计
@@ -722,6 +767,7 @@ def process_book_by_uuid(
                 output_base_dir,
                 model,
                 force_regenerate,
+                specified_lang,
             )
 
             if success:
@@ -785,41 +831,50 @@ def cleanup_and_exit(use_proxy):
 
 def main():
     """主函数"""
-    # 首先检查是否为Ubuntu系统
-    if not check_ubuntu_system():
-        print("❌ 此脚本只能在Ubuntu系统上运行！")
-        print("🖥️  当前系统: " + platform.system())
+    # 检查是否为支持的系统
+    is_supported, system_info = check_supported_system()
+    if not is_supported:
+        print(f"❌ 此脚本只能在Ubuntu或macOS系统上运行！")
+        print(f"🖥️  当前系统: {system_info}")
         exit(1)
 
-    print("✅ Ubuntu系统检测通过")
+    print(f"✅ 系统检测通过: {system_info}")
 
     parser = argparse.ArgumentParser(
-        description="书籍音频合成器 - 使用 f5-tts 将书籍文本块合成为音频（支持断点续传）",
+        description="书籍音频合成器 - 使用 f5-tts 将书籍文本块合成为音频（支持多语言和断点续传）",
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 使用示例:
-  python synthesize_book_audio.py                                # 处理所有书籍
-  python synthesize_book_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012  # 处理指定UUID的书籍
-  python synthesize_book_audio.py --preview                      # 预览模式
-  python synthesize_book_audio.py --no-resume                    # 禁用断点续传
-  python synthesize_book_audio.py --force-regenerate             # 强制重新生成
+  # 基本使用
+  python synthesize_book_audio.py --lang en                      # 处理英文书籍
+  python synthesize_book_audio.py --lang zh                      # 处理中文书籍
+  
+  # 指定UUID处理
+  python synthesize_book_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012 --lang en
+  
+  # 其他选项
+  python synthesize_book_audio.py --lang zh --preview            # 预览模式
+  python synthesize_book_audio.py --lang en --force-regenerate   # 强制重新生成
         """,
+    )
+    parser.add_argument(
+        "--lang", "-l", 
+        required=True,
+        choices=["en", "zh"],
+        help="语言类型: en=英文, zh=中文 (必需参数)"
     )
     parser.add_argument("--uuid", "-u", help="要处理的书籍UUID，不指定则处理所有书籍")
     parser.add_argument(
         "--input-base-dir",
-        default=DEFAULT_INPUT_BASE_DIR,
-        help=f"输入基础目录路径 (默认: {DEFAULT_INPUT_BASE_DIR})",
+        help="输入基础目录路径 (默认根据语言自动设置)"
     )
     parser.add_argument(
         "--output-base-dir",
-        default=DEFAULT_OUTPUT_BASE_DIR,
-        help=f"输出基础目录路径 (默认: {DEFAULT_OUTPUT_BASE_DIR})",
+        help="输出基础目录路径 (默认根据语言自动设置)"
     )
     parser.add_argument(
         "--ref-audio",
-        default=REF_AUDIO_EN,
-        help=f"参考音频文件路径 (默认: {REF_AUDIO_EN}，中文自动使用: {REF_AUDIO_ZH})",
+        help=f"参考音频文件路径 (默认: 英文使用{REF_AUDIO_EN}，中文使用{REF_AUDIO_ZH})"
     )
     parser.add_argument(
         "--model",
@@ -858,13 +913,32 @@ def main():
     else:
         print("🌐 未启用代理设置")
 
-    input_base_dir = args.input_base_dir
-    output_base_dir = args.output_base_dir
-    ref_audio = args.ref_audio
+    # 根据语言设置路径
+    lang = args.lang
+    
+    # 获取语言对应的路径
+    if args.input_base_dir:
+        input_base_dir = args.input_base_dir
+    else:
+        input_base_dir, _ = get_paths_for_language(lang)
+    
+    if args.output_base_dir:
+        output_base_dir = args.output_base_dir
+    else:
+        _, output_base_dir = get_paths_for_language(lang)
+    
+    # 根据语言设置参考音频
+    if args.ref_audio:
+        ref_audio = args.ref_audio
+    else:
+        ref_audio = get_ref_audio_for_language(lang)
+    
     model = args.model
     resume_mode = not args.no_resume
 
-    print(f"\n🎵 书籍音频合成器 (支持断点续传)")
+    lang_name = "中文" if lang == "zh" else "英文"
+    print(f"\n🎵 书籍音频合成器 (支持多语言和断点续传)")
+    print(f"🌐 处理语言: {lang_name} ({lang})")
     print(f"📁 输入基础目录: {input_base_dir}")
     print(f"📁 输出基础目录: {output_base_dir}")
     print(f"🎤 参考音频: {ref_audio}")
@@ -887,18 +961,26 @@ def main():
 
     # 检查参考音频文件是否存在
     if not os.path.exists(ref_audio):
-        print(f"❌ 英文参考音频文件不存在: {ref_audio}")
+        audio_type = "中文" if lang == "zh" else "英文"
+        print(f"❌ {audio_type}参考音频文件不存在: {ref_audio}")
         cleanup_and_exit(use_proxy)
         return
 
+    # 检查所有参考音频文件是否存在（用于自动检测时的后备）
+    missing_audios = []
+    if not os.path.exists(REF_AUDIO_EN):
+        missing_audios.append(f"英文参考音频: {REF_AUDIO_EN}")
     if not os.path.exists(REF_AUDIO_ZH):
-        print(f"❌ 中文参考音频文件不存在: {REF_AUDIO_ZH}")
-        cleanup_and_exit(use_proxy)
-        return
+        missing_audios.append(f"中文参考音频: {REF_AUDIO_ZH}")
 
-    print(f"✅ 参考音频文件检查通过:")
-    print(f"   英文参考音频: {ref_audio}")
-    print(f"   中文参考音频: {REF_AUDIO_ZH}")
+    if missing_audios:
+        print(f"⚠️  发现缺失的参考音频文件:")
+        for missing in missing_audios:
+            print(f"   {missing}")
+        print(f"💡 如果开启自动语言检测，可能会影响功能")
+
+    print(f"✅ 当前使用的参考音频文件检查通过:")
+    print(f"   {lang_name}参考音频: {ref_audio}")
 
     # 获取要处理的书籍列表
     if args.uuid:
@@ -934,6 +1016,7 @@ def main():
                     args.preview,
                     resume_mode,
                     args.force_regenerate,
+                    lang,
                 )
                 all_results.append(result)
             except Exception as e:
@@ -992,7 +1075,7 @@ def main():
 
                 if total_successful > 0:
                     print(f"\n📝 音频文件已保存到: {output_base_dir}")
-                    print(f"📁 目录结构: mp3_clips/book/{uuid}/{chunk_index}.mp3")
+                    print(f"📁 目录结构: {lang}/mp3_clips/{{uuid}}/{{chunk_index}}.mp3")
 
     except KeyboardInterrupt:
         print(f"\n⚠️  用户中断了程序执行")

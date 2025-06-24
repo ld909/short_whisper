@@ -20,10 +20,11 @@
 - 文件命名规则: {uuid}.txt
 
 📤 输出信息:
-- 输出根目录: /home/dhl/Documents/book/
-- 完整输出路径格式: /home/dhl/Documents/book/{uuid}/{chunk_index}.txt
-- 完整路径示例: /home/dhl/Documents/book/12345678-abcd-efgh-ijkl-123456789012/1.txt
-- 每个书籍有自己的子目录，按UUID命名
+- 输出根目录: /home/dhl/Documents/book/{language}/
+- 完整输出路径格式: /home/dhl/Documents/book/{language}/{uuid}/{chunk_index}.txt
+- 完整路径示例(中文): /home/dhl/Documents/book/zh/12345678-abcd-efgh-ijkl-123456789012/1.txt
+- 完整路径示例(英文): /home/dhl/Documents/book/en/12345678-abcd-efgh-ijkl-123456789012/1.txt
+- 按语言分目录存储，每个书籍有自己的子目录，按UUID命名
 - 每个子目录内的文件按块索引命名（1.txt, 2.txt, 3.txt...）
 
 🔄 处理规则:
@@ -91,6 +92,11 @@ def get_default_input_dir(language="en"):
     """获取默认输入目录"""
     base_path = get_base_media_path()
     return os.path.join(base_path, "books", language, "summary")
+
+
+def get_default_output_dir(language="en"):
+    """获取默认输出目录（按语言分类）"""
+    return f"/home/dhl/Documents/book/{language}"
 
 
 def split_content_into_chunks(content, max_chars=3000):
@@ -497,7 +503,7 @@ def main():
     # 获取默认输入和输出目录（现在需要语言参数，所以先解析参数）
     args_preview = parser.parse_known_args()[0]
     default_input_dir = get_default_input_dir(args_preview.lang)
-    default_output_dir = "/home/dhl/Documents/book"
+    default_output_dir = get_default_output_dir(args_preview.lang)
 
     parser.add_argument(
         "--input-dir",
@@ -529,9 +535,12 @@ def main():
     resume_mode = not args.no_resume
     language = args.lang
 
-    # 如果用户没有手动指定input_dir，重新计算正确的路径
+    # 如果用户没有手动指定input_dir或output_dir，重新计算正确的路径
     if args.input_dir == default_input_dir:
         input_dir = get_default_input_dir(language)
+    
+    if args.output_dir == default_output_dir:
+        output_dir = get_default_output_dir(language)
 
     lang_name = "中文" if language == "zh" else "English"
 
@@ -593,7 +602,7 @@ def main():
 
             if result["successful"] > 0:
                 print(f"\n📝 分块后的文件已保存到: {output_dir}")
-                print("📁 目录结构: book/<uuid>/<chunk_index>.txt")
+                print(f"📁 目录结构: book/{language}/<uuid>/<chunk_index>.txt")
 
     except Exception as e:
         print(f"❌ 处理过程中出错: {e}")
