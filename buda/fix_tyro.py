@@ -1,43 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SRT字幕错别字修复工具
+SRT字幕错别字修复工具 - 简化版
 
 功能描述：
     使用大模型API自动检查和修复SRT字幕文件中的错别字，特别针对佛教/佛学主题内容优化。
-    支持并发处理、断点续传、多种API服务。
-
-主要特性：
-    - 智能错别字检测和修复（特别优化佛教专业术语）
-    - 并发处理提高效率
-    - 断点续传功能，避免重复处理
-    - 支持多种大模型API（阿里云千问、uniapi）
-    - 自动处理目录结构中的所有SRT文件
-
-目录结构：
-    输入目录结构：
-    input_base_dir/
-    ├── 频道1/
-    │   ├── 视频1.srt
-    │   ├── 视频2.srt
-    │   └── ...
-    ├── 频道2/
-    │   ├── 视频1.srt
-    │   └── ...
-    └── ...
-
-    输出目录结构：
-    output_base_dir/
-    ├── 频道1/
-    │   ├── 视频1.srt (修复后)
-    │   ├── 视频2.srt (修复后)
-    │   └── ...
-    └── ...
+    支持并发处理、断点续传、多种API服务、智能重试机制。
 
 默认路径：
     Linux系统输入路径：/media/dhl/buda_videos_youtube/format_srt_zh
     macOS系统输入路径：/Volumes/dhl/buda_videos_youtube/format_srt_zh
-    
+
     Linux系统输出路径：/media/dhl/buda_videos_youtube/zh_srt_tyro_fix
     macOS系统输出路径：/Volumes/dhl/buda_videos_youtube/zh_srt_tyro_fix
 
@@ -57,8 +30,14 @@ SRT字幕错别字修复工具
     5. 调整并发数量：
        python fix_tyro.py -b 10
 
-    6. 完整参数示例：
-       python fix_tyro.py -a ali -o /custom/output -b 8
+    6. 调整重试次数（处理网络不稳定）：
+       python fix_tyro.py -r 5
+
+    7. 限制新处理文件数量（从未完成的文件中选择10个进行处理）：
+       python fix_tyro.py -n 10
+
+    8. 强制重新处理所有文件（忽略断点续传）：
+       python fix_tyro.py -f
 
 命令行参数：
     -a, --api {ali,uni}     选择API服务（ali=阿里云千问，uni=uniapi，默认uni）
@@ -66,29 +45,20 @@ SRT字幕错别字修复工具
     -o, --output PATH       输出SRT文件基础目录路径
     -l, --local             使用本地目录 ~/srt_fixed 作为输出（避免权限问题）
     -b, --batch_size NUM    并发处理批量大小（默认5）
+    -r, --max_retries NUM   API调用失败时的最大重试次数（默认3次）
+    -n, --max_files NUM     最大新处理文件数量（从未完成的文件中选择指定数量处理，默认处理所有未完成文件）
+    -f, --force             强制重新处理所有文件，忽略断点续传
     -h, --help             显示帮助信息
 
 环境变量设置：
     使用阿里云千问API时：
         export DASHSCOPE_API_KEY=你的阿里云API密钥
-    
+
     使用uniapi时：
         export UNI_API_KEY=你的uniapi密钥
 
-注意事项：
-    1. 确保已安装所需依赖：pip install openai tqdm
-    2. 确保API密钥已正确设置
-    3. 如遇权限问题，使用 -l 选项或手动指定可写目录
-    4. 脚本支持断点续传，可随时中断并重新运行
-    5. 处理过程中会显示原句、AI返回结果和最终修正结果
-
-示例输出：
-    原句: 须云菩提对师尊说
-    AI返回: 须菩提对释尊说
-    结果: 已修正为: 须菩提对释尊说
-
 作者：dhl
-版本：1.0
+版本：2.1 - 简化日志版本
 """
 
 import os
@@ -96,22 +66,77 @@ import re
 import sys
 import argparse
 import platform
+import time
+import datetime
 from tqdm import tqdm
 from openai import OpenAI
 import concurrent.futures
 from threading import Lock
 
+# 全局统计变量
+api_stats = {
+    "total_calls": 0,
+    "successful_calls": 0,
+    "failed_calls": 0,
+    "retry_calls": 0,
+    "rate_limit_errors": 0,
+    "network_errors": 0,
+    "auth_errors": 0,
+    "model_errors": 0,
+    "unknown_errors": 0,
+}
+stats_lock = Lock()
+
+
+def update_api_stats(stat_type):
+    """线程安全地更新API统计信息"""
+    with stats_lock:
+        if stat_type in api_stats:
+            api_stats[stat_type] += 1
+
+
+def print_api_stats():
+    """打印API调用统计信息"""
+    with stats_lock:
+        print(f"\n📊 API调用统计报告:")
+        print(f"🔧 总调用次数: {api_stats['total_calls']}")
+        print(f"✅ 成功调用: {api_stats['successful_calls']}")
+        print(f"❌ 失败调用: {api_stats['failed_calls']}")
+        print(f"🔄 重试次数: {api_stats['retry_calls']}")
+
+        if api_stats["total_calls"] > 0:
+            success_rate = (
+                api_stats["successful_calls"] / api_stats["total_calls"]
+            ) * 100
+            print(f"📈 成功率: {success_rate:.1f}%")
+
+        if api_stats["failed_calls"] > 0:
+            print(f"⚠️  错误分类:")
+            if api_stats["rate_limit_errors"] > 0:
+                print(f"   💤 API限流: {api_stats['rate_limit_errors']}")
+            if api_stats["network_errors"] > 0:
+                print(f"   🌐 网络错误: {api_stats['network_errors']}")
+            if api_stats["auth_errors"] > 0:
+                print(f"   🔐 认证错误: {api_stats['auth_errors']}")
+            if api_stats["model_errors"] > 0:
+                print(f"   🤖 模型错误: {api_stats['model_errors']}")
+            if api_stats["unknown_errors"] > 0:
+                print(f"   ❓ 未知错误: {api_stats['unknown_errors']}")
+
 
 def read_srt_file(file_path):
     """读取SRT文件并返回内容"""
-    with open(file_path, "r", encoding="utf-8") as f:
-        srt_content = f.read()
-    return srt_content
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            srt_content = f.read()
+        return srt_content
+    except Exception as e:
+        print(f"❌ 读取文件失败 {file_path}: {e}")
+        raise
 
 
 def parse_srt_with_re(srt_content):
     """使用正则表达式解析SRT字幕内容"""
-    # 定义一个正则表达式来匹配字幕块：序号、时间戳和字幕文本
     pattern = re.compile(
         r"(\d+)\s+(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})\s+(.*?)(?=\n\n|\Z)",
         re.DOTALL,
@@ -137,44 +162,57 @@ def parse_srt_with_re(srt_content):
 
 def save_subtitle_item(subtitle_item, output_path, mode="a"):
     """保存单个字幕项到文件"""
-    with open(output_path, mode, encoding="utf-8") as f:
-        f.write(f"{subtitle_item['index']}\n")
-        f.write(f"{subtitle_item['start_time']} --> {subtitle_item['end_time']}\n")
-        f.write(f"{subtitle_item['text']}\n\n")
+    try:
+        with open(output_path, mode, encoding="utf-8") as f:
+            f.write(f"{subtitle_item['index']}\n")
+            f.write(f"{subtitle_item['start_time']} --> {subtitle_item['end_time']}\n")
+            f.write(f"{subtitle_item['text']}\n\n")
+        return True
+    except Exception as e:
+        print(f"❌ 保存字幕失败: {e}")
+        return False
 
 
 def setup_ali_client():
     """设置阿里云千问大模型客户端"""
     api_key = os.getenv("DASHSCOPE_API_KEY")
     if not api_key:
-        print("错误: 环境变量 DASHSCOPE_API_KEY 未设置！请设置API密钥。")
-        print("设置方法: export DASHSCOPE_API_KEY=你的密钥")
+        print("❌ 环境变量 DASHSCOPE_API_KEY 未设置！")
+        print("💡 设置方法: export DASHSCOPE_API_KEY=你的密钥")
         sys.exit(1)
 
-    client = OpenAI(
-        api_key=api_key,
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-    )
-    return client
+    try:
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
+        return client
+    except Exception as e:
+        print(f"❌ 设置阿里云千问API客户端失败: {e}")
+        raise
 
 
 def setup_uni_client():
     """设置uniapi大模型客户端"""
     api_key = os.getenv("UNI_API_KEY")
     if not api_key:
-        print("错误: 环境变量 UNI_API_KEY 未设置！请设置API密钥。")
-        print("设置方法: export UNI_API_KEY=你的密钥")
+        print("❌ 环境变量 UNI_API_KEY 未设置！")
+        print("💡 设置方法: export UNI_API_KEY=你的密钥")
         sys.exit(1)
 
-    client = OpenAI(
-        api_key=api_key,
-        base_url="https://api.uniapi.io/v1",
-    )
-    return client
+    try:
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.uniapi.io/v1",
+        )
+        return client
+    except Exception as e:
+        print(f"❌ 设置uniapi客户端失败: {e}")
+        raise
 
 
-def fix_typos(subtitle, context="", api_type="ali"):
-    """使用指定的大模型检查并修复字幕中的错别字"""
+def fix_typos(subtitle, context="", api_type="ali", max_retries=3):
+    """使用指定的大模型检查并修复字幕中的错别字，包含重试机制"""
     tyro_dict = {
         "元气": "缘起",
         "吟念": "淫念",
@@ -189,103 +227,135 @@ def fix_typos(subtitle, context="", api_type="ali"):
                 一定要注意专业词汇，要专业。如果句子没有错别字，仅回复数字"111"；\
                     如果有错别字，请返回修复后的完整句子，直接返回新句子,不要返回修改前的句子，不要返回类似于：【原句】，修改后：【新句】这样的错误结构。不要对任何其他作修改，不要修改标点、引号等内容，不要增加任何内容。'
 
-    try:
-        if api_type == "ali":
-            client = setup_ali_client()
-            model = "qwen-max-0125"
-        else:  # api_type == "uni"
-            client = setup_uni_client()
-            # model = "gemini-2.5-pro-exp-03-25"
-            model = "gpt-4.1-mini"
+    update_api_stats("total_calls")
 
-        completion = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": f'检查这个句子是否有错别字："{subtitle}"。',
-                },
-            ],
-        )
+    for attempt in range(max_retries + 1):
+        try:
+            if attempt > 0:
+                wait_time = 2**attempt
+                time.sleep(wait_time)
+                update_api_stats("retry_calls")
 
-        response = completion.choices[0].message.content.strip()
+            if api_type == "ali":
+                client = setup_ali_client()
+                model = "qwen-max-0125"
+            else:  # api_type == "uni"
+                client = setup_uni_client()
+                model = "doubao-seed-1-6-250615"
 
-        # 去除可能添加的中英文引号
-        response = response.strip('"\'""' "")
+            completion = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "user",
+                        "content": f'检查这个句子是否有错别字："{subtitle}"。',
+                    },
+                ],
+            )
 
-        # 打印原句和大模型返回的结果
-        print(f"原句: {subtitle}")
-        print(f"AI返回: {response}")
+            response = completion.choices[0].message.content.strip()
+            update_api_stats("successful_calls")
 
-        # 如果回复是"111"，表示无错误，返回原句
-        if response == "111":
-            print("结果: 无需修改")
-            return subtitle
-        else:
-            print(f"结果: 已修正为: {response}")
-            return response
-    except Exception as e:
-        print(f"API调用错误：{e}")
-        return subtitle  # 发生错误时返回原句
+            # 去除可能添加的中英文引号
+            response = response.strip('"\'""' "")
+
+            # 打印原句和大模型返回的结果
+            print(f"📝 原句: {subtitle}")
+            print(f"🤖 AI返回: {response}")
+
+            # 如果回复是"111"，表示无错误，返回原句
+            if response == "111":
+                print("✅ 无需修改")
+                print("─" * 50)  # 添加分割线
+                return subtitle
+            else:
+                print("🔧 已修正")
+                print("─" * 50)  # 添加分割线
+                return response
+
+        except Exception as e:
+            error_message = str(e).lower()
+
+            # 分类处理不同类型的错误
+            if "rate limit" in error_message or "limit exceeded" in error_message:
+                update_api_stats("rate_limit_errors")
+                if attempt < max_retries:
+                    wait_time = 30 + (attempt * 10)
+                    print(f"💤 API限流，等待 {wait_time} 秒后重试...")
+                    time.sleep(wait_time)
+                    continue
+
+            elif (
+                "connection" in error_message
+                or "timeout" in error_message
+                or "network" in error_message
+            ):
+                update_api_stats("network_errors")
+                if attempt < max_retries:
+                    continue
+
+            elif (
+                "unauthorized" in error_message
+                or "authentication" in error_message
+                or "api_key" in error_message
+            ):
+                update_api_stats("auth_errors")
+                print(f"🔐 API认证错误，请检查API密钥: {e}")
+                break
+
+            elif "not found" in error_message or "invalid model" in error_message:
+                update_api_stats("model_errors")
+                print(f"🤖 模型配置错误: {e}")
+                break
+
+            else:
+                update_api_stats("unknown_errors")
+                if attempt < max_retries:
+                    continue
+
+    # 所有重试都失败了
+    update_api_stats("failed_calls")
+    print(f"❌ API调用失败：{e}")
+    print("⚠️ 保持原句不变")
+    print("─" * 50)  # 添加分割线
+    return subtitle
 
 
 def check_output_file_progress(output_file_path, total_subtitles):
     """检查输出文件的实际完成进度"""
     if not os.path.exists(output_file_path):
-        return 0, False  # 文件不存在，进度为0，未完成
+        return 0, False
 
     try:
         with open(output_file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
-        # 计算已处理的字幕条目数
         pattern = re.compile(
             r"(\d+)\s+(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})"
         )
         matches = pattern.findall(content)
         processed_count = len(matches)
-
-        # 检查是否完全处理
         is_completed = processed_count >= total_subtitles
 
         return processed_count, is_completed
     except Exception as e:
-        print(f"检查输出文件时出错: {e}")
         return 0, False
 
 
 def process_subtitles_concurrently(
-    subtitles, fixed_subtitles, api_type, output_path, batch_size=5
+    subtitles, fixed_subtitles, api_type, output_path, batch_size=5, max_retries=3
 ):
     """并发处理字幕，同时保持顺序并实时写入文件"""
-    results = {}  # 存储处理结果，键为索引，值为修复后的文本
-    lock = Lock()  # 用于保护对结果字典的访问和文件写入
+    results = {}
+    lock = Lock()
 
     def process_subtitle(index, subtitle):
         """处理单个字幕的函数"""
-        print(f"\n字幕 #{index+1}/{len(subtitles)}:")
-
-        # 修复错别字
-        fixed_text = fix_typos(subtitle["text"], "", api_type)
-
+        fixed_text = fix_typos(subtitle["text"], "", api_type, max_retries)
         with lock:
             results[index] = fixed_text
-
         return index, fixed_text
-
-    def safe_save_subtitle(subtitle_item, path):
-        """安全保存字幕到文件，处理可能的权限错误"""
-        try:
-            save_subtitle_item(subtitle_item, path, "a")
-            return True
-        except PermissionError as e:
-            print(f"权限错误: 无法写入文件 {path}")
-            print(f"错误信息: {str(e)}")
-            return False
-        except Exception as e:
-            print(f"保存字幕时出错: {str(e)}")
-            return False
 
     # 使用 ThreadPoolExecutor 进行并发处理
     with concurrent.futures.ThreadPoolExecutor(max_workers=batch_size) as executor:
@@ -310,114 +380,111 @@ def process_subtitles_concurrently(
 
             # 立即将该字幕写入文件
             with lock:
-                if not safe_save_subtitle(subtitles[i], output_path):
-                    print(f"警告: 字幕 #{i+1} 无法保存到文件，但处理会继续")
-
-            print(f"完成处理字幕 #{i+1}/{len(subtitles)}: {results[i]}")
+                save_subtitle_item(subtitles[i], output_path)
 
     return subtitles
 
 
 def process_srt_file(
-    input_path, output_path, channel, srt_file, api_type, batch_size=5
+    input_path,
+    output_path,
+    channel,
+    srt_file,
+    api_type,
+    batch_size=5,
+    max_retries=3,
+    force_reprocess=False,
 ):
     """处理单个SRT文件，并发修复错别字并保存"""
-    print(f"正在处理：{input_path}")
+    print(f"\n🎬 处理文件: {channel}/{srt_file}")
 
     try:
-        # 检查输出目录是否可写
-        output_dir = os.path.dirname(output_path)
-        if not os.access(output_dir, os.W_OK):
-            print(f"警告: 没有权限写入目录 {output_dir}")
-            print("解决方案: 请尝试以下命令为目录添加写入权限:")
-            print(f"sudo chmod -R 775 {output_dir}")
-            print("或者更改输出目录到本地可写目录:")
-            print("python fix_tyro.py -o /home/$USER/srt_fixed")
+        # 检查输入文件是否存在
+        if not os.path.exists(input_path):
+            print(f"❌ 输入文件不存在: {input_path}")
             return
 
-        # 读取SRT文件内容
-        srt_content = read_srt_file(input_path)
+        # 检查输出目录权限
+        output_dir = os.path.dirname(output_path)
+        if not os.access(output_dir, os.W_OK):
+            print(f"❌ 没有权限写入目录 {output_dir}")
+            return
 
-        # 解析SRT内容
+        # 读取和解析SRT文件
+        srt_content = read_srt_file(input_path)
         subtitles = parse_srt_with_re(srt_content)
 
         if not subtitles:
-            print(f"警告: 文件 {input_path} 似乎没有有效的字幕内容")
+            print(f"⚠️  文件似乎没有有效的字幕内容")
             return
+
+        print(f"📚 找到 {len(subtitles)} 个字幕条目")
 
         # 检查输出文件的实际进度
         file_progress, is_file_completed = check_output_file_progress(
             output_path, len(subtitles)
         )
 
-        # 如果输出文件已完全处理，则跳过
-        if is_file_completed:
-            print(f"文件 {srt_file} 已完全处理（根据输出文件检查），跳过")
+        # 如果输出文件已完全处理且不是强制重新处理，则跳过
+        if is_file_completed and not force_reprocess:
+            print(f"✅ 文件已完全处理，跳过")
             return
+        elif force_reprocess and is_file_completed:
+            print(f"🔄 强制重新处理文件")
+            file_progress = 0
 
-        # 如果输出文件存在但不完整，则从断点继续
+        # 处理逻辑
         start_index = file_progress
-        if file_progress > 0:
-            print(f"检测到输出文件，从字幕 #{start_index+1} 继续处理")
+        if file_progress > 0 and not force_reprocess:
+            print(f"⚡ 断点续传，从第 {start_index+1} 个字幕继续")
         else:
-            # 如果是新文件，先清空输出文件
+            # 创建新的输出文件
             try:
                 with open(output_path, "w", encoding="utf-8") as f:
                     pass
             except PermissionError:
-                print(f"错误: 没有权限创建或写入文件 {output_path}")
-                print("解决方案: 请尝试以下命令为目录添加写入权限:")
-                print(f"sudo chmod -R 775 {os.path.dirname(output_path)}")
-                print("或者更改输出目录到本地可写目录:")
-                print("python fix_tyro.py -o /home/$USER/srt_fixed")
+                print(f"❌ 没有权限创建文件 {output_path}")
                 return
 
         # 用于保存已修复的字幕，作为上下文
         fixed_subtitles = []
 
-        # 如果从中间继续处理，需要读取已经处理过的字幕作为上下文
+        # 如果从中间继续处理，读取已处理的字幕
         if start_index > 0:
             with open(output_path, "r", encoding="utf-8") as f:
                 output_content = f.read()
-
-            # 解析已处理的字幕文本
             processed_subtitles = parse_srt_with_re(output_content)
-            # 添加到已修复字幕列表
             fixed_subtitles.extend(
                 [subtitle["text"] for subtitle in processed_subtitles]
             )
 
         # 并发修复错别字 - 只处理未处理的部分
         remaining_subtitles = subtitles[start_index:]
-        print(
-            f"使用并发方式处理剩余的 {len(remaining_subtitles)} 个字幕，批量大小: {batch_size}"
-        )
+        print(f"🚀 开始处理剩余的 {len(remaining_subtitles)} 个字幕")
 
-        # 处理剩余字幕
-        with tqdm(total=len(remaining_subtitles), desc="修复错别字") as pbar:
-            processed_subtitles = process_subtitles_concurrently(
-                remaining_subtitles, fixed_subtitles, api_type, output_path, batch_size
-            )
+        if remaining_subtitles:
+            with tqdm(
+                total=len(remaining_subtitles), desc="🔧 修复错别字", ncols=80
+            ) as pbar:
+                processed_subtitles = process_subtitles_concurrently(
+                    remaining_subtitles,
+                    fixed_subtitles,
+                    api_type,
+                    output_path,
+                    batch_size,
+                    max_retries,
+                )
 
-            # 更新进度条
-            for _ in range(len(remaining_subtitles)):
-                pbar.update(1)
+                # 更新进度条
+                for _ in range(len(remaining_subtitles)):
+                    pbar.update(1)
 
-        print(f"已完成文件处理：{output_path}")
+        print(f"✅ 文件处理完成: {srt_file}")
 
     except PermissionError as e:
-        print(f"权限错误: {input_path}")
-        print(f"错误信息: {str(e)}")
-        print("\n解决方案:")
-        print(
-            f"1. 确保挂载的设备有写入权限: sudo mount -o remount,rw {os.path.dirname(output_path)}"
-        )
-        print(
-            f"2. 更改输出目录到本地可写目录: python fix_tyro.py -o /home/$USER/srt_fixed"
-        )
+        print(f"❌ 权限错误: {e}")
     except Exception as e:
-        print(f"处理文件时出错: {input_path}")
-        print(f"错误信息: {str(e)}")
+        print(f"❌ 处理文件时出错: {e}")
 
 
 def get_transcription_base_path():
@@ -438,6 +505,8 @@ def get_base_path():
 
 def main():
     """处理指定目录结构中的中文SRT文件"""
+    print("🎯 SRT字幕错别字修复工具启动")
+
     # 获取基础路径
     base_path = get_base_path()
     transcription_base_path = get_transcription_base_path()
@@ -478,126 +547,181 @@ def main():
         default=5,
         help="并发处理的批量大小",
     )
+    parser.add_argument(
+        "-r",
+        "--max_retries",
+        type=int,
+        default=3,
+        help="API调用失败时的最大重试次数（默认3次）",
+    )
+    parser.add_argument(
+        "-n",
+        "--max_files",
+        type=int,
+        default=None,
+        help="最大新处理文件数量（从未完成的文件中选择指定数量处理，默认处理所有未完成文件）",
+    )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="强制重新处理所有文件，忽略断点续传",
+    )
 
     # 解析命令行参数
     args = parser.parse_args()
     api_type = args.api
     batch_size = args.batch_size
-    
-    # 设置输入路径：如果没有指定-i参数，则使用转录输出路径
+    max_retries = args.max_retries
+    max_files = args.max_files
+    force_reprocess = args.force
+
+    print(f"🔧 配置: API={api_type}, 并发={batch_size}, 重试={max_retries}")
+
+    # 设置输入路径
     if args.input is None:
-        input_base_dir = transcription_base_path  # 直接使用基础路径，不再添加topic
+        input_base_dir = transcription_base_path
     else:
         input_base_dir = args.input
-    
+
     output_base_dir = args.output
 
     # 如果选择使用本地目录
     if args.local:
         local_output_dir = os.path.join(home_path, "srt_fixed")
         output_base_dir = local_output_dir
-        print(f"使用本地输出目录: {output_base_dir}")
+        print(f"📁 使用本地输出目录: {output_base_dir}")
 
-    print(f"使用 {api_type} API 进行错别字修复")
-    print(f"检测到系统: {platform.system()}")
-    print(f"转录基础路径: {transcription_base_path}")
-    print(f"输入目录: {input_base_dir}")
-    print(f"输出目录: {output_base_dir}")
-    print(f"并发批量大小: {batch_size}")
+    print(f"📂 输入目录: {input_base_dir}")
+    print(f"📂 输出目录: {output_base_dir}")
 
     # 检查输入目录是否存在
     if not os.path.exists(input_base_dir):
-        print(f"错误: 输入目录不存在: {input_base_dir}")
+        print(f"❌ 输入目录不存在: {input_base_dir}")
         return
 
     # 检查输出目录权限
     try:
-        # 确保输出基础目录存在
         if not os.path.exists(output_base_dir):
             os.makedirs(output_base_dir)
-            print(f"已创建输出基础目录: {output_base_dir}")
+            print(f"✅ 创建输出目录: {output_base_dir}")
     except PermissionError:
-        print(f"错误: 没有权限创建输出目录: {output_base_dir}")
-        print("建议使用 -l/--local 选项使用本地目录作为输出，或手动指定可写目录:")
-        print("python fix_tyro.py -o /home/$USER/srt_fixed")
+        print(f"❌ 没有权限创建输出目录: {output_base_dir}")
+        print("💡 建议使用 -l 选项使用本地目录")
         return
 
     # 检查API密钥是否设置
     if api_type == "ali" and not os.getenv("DASHSCOPE_API_KEY"):
-        print("错误: 环境变量 DASHSCOPE_API_KEY 未设置！请设置API密钥。")
-        print("设置方法: export DASHSCOPE_API_KEY=你的密钥")
+        print("❌ 环境变量 DASHSCOPE_API_KEY 未设置！")
+        print("💡 设置方法: export DASHSCOPE_API_KEY=你的密钥")
         return
     elif api_type == "uni" and not os.getenv("UNI_API_KEY"):
-        print("错误: 环境变量 UNI_API_KEY 未设置！请设置API密钥。")
-        print("设置方法: export UNI_API_KEY=你的密钥")
+        print("❌ 环境变量 UNI_API_KEY 未设置！")
+        print("💡 设置方法: export UNI_API_KEY=你的密钥")
         return
 
     # 获取所有频道目录
     try:
+        all_items = os.listdir(input_base_dir)
         channels = [
             d
-            for d in os.listdir(input_base_dir)
+            for d in all_items
             if os.path.isdir(os.path.join(input_base_dir, d)) and not d.startswith(".")
         ]
-        print(f"找到 {len(channels)} 个频道目录")
+
+        print(f"📺 找到 {len(channels)} 个频道目录")
 
         if not channels:
-            print(f"警告: 在 {input_base_dir} 中未找到任何频道目录")
+            print(f"⚠️  未找到任何频道目录")
             return
     except Exception as e:
-        print(f"无法读取频道目录: {str(e)}")
+        print(f"❌ 无法读取频道目录: {e}")
         return
 
-    for channel in channels:
+    total_files_processed = 0
+    total_files_found = 0
+    total_files_skipped = 0
+
+    for channel_idx, channel in enumerate(channels, 1):
+        # 检查是否已达到最大新处理文件数限制
+        if max_files and total_files_processed >= max_files:
+            print(f"🔒 已达到最大新处理文件数限制 ({max_files})，停止处理")
+            break
+
         input_channel_dir = os.path.join(input_base_dir, channel)
         output_channel_dir = os.path.join(output_base_dir, channel)
 
-        print(f"\n处理频道: {channel}")
-        print(f"输入目录: {input_channel_dir}")
-        print(f"输出目录: {output_channel_dir}")
+        print(f"\n📺 处理频道 {channel_idx}/{len(channels)}: {channel}")
 
         # 确保输出频道目录存在
         try:
             if not os.path.exists(output_channel_dir):
                 os.makedirs(output_channel_dir)
-                print(f"已创建频道输出目录: {output_channel_dir}")
         except PermissionError:
-            print(f"错误: 没有权限创建频道输出目录: {output_channel_dir}")
+            print(f"❌ 没有权限创建频道输出目录: {output_channel_dir}")
             continue
 
         # 检查是否为双层目录结构 (format_srt_zh/channel/channel/XXX.srt)
-        # 先检查当前频道目录下是否有子目录与频道同名
         inner_channel_dir = os.path.join(input_channel_dir, channel)
         if os.path.exists(inner_channel_dir) and os.path.isdir(inner_channel_dir):
-            # 使用双层目录结构
             actual_input_dir = inner_channel_dir
-            print(f"检测到双层目录结构，使用: {actual_input_dir}")
         else:
-            # 使用单层目录结构
             actual_input_dir = input_channel_dir
-            print(f"使用单层目录结构，使用: {actual_input_dir}")
 
-        # 获取实际目录下的所有SRT文件
+        # 获取所有SRT文件
         try:
+            all_files = os.listdir(actual_input_dir)
             srt_files = [
-                f
-                for f in os.listdir(actual_input_dir)
-                if f.endswith(".srt") and not f.startswith(".")
+                f for f in all_files if f.endswith(".srt") and not f.startswith(".")
             ]
-            print(f"找到 {len(srt_files)} 个SRT文件")
+            total_files_found += len(srt_files)
 
             if not srt_files:
-                print(f"警告: 在频道 {channel} 中未找到任何SRT文件")
+                print(f"⚠️  频道 {channel} 中未找到SRT文件")
                 continue
+
+            print(f"📄 找到 {len(srt_files)} 个SRT文件")
         except Exception as e:
-            print(f"无法读取频道 {channel} 中的SRT文件: {str(e)}")
+            print(f"❌ 无法读取频道 {channel} 中的SRT文件: {e}")
             continue
 
-        for srt_file in srt_files:
+        channel_files_processed = 0
+        channel_files_skipped = 0
+
+        for file_idx, srt_file in enumerate(srt_files, 1):
+            # 检查是否已达到最大新处理文件数限制
+            if max_files and total_files_processed >= max_files:
+                print(f"🔒 已达到最大新处理文件数限制 ({max_files})")
+                break
+
             input_file_path = os.path.join(actual_input_dir, srt_file)
             output_file_path = os.path.join(output_channel_dir, srt_file)
 
-            # 使用新的处理函数处理文件
+            # 检查文件是否已经完成处理
+            if not force_reprocess:
+                try:
+                    srt_content = read_srt_file(input_file_path)
+                    subtitles = parse_srt_with_re(srt_content)
+                    total_subtitles = len(subtitles)
+
+                    _, is_completed = check_output_file_progress(
+                        output_file_path, total_subtitles
+                    )
+
+                    if is_completed:
+                        print(
+                            f"⏭️  跳过已完成文件 {file_idx}/{len(srt_files)}: {srt_file}"
+                        )
+                        channel_files_skipped += 1
+                        total_files_skipped += 1
+                        continue
+
+                except Exception as e:
+                    pass  # 检查出错时继续处理该文件
+
+            print(f"\n⚡ 处理文件 {file_idx}/{len(srt_files)} 在频道 {channel}")
+
+            # 处理文件
             process_srt_file(
                 input_file_path,
                 output_file_path,
@@ -605,7 +729,24 @@ def main():
                 srt_file,
                 api_type,
                 batch_size,
+                max_retries,
+                force_reprocess,
             )
+
+            total_files_processed += 1
+            channel_files_processed += 1
+
+        print(
+            f"✅ 频道 {channel} 完成: 跳过{channel_files_skipped}个，新处理{channel_files_processed}个"
+        )
+
+    print(f"\n🎉 所有处理完成！")
+    print(f"📊 总共找到: {total_files_found} 个文件")
+    print(f"⏭️  跳过已完成: {total_files_skipped} 个文件")
+    print(f"🆕 新处理: {total_files_processed} 个文件")
+
+    # 打印API调用统计信息
+    print_api_stats()
 
 
 if __name__ == "__main__":
