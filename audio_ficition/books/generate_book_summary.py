@@ -204,7 +204,7 @@ Return only a single, continuous block of plain text.
 Do not include any stage directions, sound effects, or parenthetical descriptions of tone or music.
 This text must be directly readable by an audio engine without requiring any further modification.
 Make 100% sure the story is long enough to be a full audiobook, which is at least 15 minutes long.
-Ensure the total word count reaches at least 2500 words.
+Ensure the total word count reaches at least 5000 words.
 """
 
     def load_book_info_list(self):
