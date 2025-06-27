@@ -14,6 +14,7 @@
 3. 优化的FFmpeg参数选择
 4. 更高效的文件系统操作
 5. 智能资源管理
+6. 输出文件时长验证，确保处理质量
 
 目录结构:
 - 输入MP4目录: /Volumes/dhl/buda_videos_youtube/mp4_merge_silient/
@@ -39,6 +40,7 @@ from typing import List, Dict, Tuple, Optional, Set
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 import threading
+import re
 
 
 @dataclass
@@ -80,6 +82,7 @@ class OptimizedSubtitleProcessor:
         self.gpu_info = None
         self.validated_paths = set()
         self.system_info = self._get_system_info()
+        self.duration_cache = {}  # 缓存文件时长信息
         
         # 性能统计
         self.stats = {
@@ -88,7 +91,10 @@ class OptimizedSubtitleProcessor:
             'failed_tasks': 0,
             'total_processing_time': 0.0,
             'io_time': 0.0,
-            'encoding_time': 0.0
+            'encoding_time': 0.0,
+            'files_checked': 0,
+            'invalid_files_removed': 0,
+            'duration_check_time': 0.0
         }
         
         # 设置日志
@@ -213,6 +219,141 @@ class OptimizedSubtitleProcessor:
             self.logger.error("未找到ffmpeg，请先安装ffmpeg")
             return False
     
+    def get_video_duration(self, video_path: str) -> Optional[float]:
+        """获取视频时长（秒）"""
+        if video_path in self.duration_cache:
+            return self.duration_cache[video_path]
+        
+        try:
+            cmd = [
+                "ffprobe",
+                "-v", "quiet",
+                "-print_format", "json",
+                "-show_format",
+                video_path
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode != 0:
+                self.logger.warning(f"无法获取视频时长: {video_path}")
+                return None
+            
+            data = json.loads(result.stdout)
+            duration = float(data.get('format', {}).get('duration', 0))
+            
+            # 缓存结果
+            self.duration_cache[video_path] = duration
+            return duration
+            
+        except Exception as e:
+            self.logger.warning(f"获取视频时长时出错 {video_path}: {str(e)}")
+            return None
+    
+    def check_output_file_validity(self, input_path: str, output_path: str, max_diff: float = 3.0) -> bool:
+        """检查输出文件是否有效（时长差异是否在允许范围内）"""
+        if not os.path.exists(output_path):
+            return False
+        
+        input_duration = self.get_video_duration(input_path)
+        output_duration = self.get_video_duration(output_path)
+        
+        if input_duration is None or output_duration is None:
+            self.logger.warning(f"无法获取文件时长，将重新生成: {output_path}")
+            return False
+        
+        duration_diff = abs(input_duration - output_duration)
+        
+        if duration_diff > max_diff:
+            self.logger.warning(
+                f"时长差异过大 ({duration_diff:.2f}s > {max_diff}s): "
+                f"输入={input_duration:.2f}s, 输出={output_duration:.2f}s, 文件={output_path}"
+            )
+            return False
+        
+        self.logger.debug(
+            f"时长验证通过 (差异{duration_diff:.2f}s): {output_path}"
+        )
+        return True
+    
+    def validate_and_clean_output_files(self, languages: List[str]) -> int:
+        """验证并清理输出目录中的无效文件"""
+        start_time = time.time()
+        removed_count = 0
+        checked_count = 0
+        
+        self.logger.info("开始检查输出目录中的文件时长...")
+        
+        if not self.output_mp4_path.exists():
+            self.logger.info("输出目录不存在，跳过验证")
+            return 0
+        
+        try:
+            # 遍历输出目录
+            for channel_path in self.output_mp4_path.iterdir():
+                if not channel_path.is_dir() or channel_path.name.startswith('.'):
+                    continue
+                
+                channel = channel_path.name
+                
+                for lang_path in channel_path.iterdir():
+                    if (not lang_path.is_dir() or 
+                        lang_path.name not in languages or 
+                        lang_path.name.startswith('.')):
+                        continue
+                    
+                    language = lang_path.name
+                    
+                    # 获取所有输出MP4文件
+                    output_files = list(lang_path.glob("*.mp4"))
+                    output_files = [f for f in output_files if not f.name.startswith('.')]
+                    
+                    for output_file in output_files:
+                        checked_count += 1
+                        video_name = output_file.stem
+                        
+                        # 对应的输入文件
+                        input_file = self.input_mp4_path / channel / language / f"{video_name}.mp4"
+                        
+                        if not input_file.exists():
+                            self.logger.warning(f"对应输入文件不存在，删除输出文件: {output_file}")
+                            try:
+                                output_file.unlink()
+                                removed_count += 1
+                            except Exception as e:
+                                self.logger.error(f"删除文件失败 {output_file}: {str(e)}")
+                            continue
+                        
+                        # 检查时长是否有效
+                        if not self.check_output_file_validity(str(input_file), str(output_file)):
+                            self.logger.info(f"删除无效输出文件: {output_file}")
+                            try:
+                                output_file.unlink()
+                                removed_count += 1
+                            except Exception as e:
+                                self.logger.error(f"删除文件失败 {output_file}: {str(e)}")
+        
+        except Exception as e:
+            self.logger.error(f"验证输出文件时出错: {str(e)}")
+        
+        validation_time = time.time() - start_time
+        self.stats['duration_check_time'] += validation_time
+        self.stats['files_checked'] = checked_count
+        self.stats['invalid_files_removed'] = removed_count
+        
+        self.logger.info(
+            f"文件验证完成: 检查了{checked_count}个文件，删除了{removed_count}个无效文件，"
+            f"耗时{validation_time:.2f}秒"
+        )
+        
+        return removed_count
+    
     def collect_all_tasks(self, languages: List[str], force: bool = False) -> List[TaskInfo]:
         """优化的任务收集，批量处理I/O操作"""
         start_time = time.time()
@@ -228,6 +369,10 @@ class OptimizedSubtitleProcessor:
         if not self.input_mp4_path.exists():
             self.logger.error(f"输入MP4路径不存在: {self.input_mp4_path}")
             return []
+        
+        # 在开始任务收集前，先验证和清理输出文件
+        if not force:  # 如果不是强制模式，才进行验证
+            self.validate_and_clean_output_files(valid_languages)
         
         # 批量扫描所有频道和文件
         self.logger.info("开始批量扫描文件...")
@@ -530,6 +675,10 @@ class OptimizedSubtitleProcessor:
         self.logger.info(f"总耗时: {total_time:.2f}秒")
         self.logger.info(f"I/O耗时: {self.stats['io_time']:.2f}秒")
         self.logger.info(f"编码耗时: {self.stats['encoding_time']:.2f}秒")
+        if self.stats.get('duration_check_time', 0) > 0:
+            self.logger.info(f"时长检查耗时: {self.stats['duration_check_time']:.2f}秒")
+            self.logger.info(f"检查文件数: {self.stats['files_checked']}")
+            self.logger.info(f"删除无效文件数: {self.stats['invalid_files_removed']}")
         if self.stats['successful_tasks'] > 0:
             avg_time = self.stats['total_processing_time'] / self.stats['successful_tasks']
             self.logger.info(f"平均处理时间: {avg_time:.2f}秒/任务")
@@ -540,11 +689,34 @@ class OptimizedSubtitleProcessor:
         """处理单个视频的所有语言版本"""
         tasks = []
         
-        for language in languages:
-            if language not in self.supported_languages:
-                self.logger.warning(f"不支持的语言: {language}")
-                continue
+        # 验证语言支持
+        valid_languages = [lang for lang in languages if lang in self.supported_languages]
+        if not valid_languages:
+            self.logger.error("没有指定任何有效的语言")
+            return
+        
+        # 在处理单个视频前也进行时长验证
+        if not force:
+            self.logger.info(f"检查视频 {channel}/{video_name} 的输出文件...")
+            removed_count = 0
             
+            for language in valid_languages:
+                output_video_path = self.output_mp4_path / channel / language / f"{video_name}.mp4"
+                input_video_path = self.input_mp4_path / channel / language / f"{video_name}.mp4"
+                
+                if (output_video_path.exists() and input_video_path.exists() and 
+                    not self.check_output_file_validity(str(input_video_path), str(output_video_path))):
+                    self.logger.info(f"删除无效输出文件: {output_video_path}")
+                    try:
+                        output_video_path.unlink()
+                        removed_count += 1
+                    except Exception as e:
+                        self.logger.error(f"删除文件失败 {output_video_path}: {str(e)}")
+            
+            if removed_count > 0:
+                self.logger.info(f"删除了 {removed_count} 个无效文件")
+        
+        for language in valid_languages:
             # 构建路径
             input_video_path = self.input_mp4_path / channel / language / f"{video_name}.mp4"
             input_srt_path = self.input_srt_path / channel / language / f"{video_name}.srt"
