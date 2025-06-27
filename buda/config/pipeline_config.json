@@ -1,0 +1,181 @@
+{
+  "pipeline": {
+    "name": "材料生成管道",
+    "version": "1.0",
+    "timeout_seconds": 3600,
+    "max_retries": 2,
+    "retry_delay_seconds": 5
+  },
+  "languages": {
+    "supported": ["en", "ko", "ja", "vi"],
+    "default": ["en", "ko"],
+    "mapping": {
+      "en": "English",
+      "ko": "Korean", 
+      "ja": "Japanese",
+      "vi": "Vietnamese"
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "console_output": true,
+    "file_output": true,
+    "log_directory": "logs"
+  },
+  "system_rules": {
+    "mac_skip_scripts": ["mp3tofineEngsrt.py"],
+    "mac_skip_reason": "🍎 检测到Mac系统，自动跳过此步骤"
+  },
+  "steps": [
+    {
+      "script": "mp3tofineEngsrt.py",
+      "step_number": "1",
+      "description": "生成原始 srt 文件",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "fix_tyro.py",
+      "step_number": "2",
+      "description": "生成修复的中文 srt 文件",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "split_sentences_zh_srt.py",
+      "step_number": "2.1",
+      "description": "对中文进行分句得到分句后的txt",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "translate_srt_zh_multi.py",
+      "step_number": "3",
+      "description": "得到不同语种的 txt",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null,
+      "requires_languages": true
+    },
+    {
+      "script": "generate_mp3_clips.py",
+      "step_number": "4.1",
+      "description": "生成多语种 mp3 clips (第1次)",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": 3,
+      "requires_languages": true
+    },
+    {
+      "script": "generate_mp3_clips.py",
+      "step_number": "4.2",
+      "description": "生成多语种 mp3 clips (第2次)",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": 3,
+      "requires_languages": true
+    },
+    {
+      "script": "generate_mp3_clips.py",
+      "step_number": "4.3",
+      "description": "生成多语种 mp3 clips (第3次)",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": 3,
+      "requires_languages": true
+    },
+    {
+      "script": "check_and_regenerate_mp3.py",
+      "step_number": "4.1",
+      "description": "检查 mp3 进度，删除坏 mp3，重新生成对应 mp3 clip",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "generate_subtitles.py",
+      "step_number": "5",
+      "description": "得到不同语言对应 srt 字幕",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null,
+      "requires_languages": true
+    },
+    {
+      "script": "merge_mp3.py",
+      "step_number": "6",
+      "description": "把 mp3 clips 合成为一个 mp3",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "merge_mp4_clips_by_audio_duration.py",
+      "step_number": "7",
+      "description": "生成无声且无字幕的 mp4",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "add_subtitles_to_mp4.py",
+      "step_number": "8",
+      "description": "给无声的 mp4 增加字幕",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "merge_mp4_mp3.py",
+      "step_number": "9",
+      "description": "给 mp4 添加音频",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "title_translator_multi_lang.py",
+      "step_number": "10.1",
+      "description": "生成多语言标题翻译结果",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "shorten_titles_multi_lang.py",
+      "step_number": "10.2",
+      "description": "生成简化多语种标题",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "generate_key_phrases.py",
+      "step_number": "11",
+      "description": "生成多语种的封面关键词和简化标题",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "generate_multilingual_thumbnails.py",
+      "step_number": "12",
+      "description": "生成多语种封面",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "generate_multi_lang_descriptions.py",
+      "step_number": "13",
+      "description": "生成多语种视频描述",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    }
+  ]
+}

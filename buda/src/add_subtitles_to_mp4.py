@@ -19,7 +19,13 @@
 2. 为每个视频查找对应的SRT字幕文件
 3. 根据语言选择合适的字体
 4. 使用ffmpeg为视频添加字幕
-5. 顺序处理每个视频（一个处理完成后再处理下一个）
+5. 检查生成视频的时长差异，如果超过阈值则自动重新生成
+6. 顺序处理每个视频（一个处理完成后再处理下一个）
+
+新增功能:
+- 时长差异检查: 自动检查输入视频和输出视频的时长差异
+- 自动重新生成: 如果时长差异超过5秒阈值，自动删除输出文件并重新生成
+- 简化模式回退: 如果标准模式生成的视频仍有问题，自动使用简化模式重新生成
 
 使用方法:
 python add_subtitles_to_mp4.py [-l LANGUAGES] [-f] [-s CHANNEL/VIDEO] [--gpu]
@@ -41,6 +47,7 @@ import logging
 import time
 import glob
 import multiprocessing
+import json
 
 
 def get_base_path():
@@ -103,6 +110,79 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+# 时长差异阈值（秒）
+DURATION_DIFF_THRESHOLD = 5.0
+
+
+def get_video_duration(video_path):
+    """获取视频时长（秒）"""
+    try:
+        cmd = [
+            "ffprobe",
+            "-v", "quiet",
+            "-print_format", "json",
+            "-show_format",
+            video_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode != 0:
+            logger.error(f"获取视频时长失败: {video_path}")
+            logger.error(f"ffprobe错误: {result.stderr}")
+            return None
+            
+        try:
+            data = json.loads(result.stdout)
+            duration = float(data['format']['duration'])
+            return duration
+        except (KeyError, ValueError, json.JSONDecodeError) as e:
+            logger.error(f"解析视频时长数据失败: {str(e)}")
+            return None
+            
+    except subprocess.TimeoutExpired:
+        logger.error(f"获取视频时长超时: {video_path}")
+        return None
+    except Exception as e:
+        logger.error(f"获取视频时长时出错: {str(e)}")
+        return None
+
+
+def check_duration_difference(input_video_path, output_video_path):
+    """检查输入视频和输出视频的时长差异"""
+    try:
+        # 获取输入视频时长
+        input_duration = get_video_duration(input_video_path)
+        if input_duration is None:
+            logger.warning(f"无法获取输入视频时长: {input_video_path}")
+            return False, 0
+            
+        # 获取输出视频时长
+        output_duration = get_video_duration(output_video_path)
+        if output_duration is None:
+            logger.warning(f"无法获取输出视频时长: {output_video_path}")
+            return False, 0
+            
+        # 计算时长差异
+        duration_diff = abs(input_duration - output_duration)
+        
+        logger.info(f"视频时长比较:")
+        logger.info(f"  输入视频: {input_duration:.2f}秒")
+        logger.info(f"  输出视频: {output_duration:.2f}秒")
+        logger.info(f"  时长差异: {duration_diff:.2f}秒")
+        
+        # 检查是否超过阈值
+        if duration_diff > DURATION_DIFF_THRESHOLD:
+            logger.warning(f"时长差异 {duration_diff:.2f}秒 超过阈值 {DURATION_DIFF_THRESHOLD}秒")
+            return True, duration_diff
+        else:
+            logger.info(f"时长差异 {duration_diff:.2f}秒 在可接受范围内")
+            return False, duration_diff
+            
+    except Exception as e:
+        logger.error(f"检查时长差异时出错: {str(e)}")
+        return False, 0
 
 
 def check_required_tools():
@@ -445,15 +525,77 @@ def process_video(channel, video_name, language, force=False, use_gpu=False):
         OUTPUT_MP4_PATH, channel, language, f"{video_name}.mp4"
     )
 
-    # 如果输出文件已存在且不强制重新生成，则跳过
+    # 检查输出文件是否已存在
     if os.path.exists(output_video_path) and not force:
-        logger.info(f"输出文件已存在，跳过: {output_video_path}")
-        return True
+        # 如果输出文件存在，检查时长差异
+        logger.info(f"输出文件已存在，检查时长差异: {output_video_path}")
+        
+        needs_regeneration, duration_diff = check_duration_difference(
+            input_video_path, output_video_path
+        )
+        
+        if needs_regeneration:
+            logger.warning(f"检测到时长差异过大 ({duration_diff:.2f}秒)，删除输出文件并重新生成")
+            try:
+                os.remove(output_video_path)
+                logger.info(f"已删除输出文件: {output_video_path}")
+            except Exception as e:
+                logger.error(f"删除输出文件失败: {str(e)}")
+                return False
+        else:
+            logger.info(f"时长差异在可接受范围内，跳过处理")
+            return True
 
     # 为视频添加字幕
-    return add_subtitle_to_video(
+    success = add_subtitle_to_video(
         input_video_path, input_srt_path, output_video_path, language, use_gpu
     )
+    
+    # 如果成功生成，再次检查时长差异
+    if success and os.path.exists(output_video_path):
+        logger.info("字幕添加完成，进行时长验证...")
+        
+        needs_regeneration, duration_diff = check_duration_difference(
+            input_video_path, output_video_path
+        )
+        
+        if needs_regeneration:
+            logger.error(f"生成的视频时长差异过大 ({duration_diff:.2f}秒)，尝试使用简化模式重新生成")
+            
+            # 删除有问题的输出文件
+            try:
+                os.remove(output_video_path)
+                logger.info(f"已删除有问题的输出文件: {output_video_path}")
+            except Exception as e:
+                logger.error(f"删除输出文件失败: {str(e)}")
+                return False
+            
+            # 使用简化模式重新生成
+            logger.info("使用简化模式重新生成视频...")
+            success = add_subtitle_to_video_simple(
+                input_video_path, input_srt_path, output_video_path, language
+            )
+            
+            # 再次检查简化模式生成的视频
+            if success and os.path.exists(output_video_path):
+                needs_regeneration_2, duration_diff_2 = check_duration_difference(
+                    input_video_path, output_video_path
+                )
+                
+                if needs_regeneration_2:
+                    logger.error(f"简化模式生成的视频时长差异仍然过大 ({duration_diff_2:.2f}秒)")
+                    return False
+                else:
+                    logger.info("简化模式生成的视频时长验证通过")
+                    return True
+            else:
+                logger.error("简化模式重新生成失败")
+                return False
+        else:
+            logger.info("生成的视频时长验证通过")
+            return True
+    
+    return success
 
 
 def process_all_videos(languages=None, force=False, use_gpu=False):

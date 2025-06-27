@@ -1,0 +1,46 @@
+{
+  "pipeline": {
+    "name": "测试管道",
+    "version": "1.0",
+    "timeout_seconds": 10,
+    "max_retries": 1,
+    "retry_delay_seconds": 2
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "console_output": true,
+    "file_output": true,
+    "log_directory": "logs"
+  },
+  "system_rules": {
+    "mac_skip_scripts": [],
+    "mac_skip_reason": "🍎 检测到Mac系统，自动跳过此步骤"
+  },
+  "steps": [
+    {
+      "script": "test_pipeline.py",
+      "step_number": "1",
+      "description": "测试步骤1",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "test_pipeline.py",
+      "step_number": "2",
+      "description": "测试步骤2",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    },
+    {
+      "script": "test_pipeline.py",
+      "step_number": "3",
+      "description": "测试步骤3",
+      "required": true,
+      "timeout_override": null,
+      "max_retries_override": null
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "original": {
+    "script_path": "/Users/donghaoliu/doc/short_whisper/buda/add_subtitles_to_mp4.py",
+    "args": [
+      "-l",
+      "en",
+      "-s",
+      "test_channel/test_video"
+    ],
+    "start_time": "2025-06-27T12:34:05.773290",
+    "end_time": "2025-06-27T12:34:06.148598",
+    "execution_time": 0.37531089782714844,
+    "return_code": 0,
+    "success": true,
+    "stdout_lines": 0,
+    "stderr_lines": 3,
+    "parsed_stats": {}
+  },
+  "optimized": {
+    "script_path": "/Users/donghaoliu/doc/short_whisper/buda/add_subtitles_to_mp4_optimized.py",
+    "args": [
+      "-l",
+      "en",
+      "-s",
+      "test_channel/test_video"
+    ],
+    "start_time": "2025-06-27T12:34:06.149201",
+    "end_time": "2025-06-27T12:34:06.393220",
+    "execution_time": 0.24401402473449707,
+    "return_code": 0,
+    "success": true,
+    "stdout_lines": 0,
+    "stderr_lines": 3,
+    "parsed_stats": {}
+  },
+  "improvements": {
+    "execution_time": {
+      "original": 0.37531089782714844,
+      "optimized": 0.24401402473449707,
+      "improvement_percent": 34.983496043624314,
+      "time_saved": 0.13129687309265137
+    }
+  }
+}

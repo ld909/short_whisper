@@ -1,0 +1,53 @@
+2025-06-27 12:23:06,127 - INFO - 检查依赖...
+2025-06-27 12:23:06,127 - ERROR - ❌ voicevox-client 未安装
+2025-06-27 12:23:06,203 - INFO - ✅ pydub 已安装
+2025-06-27 12:23:06,203 - INFO - ✅ ffmpeg 已安装
+2025-06-27 12:23:06,203 - ERROR - 缺少依赖: voicevox-client
+2025-06-27 12:23:06,203 - INFO - 安装命令:
+2025-06-27 12:23:06,204 - INFO -   pip install voicevox-client
+2025-06-27 12:25:29,279 - INFO - 检查依赖...
+2025-06-27 12:25:29,279 - ERROR - ❌ voicevox-client 未安装
+2025-06-27 12:25:29,303 - INFO - ✅ pydub 已安装
+2025-06-27 12:25:29,303 - INFO - ✅ ffmpeg 已安装
+2025-06-27 12:25:29,303 - ERROR - 缺少依赖: voicevox-client
+2025-06-27 12:25:29,303 - INFO - 安装命令:
+2025-06-27 12:25:29,303 - INFO -   pip install voicevox-client
+2025-06-27 12:25:43,969 - INFO - 检查依赖...
+2025-06-27 12:25:43,970 - ERROR - ❌ voicevox-client 未安装
+2025-06-27 12:25:43,991 - INFO - ✅ pydub 已安装
+2025-06-27 12:25:43,991 - INFO - ✅ ffmpeg 已安装
+2025-06-27 12:25:43,991 - ERROR - 缺少依赖: voicevox-client
+2025-06-27 12:25:43,991 - INFO - 安装命令:
+2025-06-27 12:25:43,991 - INFO -   pip install voicevox-client
+2025-06-27 12:28:09,523 - INFO - 检查依赖...
+2025-06-27 12:28:09,802 - INFO - ✅ voicevox-client 已安装
+2025-06-27 12:28:09,812 - INFO - ✅ pydub 已安装
+2025-06-27 12:28:09,812 - INFO - ✅ ffmpeg 已安装
+2025-06-27 12:28:09,812 - INFO - 检查 VOICEVOX Engine 连接 (localhost:50021)...
+2025-06-27 12:28:10,059 - INFO - Close http client
+2025-06-27 12:28:10,067 - ERROR - ❌ 无法连接到 VOICEVOX Engine: 'Client' object has no attribute 'version'
+2025-06-27 12:28:10,067 - INFO - 请确保 VOICEVOX Engine 正在运行:
+2025-06-27 12:28:10,067 - INFO -   Docker 启动命令:
+2025-06-27 12:28:10,067 - INFO -   docker run -d --rm -p 50021:50021 voicevox/voicevox_engine:cpu-ubuntu20.04-latest
+2025-06-27 12:28:35,827 - INFO - 检查依赖...
+2025-06-27 12:28:36,173 - INFO - ✅ voicevox-client 已安装
+2025-06-27 12:28:36,184 - INFO - ✅ pydub 已安装
+2025-06-27 12:28:36,185 - INFO - ✅ ffmpeg 已安装
+2025-06-27 12:28:36,185 - INFO - 检查 VOICEVOX Engine 连接 (localhost:50021)...
+2025-06-27 12:28:36,722 - INFO - HTTP Request: GET http://localhost:50021/version "HTTP/1.1 503 Service Unavailable"
+2025-06-27 12:28:36,723 - INFO - Close http client
+2025-06-27 12:28:36,723 - ERROR - ❌ 无法连接到 VOICEVOX Engine: Expecting value: line 1 column 1 (char 0)
+2025-06-27 12:28:36,723 - INFO - 请确保 VOICEVOX Engine 正在运行:
+2025-06-27 12:28:36,723 - INFO -   Docker 启动命令:
+2025-06-27 12:28:36,723 - INFO -   docker run -d --rm -p 50021:50021 voicevox/voicevox_engine:cpu-ubuntu20.04-latest
+2025-06-27 12:29:08,987 - INFO - 检查依赖...
+2025-06-27 12:29:09,310 - INFO - ✅ voicevox-client 已安装
+2025-06-27 12:29:09,319 - INFO - ✅ pydub 已安装
+2025-06-27 12:29:09,320 - INFO - ✅ ffmpeg 已安装
+2025-06-27 12:29:09,320 - INFO - 检查 VOICEVOX Engine 连接 (localhost:50021)...
+2025-06-27 12:29:09,728 - INFO - HTTP Request: GET http://localhost:50021/version "HTTP/1.1 503 Service Unavailable"
+2025-06-27 12:29:09,729 - INFO - Close http client
+2025-06-27 12:29:09,729 - ERROR - ❌ 无法连接到 VOICEVOX Engine: Expecting value: line 1 column 1 (char 0)
+2025-06-27 12:29:09,730 - INFO - 请确保 VOICEVOX Engine 正在运行:
+2025-06-27 12:29:09,730 - INFO -   Docker 启动命令:
+2025-06-27 12:29:09,730 - INFO -   docker run -d --rm -p 50021:50021 voicevox/voicevox_engine:cpu-ubuntu20.04-latest
