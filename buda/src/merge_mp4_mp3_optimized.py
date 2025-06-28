@@ -3,18 +3,108 @@
 
 """
 优化版合并MP4和MP3文件脚本
------------------------
+=========================
+
+功能说明:
+--------
+本脚本用于将带字幕的MP4视频文件与对应的MP3音频文件合并，生成包含音频的最终视频文件。
+支持多频道、多语言的批量处理，具有并行处理、GPU加速、智能音频编码等优化功能。
+
+使用方法:
+--------
+1. 列出所有可用频道:
+   python merge_mp4_mp3_optimized.py --list-channels
+
+2. 列出指定频道的所有语言:
+   python merge_mp4_mp3_optimized.py --list-languages [频道名]
+
+3. 处理指定频道的所有文件:
+   python merge_mp4_mp3_optimized.py -c [频道名]
+
+4. 处理指定频道和语言的文件:
+   python merge_mp4_mp3_optimized.py -c [频道名] -l [语言代码]
+
+5. 处理指定文件:
+   python merge_mp4_mp3_optimized.py -c [频道名] -l [语言代码] -f [文件名]
+
+6. 使用GPU加速处理:
+   python merge_mp4_mp3_optimized.py -c [频道名] --gpu
+
+7. 设置并行处理数量:
+   python merge_mp4_mp3_optimized.py -c [频道名] --workers 8 --batch-size 20
+
+命令参数说明:
+------------
+-c, --channel         指定要处理的频道名
+-l, --language        指定要处理的语言代码 (如: en, zh, ja, ko等)
+-f, --file           指定要处理的文件名 (不含扩展名)
+--list-channels      列出所有可用频道
+--list-languages     列出指定频道的所有可用语言
+--force              强制重新生成已存在的文件
+--base-path          指定自定义的基础路径，覆盖默认路径
+--gpu                启用GPU硬件加速 (需要支持的显卡)
+--workers            并行处理的worker数量 (默认为CPU核心数)
+--batch-size         批量处理的文件数量 (默认10)
+--no-audio-encode    如果音频已是AAC格式则跳过重编码
+
+使用示例:
+--------
+# 查看可用频道
+python merge_mp4_mp3_optimized.py --list-channels
+
+# 查看频道的语言
+python merge_mp4_mp3_optimized.py --list-languages my_channel
+
+# 处理整个频道
+python merge_mp4_mp3_optimized.py -c my_channel
+
+# 处理指定语言
+python merge_mp4_mp3_optimized.py -c my_channel -l en
+
+# 处理单个文件
+python merge_mp4_mp3_optimized.py -c my_channel -l en -f video_001
+
+# 使用GPU加速和并行处理
+python merge_mp4_mp3_optimized.py -c my_channel --gpu --workers 8
+
+# 强制重新生成所有文件
+python merge_mp4_mp3_optimized.py -c my_channel --force
+
+目录结构要求:
+-----------
+基础路径 (默认):
+- Mac: /Volumes/dhl/buda_videos_youtube
+- Linux: /media/dhl/buda_videos_youtube
+
+输入目录:
+- MP4文件: {基础路径}/mp4_multi_with_subtitles/{频道}/{语言}/*.mp4
+- MP3文件: {基础路径}/merge_multi_lange_mp3/{频道}/{语言}/*.mp3
+
+输出目录:
+- 合并文件: {基础路径}/mp4_with_audio/{频道}/{语言}/*.mp4
+
+系统要求:
+--------
+- FFmpeg (必须安装并在PATH中)
+- Python 3.6+
+- 可选: 支持硬件加速的GPU (NVIDIA/AMD/Intel)
+
+注意事项:
+--------
+1. 确保MP4和MP3文件名一致 (扩展名除外)
+2. 视频和音频的时长差异不能超过2秒
+3. 处理过程中按3次'q'键可以安全退出
+4. GPU加速仅在Linux系统上启用，Mac系统会自动禁用
+5. 会自动跳过Mac系统生成的点开头文件
+
 相比原版本的主要优化：
+--------------------
 1. 并行处理多个文件
 2. 批量ffmpeg操作
 3. 智能音频格式检测，避免不必要的重编码
 4. 改进的GPU加速支持
 5. 更好的内存管理和错误处理
-
-新增参数:
-  --workers     并行处理的worker数量 (默认为CPU核心数)
-  --batch-size  批量处理的文件数量 (默认10)
-  --no-audio-encode  如果MP3已经是AAC格式则跳过重编码
+6. 实时进度显示和统计信息
 """
 
 import os
@@ -400,7 +490,7 @@ def process_channel_language_parallel(
                 break
 
             try:
-                results = future.get()
+                results = future.result()
                 for filename, success, message in results:
                     total_processed += 1
                     if success:

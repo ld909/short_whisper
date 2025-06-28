@@ -130,7 +130,7 @@
       "max_retries_override": null
     },
     {
-      "script": "merge_mp4_mp3.py",
+      "script": "merge_mp4_mp3_optimized.py",
       "step_number": "9",
       "description": "给 mp4 添加音频",
       "required": true,
