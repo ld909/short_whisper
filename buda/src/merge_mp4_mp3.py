@@ -17,7 +17,7 @@
 
 命令行参数:
   -c, --channel     指定要处理的频道名
-  -l, --language    指定要处理的语言
+  -l, --languages   指定要处理的语言列表 (支持: en ja vi ko chinese)
   -f, --file        指定要处理的文件名
   --list-channels   列出所有可用频道
   --list-languages  列出指定频道的所有可用语言
@@ -35,8 +35,14 @@
   # 处理频道'buddha'下语言'chinese'的所有文件
   python merge_mp4_mp3.py -c buddha -l chinese
 
+  # 处理频道'buddha'下多种语言(en, ja)的所有文件
+  python merge_mp4_mp3.py -c buddha -l en ja
+
   # 处理频道'buddha'下语言'chinese'中的特定文件
   python merge_mp4_mp3.py -c buddha -l chinese -f video_name
+
+  # 处理所有频道下的指定语言
+  python merge_mp4_mp3.py -l en ja vi
 
   # 强制重新生成已存在的文件
   python merge_mp4_mp3.py -c buddha -l chinese --force
@@ -83,6 +89,9 @@ BASE_PATH = get_base_path()
 MP4_BASE_DIR = f"{BASE_PATH}/mp4_multi_with_subtitles"
 MP3_BASE_DIR = f"{BASE_PATH}/merge_multi_lange_mp3"
 OUTPUT_BASE_DIR = f"{BASE_PATH}/mp4_with_audio"
+
+# 支持的语言
+SUPPORTED_LANGUAGES = ["en", "ja", "vi", "ko", "chinese"]
 
 # 退出控制
 exit_flag = False
@@ -248,35 +257,48 @@ def process_file(channel, language, file_name, force=False, use_gpu=False):
         return merge_mp4_mp3(mp4_file, mp3_file, output_file, force, use_gpu=use_gpu)
 
 
-def process_channel_language(
-    channel, language=None, specific_file=None, force=False, use_gpu=False
+def process_channel_languages(
+    channel, languages=None, specific_file=None, force=False, use_gpu=False
 ):
-    """处理指定频道和语言的所有文件"""
+    """处理指定频道和语言列表的所有文件"""
     channel_dir = os.path.join(MP4_BASE_DIR, channel)
     if not os.path.exists(channel_dir):
         print(f"错误: 频道目录不存在 {channel_dir}")
         return
 
-    # 获取语言目录
-    if language:
-        language_dirs = (
-            [language] if os.path.isdir(os.path.join(channel_dir, language)) else []
-        )
-        if not language_dirs:
-            print(f"错误: 语言目录不存在 {os.path.join(channel_dir, language)}")
+    # 验证语言是否支持
+    if languages:
+        validated_languages = []
+        for lang in languages:
+            if lang not in SUPPORTED_LANGUAGES:
+                print(f"警告: 不支持的语言 {lang}，将被忽略")
+                continue
+            if not os.path.isdir(os.path.join(channel_dir, lang)):
+                print(f"警告: 语言目录不存在 {os.path.join(channel_dir, lang)}，跳过")
+                continue
+            validated_languages.append(lang)
+        
+        if not validated_languages:
+            print("错误: 没有指定任何有效的语言")
             return
+        
+        language_dirs = validated_languages
     else:
+        # 如果没有指定语言，处理所有可用的语言目录
         language_dirs = [
             d
             for d in os.listdir(channel_dir)
             if os.path.isdir(os.path.join(channel_dir, d)) and not d.startswith(".")
         ]
 
+    print(f"处理频道 {channel} 的语言: {', '.join(language_dirs)}")
+
     for lang in language_dirs:
         if exit_flag:
             print(f"接收到退出信号，停止处理新文件")
             return
 
+        print(f"\n处理语言: {lang}")
         lang_dir = os.path.join(channel_dir, lang)
 
         # 确保MP3语言目录存在
@@ -300,6 +322,13 @@ def process_channel_language(
                 for f in glob.glob(os.path.join(lang_dir, "*.mp4"))
                 if not os.path.basename(f).startswith(".")
             ]
+            
+            if not mp4_files:
+                print(f"在语言目录 {lang} 中未找到任何MP4文件")
+                continue
+                
+            print(f"找到 {len(mp4_files)} 个MP4文件需要处理")
+            
             for mp4_file in mp4_files:
                 if exit_flag:
                     print(f"接收到退出信号，停止处理新文件")
@@ -482,7 +511,13 @@ def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description="合并MP4和MP3文件")
     parser.add_argument("-c", "--channel", help="指定要处理的频道名")
-    parser.add_argument("-l", "--language", help="指定要处理的语言")
+    parser.add_argument(
+        "-l",
+        "--languages",
+        nargs="+",
+        choices=SUPPORTED_LANGUAGES,
+        help=f"指定要处理的语言列表 (可选: {' '.join(SUPPORTED_LANGUAGES)})",
+    )
     parser.add_argument("-f", "--file", help="指定要处理的文件名")
     parser.add_argument("--list-channels", action="store_true", help="列出所有可用频道")
     parser.add_argument(
@@ -547,8 +582,10 @@ def main():
     # 处理指定频道或所有频道
     if args.channel:
         print(f"\n开始处理频道: {args.channel}")
-        process_channel_language(
-            args.channel, args.language, args.file, args.force, use_gpu=use_gpu
+        if args.languages:
+            print(f"指定语言: {', '.join(args.languages)}")
+        process_channel_languages(
+            args.channel, args.languages, args.file, args.force, use_gpu=use_gpu
         )
     else:
         # 获取所有频道
@@ -565,8 +602,10 @@ def main():
                 break
 
             print(f"\n开始处理频道: {channel}")
-            process_channel_language(
-                channel, args.language, args.file, args.force, use_gpu=use_gpu
+            if args.languages:
+                print(f"指定语言: {', '.join(args.languages)}")
+            process_channel_languages(
+                channel, args.languages, args.file, args.force, use_gpu=use_gpu
             )
 
     # 等待可能存在的视频处理完成
