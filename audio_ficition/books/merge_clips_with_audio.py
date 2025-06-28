@@ -17,7 +17,7 @@
 
 📥 输入信息:
 - MP4 Clip目录: /Volumes/dhl/audio/books/{language}/1080_clips/{uuid}.mp4
-- 音频文件目录: /Volumes/dhl/audio/books/{language}/mp3/{uuid}.mp3
+- 完整音频文件目录: /Volumes/dhl/audio/books/{language}/mp3/{uuid}.mp3 (merge_book_audio.py的输出)
 
 📤 输出信息:
 - 合并视频: /Volumes/dhl/audio/books/{language}/mp4_with_audio/{uuid}.mp4
@@ -95,9 +95,13 @@ def get_directories(language="en"):
     base_media_path = get_base_media_path()
     books_path = os.path.join(base_media_path, "books", language)
 
+    # 音频输入路径：从 merge_book_audio.py 的输出路径读取完整音频文件
+    # 这里应该读取合并后的完整音频文件，而不是音频片段
+    audio_input_dir = os.path.join(books_path, "mp3")
+
     return {
         "clips": os.path.join(books_path, "1080_clips"),
-        "audio": os.path.join(books_path, "mp3"),
+        "audio": audio_input_dir,
         "output": os.path.join(books_path, "mp4_with_audio"),
         "covers": os.path.join(books_path, "ytb_cover"),
         "temp": DEFAULT_TEMP_DIR,

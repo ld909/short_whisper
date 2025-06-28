@@ -14,8 +14,10 @@
 - 自动排除Mac系统产生的点文件
 
 📥 输入信息:
-- 文本块目录: /home/dhl/Documents/book/{uuid}/{chunk_index}.txt
-- 音频片段目录: /home/dhl/Documents/audio/mp3_clips/book/{uuid}/{chunk_index}.mp3
+- 文本块目录: /home/dhl/Documents/book/{lang}/{uuid}/{chunk_index}.txt
+- 音频片段目录: 
+  * 中文: /home/dhl/Documents/audio/mp3_clips/book/book_zh/{uuid}/{chunk_index}.mp3
+  * 英文: /home/dhl/Documents/audio/mp3_clips/book/book_en/{uuid}/{chunk_index}.mp3
 
 📤 输出信息:
 - 输出目录: /mnt/dhl/audio/books/en/mp3/{uuid}.mp3
@@ -29,17 +31,20 @@
 5. 按块索引顺序合并音频
 
 💡 使用示例:
-# 合并所有书籍音频
-python merge_book_audio.py
+# 合并英文书籍音频
+python merge_book_audio.py --lang en
+
+# 合并中文书籍音频
+python merge_book_audio.py --lang zh
 
 # 合并指定UUID的书籍
-python merge_book_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012
+python merge_book_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012 --lang en
 
 # 预览模式
-python merge_book_audio.py --preview
+python merge_book_audio.py --preview --lang zh
 
 # 强制重新生成
-python merge_book_audio.py --force-regenerate
+python merge_book_audio.py --force-regenerate --lang en
 """
 
 import os
@@ -54,8 +59,8 @@ from pathlib import Path
 # 文本块目录：chunk_book_summaries.py的输出目录
 DEFAULT_TEXT_BASE_DIR = "/home/dhl/Documents/book"
 
-# 音频片段目录：synthesize_book_audio.py的输出目录
-DEFAULT_AUDIO_BASE_DIR = "/home/dhl/Documents/audio/mp3_clips/book"
+# 音频片段目录：synthesize_book_audio.py的输出目录（支持多语言）
+# 默认为英文，具体路径在运行时根据语言参数确定
 
 # 最终输出目录：合并后的完整音频文件
 DEFAULT_OUTPUT_BASE_DIR = "/mnt/dhl/audio/books/en/mp3"
@@ -69,6 +74,14 @@ MIN_AUDIO_SIZE = 1024
 # 最小合并音频文件大小（字节）
 MIN_MERGED_AUDIO_SIZE = 10240
 # ===================================
+
+
+def get_audio_base_dir(language="en"):
+    """根据语言获取音频片段基础目录"""
+    if language == "zh":
+        return "/home/dhl/Documents/audio/mp3_clips/book/book_zh"
+    else:  # language == "en"
+        return "/home/dhl/Documents/audio/mp3_clips/book/book_en"
 
 
 def check_ubuntu_system():
@@ -567,10 +580,11 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 使用示例:
-  python merge_book_audio.py                                # 合并所有书籍音频
-  python merge_book_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012  # 合并指定UUID的书籍
-  python merge_book_audio.py --preview                      # 预览模式
-  python merge_book_audio.py --force-regenerate             # 强制重新生成
+  python merge_book_audio.py --lang en                      # 合并所有英文书籍音频
+  python merge_book_audio.py --lang zh                      # 合并所有中文书籍音频
+  python merge_book_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012 --lang en  # 合并指定UUID的书籍
+  python merge_book_audio.py --preview --lang zh            # 预览模式
+  python merge_book_audio.py --force-regenerate --lang en   # 强制重新生成
         """
     )
     parser.add_argument(
@@ -583,9 +597,14 @@ def main():
         help=f"文本文件基础目录路径 (默认: {DEFAULT_TEXT_BASE_DIR})"
     )
     parser.add_argument(
+        "--lang", "-l",
+        choices=["en", "zh"], 
+        default="en",
+        help="语言类型: en=英文, zh=中文 (默认: en)"
+    )
+    parser.add_argument(
         "--audio-base-dir", 
-        default=DEFAULT_AUDIO_BASE_DIR, 
-        help=f"音频文件基础目录路径 (默认: {DEFAULT_AUDIO_BASE_DIR})"
+        help="音频文件基础目录路径 (默认：根据语言自动确定)"
     )
     parser.add_argument(
         "--output-base-dir", 
@@ -610,12 +629,28 @@ def main():
 
     args = parser.parse_args()
 
-    text_base_dir = args.text_base_dir
-    audio_base_dir = args.audio_base_dir
+    # 根据语言设置路径
+    language = args.lang
+    
+    # 文本基础目录 - 支持语言参数
+    if args.text_base_dir:
+        text_base_dir = args.text_base_dir
+    else:
+        text_base_dir = f"/home/dhl/Documents/book/{language}"
+    
+    # 音频基础目录 - 根据语言确定
+    if args.audio_base_dir:
+        audio_base_dir = args.audio_base_dir
+    else:
+        audio_base_dir = get_audio_base_dir(language)
+    
     output_base_dir = args.output_base_dir
     temp_dir = args.temp_dir
 
+    lang_name = "中文" if language == "zh" else "英文"
+    
     print(f"\n🎵 书籍音频合并器 (支持断点续传)")
+    print(f"🌍 处理语言: {lang_name} ({language})")
     print(f"📁 文本基础目录: {text_base_dir}")
     print(f"📁 音频基础目录: {audio_base_dir}")
     print(f"📁 输出基础目录: {output_base_dir}")

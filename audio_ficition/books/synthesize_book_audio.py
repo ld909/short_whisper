@@ -24,9 +24,8 @@
 
 📤 输出信息:
 - 多语言输出目录结构:
-  * Ubuntu: /media/dhl/audio/books/{lang}/mp3_clips/
-  * macOS: /Volumes/dhl/audio/books/{lang}/mp3_clips/
-- 输出目录结构: mp3_clips/{uuid}/{chunk_index}.mp3
+  * 中文: /home/dhl/Documents/audio/mp3_clips/book/book_zh/{uuid}/{chunk_index}.mp3
+  * 英文: /home/dhl/Documents/audio/mp3_clips/book/book_en/{uuid}/{chunk_index}.mp3
 - 自动排除Mac系统产生的点文件
 
 🎤 参考音频:
@@ -79,14 +78,14 @@ def get_base_media_path():
 
 def get_paths_for_language(lang="en"):
     """根据语言获取输入和输出路径"""
-    base_media_path = get_base_media_path()
-    
     # 输入目录：从chunk_book_summaries.py的输出目录读取
     input_dir = f"/home/dhl/Documents/book/{lang}"
     
-    # 输出目录：保持原有的输出路径结构
-    base_path = os.path.join(base_media_path, "books", lang)
-    output_dir = os.path.join(base_path, "mp3_clips")
+    # 输出目录：新的统一路径结构
+    if lang == "zh":
+        output_dir = "/home/dhl/Documents/audio/mp3_clips/book/book_zh"
+    else:  # lang == "en"
+        output_dir = "/home/dhl/Documents/audio/mp3_clips/book/book_en"
     
     return input_dir, output_dir
 
