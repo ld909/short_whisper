@@ -9,7 +9,7 @@
 2. 过滤条件：是否发布=1 且 是否已经发布=0 且 频道名称列不为空
 3. 优先使用Excel中的频道信息定位视频文件和相关资源
 4. 从title_shorten_multi_lang和multi_lang_desc目录获取标题和描述
-5. 计算发布时间：基于已发布视频的最远时间+6小时
+5. 计算发布时间：基于已发布视频的最远时间+设定间隔（默认6小时）
 6. 自动发布视频到YouTube（使用Playwright标准方法）
 7. 更新Excel表格，标记为已发布并记录发布时间
 
@@ -33,6 +33,7 @@ python auto_publish_system.py [选项]
 -n, --max-count     最大发布数量 (默认1)
 -d, --dry-run       试运行模式，不实际发布
 -w, --wait-minutes  等待时间（分钟） (默认30)
+-i, --interval      视频间隔时间（小时） (默认6)
 --ads-id           AdsPower浏览器ID (默认kq316tr)
 --studio-url       YouTube Studio URL
 """
@@ -63,7 +64,10 @@ BASE_PATH = get_base_path()
 MP4_DIR = f"{BASE_PATH}/mp4_with_audio"
 TITLE_DIR = f"{BASE_PATH}/title_shorten_multi_lang"
 DESC_DIR = f"{BASE_PATH}/multi_lang_desc"
-TRACKER_FILE = "mp4_publish_tracker.xlsx"
+# Excel文件现在在data目录下
+TRACKER_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "mp4_publish_tracker.xlsx"
+)
 
 # 语言映射
 LANGUAGE_NAMES = {"en": "English", "ko": "Korean"}
@@ -71,11 +75,17 @@ LANGUAGE_NAMES = {"en": "English", "ko": "Korean"}
 
 class AutoPublishSystem:
     def __init__(
-        self, language="en", ads_id="kq316tr", studio_url=None, wait_minutes=30
+        self,
+        language="en",
+        ads_id="kq316tr",
+        studio_url=None,
+        wait_minutes=30,
+        interval_hours=6,
     ):
         self.language = language
         self.ads_id = ads_id
         self.wait_minutes = wait_minutes  # 新增：等待时间（分钟）
+        self.interval_hours = interval_hours  # 新增：视频间隔时间（小时）
 
         # 根据语言自动选择对应的YouTube Studio URL
         if studio_url:
@@ -324,8 +334,8 @@ class AutoPublishSystem:
             base_time = latest_time
             print(f"🔄 选择基准时间: {base_time} (最远发布时间)")
 
-        next_time = base_time + timedelta(hours=6)
-        print(f"➕ 计算过程: {base_time} + 6小时 = {next_time}")
+        next_time = base_time + timedelta(hours=self.interval_hours)
+        print(f"➕ 计算过程: {base_time} + {self.interval_hours}小时 = {next_time}")
         print(f"✅ 最终下一个发布时间: {next_time}")
 
         # 显示时间安排的合理性
@@ -758,26 +768,30 @@ class AutoPublishSystem:
             # 等待上传处理
             page.wait_for_load_state("networkidle")
 
-            # 添加随机延迟，模拟人工操作
-            delay = random.uniform(1.0, 1.5)
-            print(f"等待 {delay:.2f} 秒后开始输入标题...")
-            page.wait_for_timeout(int(delay * 1000))
+            # 固定等待5秒再输入标题
+            print("等待 5 秒后开始输入标题...")
+            page.wait_for_timeout(5000)
 
-            # 输入标题 - 增加更长的等待时间确保页面完全加载
+            # 输入标题 - 使用try-catch处理失败情况
             title_selector = 'div[id="textbox"][aria-label="Add a title that describes your video (type @ to mention a channel)"]'
-            print("等待标题输入框...")
-            page.wait_for_selector(title_selector, state="visible")
+            try:
+                print("等待标题输入框...")
+                page.wait_for_selector(title_selector, state="visible", timeout=10000)
 
-            # 增加额外等待时间，确保输入框完全可用
-            additional_wait = random.uniform(3.0, 5.0)
-            print(f"等待额外 {additional_wait:.2f} 秒确保标题输入框完全可用...")
-            page.wait_for_timeout(int(additional_wait * 1000))
-
-            title_input = page.locator(title_selector)
-            title_input.click()
-            title_input.press("Control+a")
-            title_input.fill(video_content["title"])
-            print(f"已输入标题: {video_content['title']}")
+                title_input = page.locator(title_selector)
+                title_input.click()
+                title_input.press("Control+a")
+                title_input.fill(video_content["title"])
+                print(f"✅ 已成功输入标题: {video_content['title']}")
+            except Exception as title_error:
+                print(f"❌ 标题输入失败: {title_error}")
+                print("🔒 关闭当前tab，认为上传失败...")
+                try:
+                    page.close()
+                    print("✅ 已关闭失败的tab")
+                except Exception as close_error:
+                    print(f"⚠️ 关闭tab时出错: {close_error}")
+                return False
 
             # 添加随机延迟，模拟人工操作
             delay = random.uniform(1.0, 1.5)
@@ -1828,6 +1842,7 @@ class AutoPublishSystem:
         print(f"最大发布数量: {max_count}")
         print(f"试运行模式: {dry_run}")
         print(f"等待时间: {self.wait_minutes}分钟")
+        print(f"视频间隔: {self.interval_hours}小时")
 
         if not dry_run:
             print("\n📌 重要提示:")
@@ -2093,7 +2108,7 @@ def main():
     parser.add_argument(
         "--ads-id",
         default=None,
-        help="AdsPower浏览器ID (默认: 根据语言自动选择，en=kq316tr, ko=kyvhm2m)",
+        help="AdsPower浏览器ID (默认: 根据语言自动选择，en=kq316tr, ko=k10i7fjt)",
     )
     parser.add_argument("--studio-url", help="YouTube Studio频道URL")
     parser.add_argument(
@@ -2103,13 +2118,20 @@ def main():
         default=30,
         help="当tab达到限制时的等待时间（分钟） (默认: 30)",
     )
+    parser.add_argument(
+        "-i",
+        "--interval",
+        type=int,
+        default=6,
+        help="视频间隔时间（小时） (默认: 6)",
+    )
 
     args = parser.parse_args()
 
     # 根据语言自动选择浏览器ID（如果用户没有明确指定）
     if args.ads_id is None:
         if args.language == "ko":
-            ads_id = "kyvhm2m"
+            ads_id = "k10i7fjt"
             print(f"🌏 检测到韩文模式，自动使用浏览器ID: {ads_id}")
         else:  # 默认英文
             ads_id = "kq316tr"
@@ -2130,6 +2152,7 @@ def main():
         ads_id=ads_id,
         studio_url=args.studio_url,
         wait_minutes=args.wait_minutes,
+        interval_hours=args.interval,
     )
 
     # 如果没有指定max_count，则发布所有视频

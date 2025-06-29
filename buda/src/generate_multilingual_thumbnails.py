@@ -20,12 +20,14 @@
 1. 基本使用: python generate_multilingual_thumbnails.py
 2. 指定频道: python generate_multilingual_thumbnails.py -c 频道名称
 3. 指定视频: python generate_multilingual_thumbnails.py -v 视频名称
-4. 调整文字大小: python generate_multilingual_thumbnails.py --font_size 50
-5. 设置字体颜色: python generate_multilingual_thumbnails.py --font_color white
-6. 设置文字描边: python generate_multilingual_thumbnails.py --stroke_width 2 --stroke_color black
-7. 设置字体粗细: python generate_multilingual_thumbnails.py --font_weight 700
-8. 关闭文字描边: python generate_multilingual_thumbnails.py --no_stroke
-9. 随机选择关键词高亮: python generate_multilingual_thumbnails.py --random_highlight
+4. 指定语言: python generate_multilingual_thumbnails.py --lang en (只处理英语)
+5. 指定语言: python generate_multilingual_thumbnails.py --lang ko (只处理韩语)
+6. 调整文字大小: python generate_multilingual_thumbnails.py --font_size 50
+7. 设置字体颜色: python generate_multilingual_thumbnails.py --font_color white
+8. 设置文字描边: python generate_multilingual_thumbnails.py --stroke_width 2 --stroke_color black
+9. 设置字体粗细: python generate_multilingual_thumbnails.py --font_weight 700
+10. 关闭文字描边: python generate_multilingual_thumbnails.py --no_stroke
+11. 随机选择关键词高亮: python generate_multilingual_thumbnails.py --random_highlight
 """
 
 import os
@@ -382,6 +384,7 @@ def create_thumbnail(
 def generate_thumbnails(
     channel=None,
     video_name=None,
+    language_filter=None,
     font_size=80,
     font_color=APPLE_WHITE,
     stroke_width=2,
@@ -394,8 +397,28 @@ def generate_thumbnails(
     """生成英语和韩语视频封面"""
     media_path = get_base_media_path()
 
-    # 固定使用英语和韩语
-    languages = ["English", "Korean"]
+    # 根据参数决定处理的语言
+    if language_filter:
+        # 验证指定的语言代码是否支持
+        supported_codes = list(LANGUAGES.values())
+        if language_filter not in supported_codes:
+            print(f"错误: 不支持的语言代码 '{language_filter}'")
+            print(f"支持的语言代码: {', '.join(supported_codes)}")
+            return
+
+        # 根据语言代码找到对应的语言名称
+        lang_name = None
+        for name, code in LANGUAGES.items():
+            if code == language_filter:
+                lang_name = name
+                break
+
+        languages = [lang_name] if lang_name else []
+        print(f"仅处理指定语言: {lang_name} ({language_filter})")
+    else:
+        # 默认处理所有支持的语言
+        languages = ["English", "Korean"]
+        print("处理所有支持的语言: English, Korean")
 
     # 频道目录列表
     if channel:
@@ -441,7 +464,9 @@ def generate_thumbnails(
             if os.path.exists(keywords_lang_dir):
                 lang_dirs.append((lang, lang_code, mp4_lang_dir, keywords_lang_dir))
                 if not os.path.exists(mp4_lang_dir):
-                    print(f"注意: {lang} 语言的mp4目录不存在 {mp4_lang_dir}，但继续处理")
+                    print(
+                        f"注意: {lang} 语言的mp4目录不存在 {mp4_lang_dir}，但继续处理"
+                    )
 
         if not lang_dirs:
             print(f"跳过: 频道 {current_channel} 下没有找到任何支持的语言目录")
@@ -492,7 +517,9 @@ def generate_thumbnails(
                     f"{video_name_no_ext}.mp4",
                 )
                 if not os.path.exists(mp4_file):
-                    print(f"注意: 找不到对应的 {language} 视频文件 {mp4_file}，但依然生成封面")
+                    print(
+                        f"注意: 找不到对应的 {language} 视频文件 {mp4_file}，但依然生成封面"
+                    )
 
                 key_phrase = key_phrases[language]
 
@@ -546,6 +573,13 @@ def main():
     parser = argparse.ArgumentParser(description="生成英语和韩语视频封面")
     parser.add_argument("-c", "--channel", help="指定要处理的频道")
     parser.add_argument("-v", "--video", help="指定要处理的视频名称（不含扩展名）")
+    parser.add_argument(
+        "--lang",
+        "--language",
+        dest="language_filter",
+        choices=["en", "ko"],
+        help="指定要处理的语言 (en=英语, ko=韩语)",
+    )
     parser.add_argument("--font_size", type=int, default=80, help="字体大小")
     parser.add_argument("--font_color", default=APPLE_WHITE, help="字体颜色")
     parser.add_argument(
@@ -555,7 +589,9 @@ def main():
     parser.add_argument(
         "--font_weight", type=int, default=400, help="字体粗细 (100-900)"
     )
-    parser.add_argument("--no_stroke", action="store_true", default=True, help="关闭文字描边")
+    parser.add_argument(
+        "--no_stroke", action="store_true", default=True, help="关闭文字描边"
+    )
     parser.add_argument(
         "--random_highlight", action="store_true", help="随机选择关键词高亮"
     )
@@ -599,6 +635,7 @@ def main():
     generate_thumbnails(
         channel=args.channel,
         video_name=args.video,
+        language_filter=args.language_filter,
         font_size=args.font_size,
         font_color=args.font_color,
         stroke_width=args.stroke_width,
