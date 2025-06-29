@@ -379,7 +379,12 @@ class YouTubeDescriptionGenerator:
             print("💡 请确保:")
             print("   1. 运行 merge_clips_with_audio.py 生成MP4文件")
             print("   2. 运行 generate_book_summary.py 生成总结文件")
-            return
+            return {
+                'total_targets': 0,
+                'successful': 0,
+                'failed': 0,
+                'skipped': 0
+            }
 
         # 如果指定了特定UUID
         if target_uuid:
@@ -388,7 +393,12 @@ class YouTubeDescriptionGenerator:
                 print(f"🎯 处理指定UUID: {target_uuid}")
             else:
                 print(f"❌ 未找到指定的UUID或该UUID缺少必要文件: {target_uuid}")
-                return
+                return {
+                    'total_targets': 0,
+                    'successful': 0,
+                    'failed': 0,
+                    'skipped': 0
+                }
 
         # 获取已存在的描述
         existing_descriptions = self.get_existing_descriptions()
@@ -411,7 +421,12 @@ class YouTubeDescriptionGenerator:
 
         if not books_to_process:
             print("🎉 所有已完成的MP4文件的YouTube描述都已生成完成！")
-            return
+            return {
+                'total_targets': 0,
+                'successful': 0,
+                'failed': 0,
+                'skipped': len(processable_books)
+            }
 
         print(f"\n📊 处理统计:")
         print(f"可处理书籍: {len(processable_books)}")
@@ -474,6 +489,14 @@ class YouTubeDescriptionGenerator:
             if (success_count + failed_count) > 0
             else "N/A"
         )
+        
+        # 返回统计信息
+        return {
+            'total_targets': len(books_to_process),
+            'successful': success_count,
+            'failed': failed_count,
+            'skipped': len(processable_books) - len(books_to_process)
+        }
 
     def check_status(self):
         """检查当前状态"""

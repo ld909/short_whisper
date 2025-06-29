@@ -87,19 +87,13 @@ def get_base_media_path():
 def get_input_directory(language="en"):
     """获取输入目录路径"""
     base_media_path = get_base_media_path()
-    if language == "zh":
-        return os.path.join(base_media_path, "books_zh", "zh", "thumbnails")
-    else:
-        return os.path.join(base_media_path, "books", "en", "thumbnails")
+    return os.path.join(base_media_path, "books", language, "thumbnails")
 
 
 def get_output_directory(language="en"):
     """获取输出目录路径"""
     base_media_path = get_base_media_path()
-    if language == "zh":
-        return os.path.join(base_media_path, "books_zh", "zh", "thumbnails_large")
-    else:
-        return os.path.join(base_media_path, "books", "en", "thumbnails_large")
+    return os.path.join(base_media_path, "books", language, "thumbnails_large")
 
 
 def create_client() -> ImageEnhanClient:

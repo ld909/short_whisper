@@ -10,6 +10,21 @@
 - 右半边下部分: 放大的 MP4 素材 (来自 assets 目录)
 - 右侧视频上叠加: "Book summary" 文字 (绿色，Merriweather字体，居中对齐)
 
+智能标题处理:
+1. 自动检测中文/英文，采用不同换行策略
+2. 固定字体大小模式：保持指定字体大小，长标题自动换行
+3. 智能溢出防护：如果标题过长导致溢出，自动使用省略号
+4. 中文按字符换行，英文按单词换行
+5. 支持按标点符号边界智能截断
+6. 可调节标题距离上边沿的距离，解决多行标题布局过紧的问题
+
+省略号处理策略:
+- 优先保留标题前半部分的完整性
+- 中文：在标点符号(，。！？；：)后截断
+- 英文：在单词边界截断
+- 智能估算最佳长度，避免过度截断
+- 保证最终显示不溢出屏幕边界
+
 主要功能:
 1. 自动扫描超分后的书籍封面图片 (thumbnails_large 目录)
 2. 读取对应的书籍信息获取标题
@@ -17,29 +32,35 @@
 4. 在右侧视频上叠加绿色"Book summary"文字（使用Merriweather字体）
 5. 支持断点续传，跳过已处理的文件
 6. 自动跳过Mac系统生成的点开头文件
+7. 支持中文和英文两种语言
+8. 智能防溢出，长标题自动省略
 
 输入:
-- 封面图片: /Volumes/dhl/audio/books/en/thumbnails_large/*.png
-- 书籍信息: /Volumes/dhl/audio/books/en/info/*.json
+- 封面图片: /mnt/dhl/audio/books/{lang}/thumbnails_large/*.png
+- 书籍信息: /mnt/dhl/audio/books/{lang}/info/*.json
 - 背景视频: audio_ficition/books/assets/plate_upscaled.mp4
-- 字体文件: audio_ficition/books/font/en/*.ttf
+- 字体文件: audio_ficition/books/font/{lang}/*.ttf
 
 输出:
-- 输出目录: /Volumes/dhl/audio/books/en/1080_clips/
+- 输出目录: /mnt/dhl/audio/books/{lang}/1080_clips/
 - 命名规则: [uuid].mp4
 
 使用方法:
-1. 默认处理所有书籍: python generate_book_clips.py
-2. 指定字体大小: python generate_book_clips.py --font-size 48
-3. 强制重新处理: python generate_book_clips.py --force
-4. 调试模式: python generate_book_clips.py --debug
-5. 指定语言: python generate_book_clips.py --language zh
+1. 默认处理英文书籍: python generate_book_clips.py
+2. 处理中文书籍: python generate_book_clips.py --language zh
+3. 固定字体大小: python generate_book_clips.py --language zh --fixed-font-size --font-size 56
+4. 强制重新处理: python generate_book_clips.py --force --language en
+5. 调试模式: python generate_book_clips.py --debug --language zh
+
+推荐中文用法:
+python generate_book_clips.py --language zh --fixed-font-size --font-size 48 --debug
 
 处理流程:
 1. 扫描 thumbnails_large 目录中的所有超分封面图片
 2. 读取对应的书籍信息 JSON 文件获取标题
-3. 使用 FFmpeg 合成左右布局的 1080p 视频
-4. 保存到 1080_clips 目录
+3. 智能处理标题长度和溢出问题
+4. 使用 FFmpeg 合成左右布局的 1080p 视频
+5. 保存到 1080_clips 目录
 
 注意:
 - 需要安装 FFmpeg 和相关 Python 库
@@ -48,6 +69,8 @@
 - 右边上下分配需要根据标题长度动态调整
 - 自动跳过点开头的系统文件
 - 支持中英文两种语言的书籍处理
+- 只支持在Linux/Ubuntu系统上运行
+- 长标题会智能使用省略号，确保不溢出屏幕
 """
 
 import os
@@ -77,13 +100,38 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def check_ubuntu_system():
+    """
+    检查是否为Ubuntu系统
+    
+    Returns:
+        bool: 是否为Ubuntu系统
+    """
+    try:
+        # 检查系统类型
+        if platform.system() != "Linux":
+            return False
+        
+        # 检查是否为Ubuntu
+        with open('/etc/os-release', 'r') as f:
+            content = f.read()
+            if 'Ubuntu' in content or 'ubuntu' in content:
+                return True
+        
+        return False
+    except:
+        return False
+
+
 def get_base_media_path():
     """根据操作系统返回适当的媒体路径"""
+    # 参考 merge_book_audio.py 的路径配置
     system = platform.system()
-    if system == "Darwin":  # macOS
-        return "/Volumes/dhl/audio"
-    else:  # 默认为Linux/Ubuntu
+    if system == "Linux":
         return "/mnt/dhl/audio"
+    else:  # 其他系统暂不支持
+        logger.error(f"❌ 不支持的操作系统: {system}")
+        return None
 
 
 def get_script_dir():
@@ -92,28 +140,45 @@ def get_script_dir():
 
 
 def get_input_directories(language="en"):
-    """获取输入目录路径"""
+    """
+    获取输入目录路径
+    
+    Args:
+        language: 语言代码 (en/zh)
+        
+    Returns:
+        dict: 包含各种输入目录路径的字典
+    """
     base_media_path = get_base_media_path()
-    if language == "zh":
-        base_path = os.path.join(base_media_path, "books_zh", "zh")
-    else:
-        base_path = os.path.join(base_media_path, "books", "en")
-
+    if not base_media_path:
+        return {}
+    
+    # 根据语言设置基础路径
+    base_path = os.path.join(base_media_path, "books", language)
+    
     return {
         "thumbnails_large": os.path.join(base_path, "thumbnails_large"),
         "info": os.path.join(base_path, "info"),
         "assets": os.path.join(get_script_dir(), "assets"),
-        "font": os.path.join(get_script_dir(), "font", "en"),
+        "font": os.path.join(get_script_dir(), "font", language),
     }
 
 
 def get_output_directory(language="en"):
-    """获取输出目录路径"""
+    """
+    获取输出目录路径
+    
+    Args:
+        language: 语言代码 (en/zh)
+        
+    Returns:
+        str: 输出目录路径
+    """
     base_media_path = get_base_media_path()
-    if language == "zh":
-        return os.path.join(base_media_path, "books_zh", "zh", "1080_clips")
-    else:
-        return os.path.join(base_media_path, "books", "en", "1080_clips")
+    if not base_media_path:
+        return ""
+    
+    return os.path.join(base_media_path, "books", language, "1080_clips")
 
 
 def check_dependencies():
@@ -128,7 +193,6 @@ def check_dependencies():
     if missing:
         print(f"❌ 缺少依赖: {', '.join(missing)}")
         print("请安装 FFmpeg:")
-        print("macOS: brew install ffmpeg")
         print("Ubuntu: sudo apt install ffmpeg")
         return False
 
@@ -159,13 +223,16 @@ def get_available_books(language="en") -> List[Tuple[str, str]]:
     """
     获取可用的书籍列表 (包含超分封面的书籍)
 
+    Args:
+        language: 语言代码 (en/zh)
+
     Returns:
         书籍信息元组列表: [(封面图片路径, UUID)]
     """
     directories = get_input_directories(language)
-    thumbnails_dir = directories["thumbnails_large"]
+    thumbnails_dir = directories.get("thumbnails_large", "")
 
-    if not os.path.exists(thumbnails_dir):
+    if not thumbnails_dir or not os.path.exists(thumbnails_dir):
         print(f"❌ 超分封面目录不存在: {thumbnails_dir}")
         return []
 
@@ -200,13 +267,13 @@ def get_book_info(uuid: str, language="en") -> Optional[Dict]:
 
     Args:
         uuid: 书籍UUID
-        language: 语言
+        language: 语言代码 (en/zh)
 
     Returns:
         书籍信息字典，失败时返回None
     """
     directories = get_input_directories(language)
-    info_file = os.path.join(directories["info"], f"{uuid}.json")
+    info_file = os.path.join(directories.get("info", ""), f"{uuid}.json")
 
     if not os.path.exists(info_file):
         logger.warning(f"⚠️ 书籍信息文件不存在: {info_file}")
@@ -221,11 +288,19 @@ def get_book_info(uuid: str, language="en") -> Optional[Dict]:
 
 
 def get_available_fonts(language="en") -> List[str]:
-    """获取可用的字体文件列表"""
+    """
+    获取可用的字体文件列表
+    
+    Args:
+        language: 语言代码 (en/zh)
+        
+    Returns:
+        list: 字体文件路径列表
+    """
     directories = get_input_directories(language)
-    font_dir = directories["font"]
+    font_dir = directories.get("font", "")
 
-    if not os.path.exists(font_dir):
+    if not font_dir or not os.path.exists(font_dir):
         logger.warning(f"⚠️ 字体目录不存在: {font_dir}")
         return []
 
@@ -247,7 +322,7 @@ def select_font_by_path_or_weight(
     Args:
         font_path: 指定的字体文件路径，优先使用
         font_weight: 字体权重 (extra-light, light, regular, medium, semi-bold, bold, extra-bold)
-        language: 语言
+        language: 语言代码 (en/zh)
 
     Returns:
         选中的字体文件路径
@@ -268,16 +343,26 @@ def select_font_by_path_or_weight(
 
     # 如果指定了字体权重，尝试匹配
     if font_weight:
-        # 字体权重映射 (基于Oxanium字体系列)
-        weight_mapping = {
-            "extra-light": ["ExtraLight", "extralight", "100", "200"],
-            "light": ["Light", "light", "300"],
-            "regular": ["Regular", "regular", "normal", "400"],
-            "medium": ["Medium", "medium", "500"],
-            "semi-bold": ["SemiBold", "semibold", "semi-bold", "600"],
-            "bold": ["Bold", "bold", "700"],
-            "extra-bold": ["ExtraBold", "extrabold", "extra-bold", "800", "900"],
-        }
+        # 字体权重映射 (基于Oxanium字体系列和中文字体)
+        if language == "en":
+            weight_mapping = {
+                "extra-light": ["ExtraLight", "extralight", "100", "200"],
+                "light": ["Light", "light", "300"],
+                "regular": ["Regular", "regular", "normal", "400"],
+                "medium": ["Medium", "medium", "500"],
+                "semi-bold": ["SemiBold", "semibold", "semi-bold", "600"],
+                "bold": ["Bold", "bold", "700"],
+                "extra-bold": ["ExtraBold", "extrabold", "extra-bold", "800", "900"],
+            }
+        else:  # 中文字体权重映射
+            weight_mapping = {
+                "light": ["Light", "light", "细", "W1", "W2"],
+                "regular": ["Regular", "regular", "normal", "标准", "W3", "W4"],
+                "medium": ["Medium", "medium", "中等", "W5"],
+                "semi-bold": ["SemiBold", "semibold", "半粗", "W6"],
+                "bold": ["Bold", "bold", "粗", "黑", "W7"],
+                "extra-bold": ["ExtraBold", "extrabold", "特粗", "W8", "W9"],
+            }
 
         # 规范化权重名称
         normalized_weight = font_weight.lower().replace("_", "-")
@@ -298,7 +383,11 @@ def select_font_by_path_or_weight(
         logger.warning(f"⚠️ 未找到匹配权重 '{font_weight}' 的字体，使用默认字体")
 
     # 默认使用第一个字体，优先选择Regular或Medium
-    preferred_weights = ["regular", "medium", "semi-bold", "bold"]
+    if language == "en":
+        preferred_weights = ["regular", "medium", "semi-bold", "bold"]
+    else:  # 中文字体优先选择
+        preferred_weights = ["regular", "标准", "medium", "中等", "semi-bold", "半粗"]
+    
     for weight in preferred_weights:
         for font_file in font_files:
             if weight in os.path.basename(font_file).lower():
@@ -314,7 +403,10 @@ def select_font_by_path_or_weight(
 def get_background_video(language="en") -> Optional[str]:
     """获取背景视频路径"""
     directories = get_input_directories(language)
-    assets_dir = directories["assets"]
+    assets_dir = directories.get("assets", "")
+
+    if not assets_dir:
+        return None
 
     # 优先使用超分后的视频
     upscaled_video = os.path.join(assets_dir, "plate_upscaled.mp4")
@@ -331,31 +423,48 @@ def get_background_video(language="en") -> Optional[str]:
 
 
 def get_merriweather_font_path(language="en") -> Optional[str]:
-    """获取Merriweather字体路径（M开头的字体）"""
+    """
+    获取适合的字体路径（英文使用Merriweather，中文使用合适的中文字体）
+    
+    Args:
+        language: 语言代码 (en/zh)
+        
+    Returns:
+        str: 字体文件路径，如果没找到返回None
+    """
     directories = get_input_directories(language)
-    font_dir = directories["font"]
+    font_dir = directories.get("font", "")
 
-    if not os.path.exists(font_dir):
+    if not font_dir or not os.path.exists(font_dir):
         logger.warning(f"⚠️ 字体目录不存在: {font_dir}")
         return None
 
-    # 查找M开头的字体文件，优先选择Merriweather
-    font_files = glob.glob(os.path.join(font_dir, "M*.ttf"))
-    font_files.extend(glob.glob(os.path.join(font_dir, "M*.TTF")))
+    # 查找字体文件
+    font_files = glob.glob(os.path.join(font_dir, "*.ttf"))
+    font_files.extend(glob.glob(os.path.join(font_dir, "*.TTF")))
 
-    # 按优先级排序：Merriweather > 其他M开头字体
-    merriweather_fonts = [f for f in font_files if "merriweather" in f.lower()]
-    if merriweather_fonts:
-        selected_font = merriweather_fonts[0]
-        logger.info(f"🔤 找到Merriweather字体: {os.path.basename(selected_font)}")
-        return selected_font
-    elif font_files:
-        selected_font = font_files[0]
-        logger.info(f"🔤 找到M开头字体: {os.path.basename(selected_font)}")
-        return selected_font
-    else:
-        logger.warning(f"⚠️ 未找到M开头的字体文件在: {font_dir}")
-        return None
+    if language == "en":
+        # 英文：查找M开头的字体文件，优先选择Merriweather
+        m_fonts = [f for f in font_files if os.path.basename(f).lower().startswith("m")]
+        merriweather_fonts = [f for f in m_fonts if "merriweather" in f.lower()]
+        
+        if merriweather_fonts:
+            selected_font = merriweather_fonts[0]
+            logger.info(f"🔤 找到Merriweather字体: {os.path.basename(selected_font)}")
+            return selected_font
+        elif m_fonts:
+            selected_font = m_fonts[0]
+            logger.info(f"🔤 找到M开头字体: {os.path.basename(selected_font)}")
+            return selected_font
+    else:  # language == "zh"
+        # 中文：使用任何可用的中文字体
+        if font_files:
+            selected_font = font_files[0]
+            logger.info(f"🔤 找到中文字体: {os.path.basename(selected_font)}")
+            return selected_font
+
+    logger.warning(f"⚠️ 未找到合适的字体文件在: {font_dir}")
+    return None
 
 
 def process_title_for_overflow(
@@ -366,6 +475,7 @@ def process_title_for_overflow(
     max_width: int,
     max_height: int,
     debug: bool = False,
+    fixed_font_size: bool = False,  # 新增：是否固定字体大小
 ) -> Tuple[str, int, bool]:
     """
     智能处理标题溢出问题
@@ -378,6 +488,7 @@ def process_title_for_overflow(
         max_width: 标题区域最大宽度
         max_height: 标题区域最大高度
         debug: 是否启用调试模式
+        fixed_font_size: 是否固定字体大小（不动态调整，允许换行）
 
     Returns:
         tuple: (处理后的标题, 最终字体大小, 是否进行了处理)
@@ -395,36 +506,70 @@ def process_title_for_overflow(
         font = ImageFont.truetype(font_path, font_sz)
 
         # 分词换行计算
-        words = text.split()
+        import re
+        has_chinese = bool(re.search(r'[\u4e00-\u9fff]', text))
+        
         lines = []
-        current_line = ""
         max_line_width = 0
 
-        for word in words:
-            test_line = current_line + " " + word if current_line else word
-            bbox = draw.textbbox((0, 0), test_line, font=font)
-            test_width = bbox[2] - bbox[0]
+        if has_chinese:
+            # 中文换行：逐字符处理
+            current_line = ""
+            for char in text:
+                test_line = current_line + char
+                bbox = draw.textbbox((0, 0), test_line, font=font)
+                test_width = bbox[2] - bbox[0]
 
-            if test_width <= max_width - 40:  # 留40px边距
-                current_line = test_line
-                max_line_width = max(max_line_width, test_width)
-            else:
-                if current_line:
-                    lines.append(current_line)
-                    current_line = word
+                if test_width <= max_width - 40:  # 留40px边距
+                    current_line = test_line
+                    max_line_width = max(max_line_width, test_width)
                 else:
-                    lines.append(word)  # 单词太长也强制加入
+                    if current_line:
+                        lines.append(current_line)
+                        current_line = char
+                    else:
+                        lines.append(char)  # 单个字符也强制加入
 
-                # 计算当前词的宽度
-                bbox = draw.textbbox((0, 0), word, font=font)
-                word_width = bbox[2] - bbox[0]
-                max_line_width = max(max_line_width, word_width)
+                    # 计算当前字符的宽度
+                    bbox = draw.textbbox((0, 0), char, font=font)
+                    char_width = bbox[2] - bbox[0]
+                    max_line_width = max(max_line_width, char_width)
 
-        if current_line:
-            lines.append(current_line)
-            bbox = draw.textbbox((0, 0), current_line, font=font)
-            line_width = bbox[2] - bbox[0]
-            max_line_width = max(max_line_width, line_width)
+            if current_line:
+                lines.append(current_line)
+                bbox = draw.textbbox((0, 0), current_line, font=font)
+                line_width = bbox[2] - bbox[0]
+                max_line_width = max(max_line_width, line_width)
+        else:
+            # 英文换行：按单词处理
+            words = text.split()
+            current_line = ""
+
+            for word in words:
+                test_line = current_line + " " + word if current_line else word
+                bbox = draw.textbbox((0, 0), test_line, font=font)
+                test_width = bbox[2] - bbox[0]
+
+                if test_width <= max_width - 40:  # 留40px边距
+                    current_line = test_line
+                    max_line_width = max(max_line_width, test_width)
+                else:
+                    if current_line:
+                        lines.append(current_line)
+                        current_line = word
+                    else:
+                        lines.append(word)  # 单词太长也强制加入
+
+                    # 计算当前词的宽度
+                    bbox = draw.textbbox((0, 0), word, font=font)
+                    word_width = bbox[2] - bbox[0]
+                    max_line_width = max(max_line_width, word_width)
+
+            if current_line:
+                lines.append(current_line)
+                bbox = draw.textbbox((0, 0), current_line, font=font)
+                line_width = bbox[2] - bbox[0]
+                max_line_width = max(max_line_width, line_width)
 
         # 计算总高度
         bbox = draw.textbbox((0, 0), "A", font=font)
@@ -446,6 +591,7 @@ def process_title_for_overflow(
         print(f"🔍 开始处理标题溢出检测: '{title}'")
         print(f"   区域限制: 宽度={max_width}px, 高度={max_height}px")
         print(f"   初始字体大小: {font_size}px")
+        print(f"   固定字体大小模式: {'是' if fixed_font_size else '否'}")
 
     # 步骤1: 检查原始标题是否溢出
     overflow, text_width, text_height, line_count = will_text_overflow(
@@ -462,6 +608,90 @@ def process_title_for_overflow(
         if debug:
             print(f"✅ 标题无需处理，直接使用")
         return processed_title, current_font_size, False
+    
+    # 如果启用固定字体大小模式，保持字体大小但检查溢出，必要时使用省略号
+    if fixed_font_size:
+        if debug:
+            print(f"🔒 固定字体大小模式：保持{font_size}px字体，检查溢出并智能处理")
+        
+        # 检查原始标题是否溢出
+        if not overflow:
+            if debug:
+                print(f"✅ 原始标题无溢出，直接使用")
+            return title, font_size, False
+        
+        # 溢出了，需要使用省略号处理
+        if debug:
+            print(f"⚠️ 原始标题溢出，开始省略号处理")
+        
+        # 检查是否包含中文字符
+        import re
+        has_chinese = bool(re.search(r'[\u4e00-\u9fff]', title))
+        ellipsis = "..." if not has_chinese else "..."  # 中英文都用...
+        
+        # 智能缩短标题直到不溢出
+        processed_title = title
+        min_length = 3  # 最少保留字符数
+        
+        # 先估算需要的大概长度（粗略估算）
+        original_length = len(title)
+        target_lines = max_height // (font_size + 5)  # 估算最大行数
+        chars_per_line = (max_width - 40) // (font_size * 0.6)  # 粗略估算每行字符数
+        estimated_max_chars = int(target_lines * chars_per_line * 0.8)  # 保守估计
+        
+        if debug:
+            print(f"   估算参数: 原长度={original_length}, 目标行数≤{target_lines}, 每行约{chars_per_line:.1f}字符")
+            print(f"   估算最大字符数: {estimated_max_chars}")
+        
+        # 如果估算长度远小于原长度，直接跳到估算长度附近开始测试
+        if estimated_max_chars > 0 and estimated_max_chars < original_length * 0.7:
+            processed_title = title[:max(estimated_max_chars, min_length)]
+            if debug:
+                print(f"   快速定位到估算长度: '{processed_title}'")
+        
+        # 逐步精确调整
+        while len(processed_title) > min_length:
+            # 尝试添加省略号
+            test_title = processed_title + ellipsis
+            
+            # 检查是否还溢出
+            test_overflow, test_width, test_height, test_lines = will_text_overflow(
+                test_title, font_size
+            )
+            
+            if debug:
+                print(f"   测试标题长度{len(test_title)}: 溢出={'是' if test_overflow else '否'}, 高度={test_height}px/{max_height}px, 行数={test_lines}")
+            
+            if not test_overflow:
+                # 找到合适的长度
+                if debug:
+                    print(f"✅ 省略号处理成功: '{test_title}'")
+                return test_title, font_size, True
+            
+            # 继续缩短，智能选择缩短长度
+            if has_chinese:
+                # 中文：尝试按标点符号边界或字符截断
+                shorter_length = len(processed_title) - 1
+                # 寻找合适的截断点（标点符号后）
+                punctuation_chars = '，。！？；：、）】』」'
+                for i in range(len(processed_title) - 1, max(len(processed_title) - 5, 0), -1):
+                    if processed_title[i] in punctuation_chars:
+                        shorter_length = i + 1
+                        break
+                processed_title = processed_title[:shorter_length]
+            else:
+                # 英文：尝试按单词边界截断
+                words = processed_title.split()
+                if len(words) > 1:
+                    processed_title = ' '.join(words[:-1])  # 删除最后一个单词
+                else:
+                    processed_title = processed_title[:-1]  # 按字符删除
+        
+        # 如果缩短到很短还是溢出，使用最短安全版本
+        safe_title = title[:min_length] + ellipsis
+        if debug:
+            print(f"⚠️ 使用最短安全版本: '{safe_title}'")
+        return safe_title, font_size, True
 
     # 步骤2: 如果溢出，尝试按冒号分割
     if ":" in processed_title:
@@ -521,10 +751,61 @@ def process_title_for_overflow(
             break
 
         if current_font_size <= min_font_size:
-            # 已到最小字体大小，无法再调整
+            # 已到最小字体大小，检查是否还溢出，如果是则使用省略号
             processed = True
             if debug:
-                print(f"⚠️ 已达最小字体大小({min_font_size}px)，强制使用")
+                print(f"⚠️ 已达最小字体大小({min_font_size}px)")
+            
+            # 检查最小字体大小是否还溢出
+            final_overflow, _, _, _ = will_text_overflow(processed_title, min_font_size)
+            if final_overflow:
+                if debug:
+                    print(f"⚠️ 最小字体仍溢出，启用省略号处理")
+                
+                # 使用省略号处理逻辑
+                import re
+                has_chinese = bool(re.search(r'[\u4e00-\u9fff]', processed_title))
+                ellipsis = "..."
+                
+                # 逐步缩短直到不溢出
+                test_title = processed_title
+                min_length = 3
+                
+                while len(test_title) > min_length:
+                    test_with_ellipsis = test_title + ellipsis
+                    test_overflow, _, _, _ = will_text_overflow(test_with_ellipsis, min_font_size)
+                    
+                    if not test_overflow:
+                        processed_title = test_with_ellipsis
+                        processed = True
+                        if debug:
+                            print(f"✅ 省略号处理成功: '{processed_title}'")
+                        break
+                    
+                    # 智能缩短
+                    if has_chinese:
+                        # 中文按标点或字符截断
+                        shorter_length = len(test_title) - 1
+                        punctuation_chars = '，。！？；：、）】』」'
+                        for i in range(len(test_title) - 1, max(len(test_title) - 5, 0), -1):
+                            if test_title[i] in punctuation_chars:
+                                shorter_length = i + 1
+                                break
+                        test_title = test_title[:shorter_length]
+                    else:
+                        # 英文按单词边界截断
+                        words = test_title.split()
+                        if len(words) > 1:
+                            test_title = ' '.join(words[:-1])
+                        else:
+                            test_title = test_title[:-1]
+                
+                # 如果循环结束还没找到合适长度，使用最短版本
+                if len(test_title) <= min_length:
+                    processed_title = processed_title[:min_length] + ellipsis
+                    if debug:
+                        print(f"⚠️ 使用最短安全版本: '{processed_title}'")
+            
             break
 
     if debug:
@@ -551,6 +832,8 @@ def create_left_composite_image(
     video_width_ratio: float = 0.5,  # 新增：右侧视频宽度比例（相对于右半边）
     video_align_right: bool = True,  # 新增：视频是否右对齐
     force_single_line: bool = False,  # 新增：强制单行显示
+    fixed_font_size: bool = False,  # 新增：固定字体大小
+    title_top_margin: int = 0,  # 新增：标题距离上边沿的距离（像素）
 ) -> Optional[str]:
     """
     预先合成左半边的完整图片（封面 + 标题区域）
@@ -564,6 +847,9 @@ def create_left_composite_image(
         cover_preserve_aspect: 是否保持封面比例（不crop，可留黑边）
         video_width_ratio: 右侧视频宽度比例（相对于右半边宽度）
         video_align_right: 视频是否右对齐
+        force_single_line: 强制单行显示
+        fixed_font_size: 固定字体大小（不动态调整，允许换行）
+        title_top_margin: 标题距离上边沿的距离（像素），用于调整标题垂直位置
 
     Returns:
         合成图片的临时文件路径，失败时返回None
@@ -681,6 +967,7 @@ def create_left_composite_image(
             max_width=title_area_width,
             max_height=title_area_height,
             debug=debug,
+            fixed_font_size=fixed_font_size,
         )
 
         # 使用处理后的标题和字体大小
@@ -701,59 +988,116 @@ def create_left_composite_image(
         if force_single_line:
             # 强制单行显示，已经通过智能处理确保不溢出
             x = title_x_start + (title_area_width - text_width) // 2
-            y = title_y_start + (title_area_height - text_height) // 2
+            # 应用上边距：如果设置了上边距，从上边距开始，否则垂直居中
+            if title_top_margin > 0:
+                y = title_y_start + title_top_margin
+            else:
+                y = title_y_start + (title_area_height - text_height) // 2
 
             if debug:
                 print(f"🔤 强制单行显示: 字体大小={actual_font_size}px")
                 print(f"   文本宽度={text_width}px, 区域宽度={title_area_width}px")
+                print(f"   标题位置: x={x}, y={y} (上边距={title_top_margin}px)")
 
             draw.text((x, y), processed_title, font=font, fill="white")
         elif text_width <= title_area_width - 40:
             # 文本适合单行显示
             x = title_x_start + (title_area_width - text_width) // 2
-            y = title_y_start + (title_area_height - text_height) // 2
+            # 应用上边距：如果设置了上边距，从上边距开始，否则垂直居中
+            if title_top_margin > 0:
+                y = title_y_start + title_top_margin
+            else:
+                y = title_y_start + (title_area_height - text_height) // 2
+            
+            if debug:
+                print(f"🔤 单行显示: 标题位置 x={x}, y={y} (上边距={title_top_margin}px)")
+            
             draw.text((x, y), processed_title, font=font, fill="white")
         else:
             # 需要换行，已经通过智能处理优化过的标题
             # 用处理后的标题和字体大小进行换行
-            words = processed_title.split()
+            
+            # 检查是否包含中文字符
+            import re
+            has_chinese = bool(re.search(r'[\u4e00-\u9fff]', processed_title))
+            
             lines = []
-            current_line = ""
             max_line_width = 0
-
-            for word in words:
-                test_line = current_line + " " + word if current_line else word
-                bbox = draw.textbbox((0, 0), test_line, font=font)
-                test_width = bbox[2] - bbox[0]
-
-                if test_width <= title_area_width - 40:
-                    current_line = test_line
-                    max_line_width = max(max_line_width, test_width)
-                else:
-                    if current_line:
-                        lines.append(current_line)
-                        current_line = word
-                        # 检查单个词的宽度
-                        bbox = draw.textbbox((0, 0), word, font=font)
-                        word_width = bbox[2] - bbox[0]
-                        max_line_width = max(max_line_width, word_width)
+            
+            if has_chinese:
+                # 中文换行：逐字符处理
+                current_line = ""
+                for char in processed_title:
+                    test_line = current_line + char
+                    bbox = draw.textbbox((0, 0), test_line, font=font)
+                    test_width = bbox[2] - bbox[0]
+                    
+                    if test_width <= title_area_width - 40:
+                        current_line = test_line
+                        max_line_width = max(max_line_width, test_width)
                     else:
-                        # 单个词太长，强制添加
-                        lines.append(word)
-                        bbox = draw.textbbox((0, 0), word, font=font)
-                        word_width = bbox[2] - bbox[0]
-                        max_line_width = max(max_line_width, word_width)
+                        if current_line:
+                            lines.append(current_line)
+                            current_line = char
+                            # 计算单个字符的宽度
+                            bbox = draw.textbbox((0, 0), char, font=font)
+                            char_width = bbox[2] - bbox[0]
+                            max_line_width = max(max_line_width, char_width)
+                        else:
+                            # 单个字符也太宽，强制添加
+                            lines.append(char)
+                            bbox = draw.textbbox((0, 0), char, font=font)
+                            char_width = bbox[2] - bbox[0]
+                            max_line_width = max(max_line_width, char_width)
+                
+                if current_line:
+                    lines.append(current_line)
+                    bbox = draw.textbbox((0, 0), current_line, font=font)
+                    line_width = bbox[2] - bbox[0]
+                    max_line_width = max(max_line_width, line_width)
+            else:
+                # 英文换行：按单词处理
+                words = processed_title.split()
+                current_line = ""
+                
+                for word in words:
+                    test_line = current_line + " " + word if current_line else word
+                    bbox = draw.textbbox((0, 0), test_line, font=font)
+                    test_width = bbox[2] - bbox[0]
 
-            if current_line:
-                lines.append(current_line)
-                bbox = draw.textbbox((0, 0), current_line, font=font)
-                line_width = bbox[2] - bbox[0]
-                max_line_width = max(max_line_width, line_width)
+                    if test_width <= title_area_width - 40:
+                        current_line = test_line
+                        max_line_width = max(max_line_width, test_width)
+                    else:
+                        if current_line:
+                            lines.append(current_line)
+                            current_line = word
+                            # 检查单个词的宽度
+                            bbox = draw.textbbox((0, 0), word, font=font)
+                            word_width = bbox[2] - bbox[0]
+                            max_line_width = max(max_line_width, word_width)
+                        else:
+                            # 单个词太长，强制添加
+                            lines.append(word)
+                            bbox = draw.textbbox((0, 0), word, font=font)
+                            word_width = bbox[2] - bbox[0]
+                            max_line_width = max(max_line_width, word_width)
+
+                if current_line:
+                    lines.append(current_line)
+                    bbox = draw.textbbox((0, 0), current_line, font=font)
+                    line_width = bbox[2] - bbox[0]
+                    max_line_width = max(max_line_width, line_width)
 
             # 绘制多行文本
             line_height = text_height + 5  # 行间距
             total_text_height = len(lines) * line_height
-            start_y = title_y_start + (title_area_height - total_text_height) // 2
+            
+            # 应用上边距：如果设置了上边距，从上边距开始，否则垂直居中
+            if title_top_margin > 0:
+                start_y = title_y_start + title_top_margin
+            else:
+                start_y = title_y_start + (title_area_height - total_text_height) // 2
 
             for i, line in enumerate(lines):
                 bbox = draw.textbbox((0, 0), line, font=font)
@@ -767,6 +1111,8 @@ def create_left_composite_image(
                 print(
                     f"   最宽行宽度={max_line_width}px, 区域宽度={title_area_width}px"
                 )
+                print(f"   多行起始位置: start_y={start_y} (上边距={title_top_margin}px)")
+                print(f"   总文本高度: {total_text_height}px")
 
         # 保存合成图片
         temp_composite_path = f"/tmp/composite_{int(time.time())}_{os.getpid()}.png"
@@ -845,12 +1191,15 @@ def create_book_clip(
     video_width_ratio: float = 0.5,  # 新增：右侧视频宽度比例
     video_align_right: bool = True,  # 新增：视频是否右对齐
     force_single_line: bool = False,  # 新增：强制单行显示
+    fixed_font_size: bool = False,  # 新增：固定字体大小
     show_book_summary: bool = True,  # 新增：是否显示"Book summary"文字
     summary_font_size: int = 24,  # 新增：Book summary字体大小
     summary_top_margin: int = 20,  # 新增：Book summary文字距离视频底部向上的像素距离
     summary_right_margin: int = 10,  # 新增：Book summary文字距离右边缘的像素距离
     summary_icon_size: int = 0,  # 新增：📚图标大小，0表示自动调整
     icon_vertical_offset: int = 0,  # 新增：图标垂直偏移量，负数向上移动
+    language: str = "en",  # 新增：语言代码
+    title_top_margin: int = 0,  # 新增：标题距离上边沿的距离（像素）
 ) -> bool:
     """
     创建书籍MP4 clip - 优化版本
@@ -867,10 +1216,12 @@ def create_book_clip(
         video_width_ratio: 右侧视频宽度比例（相对于右半边宽度）
         video_align_right: 视频是否右对齐
         force_single_line: 强制单行显示，保持固定字体大小
-        show_book_summary: 是否在右侧视频上显示"Book summary"文字
-        summary_font_size: Book summary文字的字体大小
-        summary_top_margin: Book summary文字距离视频底部向上的像素距离
-        summary_right_margin: Book summary文字距离右边缘的像素距离
+        fixed_font_size: 固定字体大小（不动态调整，允许换行）
+        show_book_summary: 是否在右侧视频上显示书籍摘要文字
+        summary_font_size: 书籍摘要文字的字体大小
+        summary_top_margin: 书籍摘要文字距离视频底部向上的像素距离
+        summary_right_margin: 书籍摘要文字距离右边缘的像素距离
+        title_top_margin: 标题距离上边沿的距离（像素），用于调整多行标题的垂直位置
 
     Returns:
         处理成功返回True，失败返回False
@@ -912,6 +1263,8 @@ def create_book_clip(
             video_width_ratio,
             video_align_right,
             force_single_line,
+            fixed_font_size,
+            title_top_margin,
         )
         if not composite_image:
             return False
@@ -940,8 +1293,8 @@ def create_book_clip(
 
         # 然后在整个1080p画面上添加全局文字叠加
         if show_book_summary:
-            # 获取Merriweather字体路径
-            summary_font_path = get_merriweather_font_path(language="en")
+            # 获取合适的字体路径（根据语言选择）
+            summary_font_path = get_merriweather_font_path(language)
             if summary_font_path:
                 # 转义字体路径中的特殊字符
                 escaped_font_path = summary_font_path.replace(":", "\\:").replace(
@@ -953,9 +1306,12 @@ def create_book_clip(
                 global_text_x = f"({total_width}-{summary_right_margin})"
                 global_text_y = f"({total_height}-text_h-{summary_top_margin})"
 
+                # 根据语言选择合适的文字
+                summary_text = "书籍摘要" if language == "zh" else "Book summary"
+                
                 # 先添加纯文字（不含emoji）
                 filter_complex += (
-                    f"[video_composed]drawtext=text='Book summary':"
+                    f"[video_composed]drawtext=text='{summary_text}':"
                     f"fontfile='{escaped_font_path}':"
                     f"fontsize={summary_font_size}:"
                     f"fontcolor=0x00FF00:"
@@ -1006,7 +1362,8 @@ def create_book_clip(
                         print(f"⚠️ 未找到书籍图标文件: {book_icon_path}")
 
                 if debug:
-                    print(f"📝 添加全局Book summary文字:")
+                    print(f"📝 添加全局书籍摘要文字:")
+                    print(f"   显示文字: {summary_text}")
                     print(f"   字体: {os.path.basename(summary_font_path)}")
                     print(f"   字体大小: {summary_font_size}px")
                     print(f"   颜色: 纯绿色 (0x00FF00)")
@@ -1017,7 +1374,7 @@ def create_book_clip(
                         f"   1080p坐标: x=({total_width}-{summary_right_margin}), y=({total_height}-{summary_top_margin})"
                     )
             else:
-                logger.warning("⚠️ 未找到Merriweather字体，跳过Book summary文字叠加")
+                logger.warning("⚠️ 未找到合适的字体，跳过书籍摘要文字叠加")
                 filter_complex += "[video_composed]copy[final]"
         else:
             filter_complex += "[video_composed]copy[final]"
@@ -1147,12 +1504,14 @@ def process_all_books(
     font_path: Optional[str] = None,  # 新增：指定字体路径
     font_weight: Optional[str] = None,  # 新增：指定字体权重
     force_single_line: bool = False,  # 新增：强制单行显示
+    fixed_font_size: bool = False,  # 新增：固定字体大小
     show_book_summary: bool = True,  # 新增：是否显示Book summary文字
     summary_font_size: int = 24,  # 新增：Book summary字体大小
     summary_top_margin: int = 20,  # 新增：Book summary文字距离视频底部向上的像素距离
     summary_right_margin: int = 10,  # 新增：Book summary文字距离右边缘的像素距离
     summary_icon_size: int = 0,  # 新增：图标大小，0表示自动计算
     icon_vertical_offset: int = 0,  # 新增：图标垂直偏移量
+    title_top_margin: int = 0,  # 新增：标题距离上边沿的距离（像素）
 ) -> bool:
     """
     批量处理所有书籍生成MP4 clips
@@ -1168,10 +1527,12 @@ def process_all_books(
         font_path: 指定字体文件路径（优先级最高）
         font_weight: 指定字体权重（当font_path为None时使用）
         force_single_line: 强制单行显示，保持固定字体大小
-        show_book_summary: 是否在右侧视频上显示"Book summary"文字
-        summary_font_size: Book summary文字的字体大小
-        summary_top_margin: Book summary文字距离视频底部向上的像素距离
-        summary_right_margin: Book summary文字距离右边缘的像素距离
+        fixed_font_size: 固定字体大小（不动态调整，允许换行）
+        show_book_summary: 是否在右侧视频上显示书籍摘要文字
+        summary_font_size: 书籍摘要文字的字体大小
+        summary_top_margin: 书籍摘要文字距离视频底部向上的像素距离
+        summary_right_margin: 书籍摘要文字距离右边缘的像素距离
+        title_top_margin: 标题距离上边沿的距离（像素），用于调整多行标题的垂直位置
 
     Returns:
         处理成功返回True，失败返回False
@@ -1223,7 +1584,7 @@ def process_all_books(
     lang_name = "中文" if language == "zh" else "English"
 
     print(f"\n=== 📊 书籍MP4 Clip生成统计 ===")
-    print(f"📁 封面目录: {directories['thumbnails_large']}")
+    print(f"📁 封面目录: {directories.get('thumbnails_large', 'N/A')}")
     print(f"📁 输出目录: {output_dir}")
     print(f"🌍 语言: {lang_name}")
     print(f"📹 总书籍数量: {len(available_books)}")
@@ -1281,12 +1642,15 @@ def process_all_books(
                 video_width_ratio=video_width_ratio,
                 video_align_right=video_align_right,
                 force_single_line=force_single_line,
+                fixed_font_size=fixed_font_size,
                 show_book_summary=show_book_summary,
                 summary_font_size=summary_font_size,
                 summary_top_margin=summary_top_margin,
                 summary_right_margin=summary_right_margin,
                 summary_icon_size=summary_icon_size,
                 icon_vertical_offset=icon_vertical_offset,
+                language=language,
+                title_top_margin=title_top_margin,
             )
 
             if success:
@@ -1327,6 +1691,14 @@ def process_all_books(
 
 def main():
     """主函数"""
+    # 首先检查是否为Ubuntu系统
+    if not check_ubuntu_system():
+        print("❌ 此脚本只能在Ubuntu系统上运行！")
+        print("🖥️  当前系统: " + platform.system())
+        sys.exit(1)
+    
+    print("✅ Ubuntu系统检测通过")
+
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(
         description="📚 书籍 1080p MP4 Clip 生成器",
@@ -1349,6 +1721,8 @@ def main():
   python generate_book_clips.py --font-weight semi-bold # 使用半粗体字体
   python generate_book_clips.py --font-path /path/to/font.ttf # 指定字体文件
   python generate_book_clips.py --force-single-line    # 强制单行显示，保持固定字体大小
+  python generate_book_clips.py --fixed-font-size      # 固定字体大小，长标题自动换行
+  python generate_book_clips.py --title-top-margin 30  # 标题距离上边沿30px（调整多行标题位置）
 
 Book summary文字设置:
   python generate_book_clips.py --no-book-summary      # 不显示Book summary文字
@@ -1359,17 +1733,26 @@ Book summary文字设置:
   python generate_book_clips.py --icon-vertical-offset -5 # 图标向上移动5像素对齐文字
   
   组合使用:
-  python generate_book_clips.py --video-width 0.4 --video-center --font-weight bold --force-single-line --summary-font-size 28 --summary-right-margin 15 --icon-size 30 --icon-vertical-offset -3 --debug
+  python generate_book_clips.py --video-width 0.4 --video-center --font-weight bold --force-single-line --summary-font-size 28 --summary-right-margin 15 --icon-size 30 --icon-vertical-offset -3 --title-top-margin 25 --debug
+  
+  中文书籍特殊用法:  
+  python generate_book_clips.py --language zh --fixed-font-size --font-size 56 --title-top-margin 20 --debug  # 中文书籍固定56px字体，长标题自动换行，上边距20px
 
 注意:
+- 只支持在Linux/Ubuntu系统上运行
 - 需要安装 FFmpeg
 - 需要超分后的封面图片 (来自 upscale_book_thumbnails.py)
 - 需要背景视频文件 (assets/plate_upscaled.mp4)
 - 生成 1080p (1920x1080) 分辨率视频
 - 自动跳过已处理的文件（除非使用 --force）
 - 自动跳过Mac系统生成的点开头文件
+- 支持中文和英文两种语言的书籍处理
+- 中文字体在 font/zh/ 目录，英文字体在 font/en/ 目录
 - 新版本默认保持封面比例，不crop，可留黑边
 - 右侧视频默认占右半边50%宽度，右对齐
+- 支持固定字体大小模式，长标题自动换行（推荐中文书籍使用）
+- 中文标题按字符换行，英文标题按单词换行
+- 支持调节标题距离上边沿的距离，改善多行标题布局
         """,
     )
 
@@ -1441,6 +1824,11 @@ Book summary文字设置:
         action="store_true",
         help="强制单行显示标题，不自动换行[默认: 自动换行]",
     )
+    parser.add_argument(
+        "--fixed-font-size",
+        action="store_true",
+        help="固定字体大小，长标题自动换行而不缩小字体[默认: 自动调整字体大小]",
+    )
 
     # 添加Book summary文字相关参数
     parser.add_argument(
@@ -1478,6 +1866,12 @@ Book summary文字设置:
         default=0,
         help="书籍图标垂直偏移量(像素)，负数向上移动，正数向下移动 [默认: 0]",
     )
+    parser.add_argument(
+        "--title-top-margin",
+        type=int,
+        default=0,
+        help="标题距离上边沿的距离(像素)，用于调整多行标题的垂直位置，0表示垂直居中 [默认: 0]",
+    )
 
     # 解析命令行参数
     args = parser.parse_args()
@@ -1496,18 +1890,25 @@ Book summary文字设置:
     lang_name = "中文" if args.language == "zh" else "English"
 
     print(f"🌍 语种: {lang_name}")
-    print(f"📁 封面目录: {directories['thumbnails_large']}")
+    print(f"📁 封面目录: {directories.get('thumbnails_large', 'N/A')}")
     print(f"📁 输出目录: {output_dir}")
     print(f"🖥️ 操作系统: {platform.system()}")
 
+    # 检查基础路径是否正确配置
+    if not directories:
+        print("❌ 无法获取目录配置，请检查系统设置")
+        sys.exit(1)
+
     # 检查目录是否存在
-    if not os.path.exists(directories["thumbnails_large"]):
-        print(f"❌ 超分封面目录不存在: {directories['thumbnails_large']}")
+    thumbnails_dir = directories.get("thumbnails_large", "")
+    if not thumbnails_dir or not os.path.exists(thumbnails_dir):
+        print(f"❌ 超分封面目录不存在: {thumbnails_dir}")
         print("💡 请先运行 upscale_book_thumbnails.py 生成超分封面图片")
         sys.exit(1)
 
-    if not os.path.exists(directories["assets"]):
-        print(f"❌ 素材目录不存在: {directories['assets']}")
+    assets_dir = directories.get("assets", "")
+    if not assets_dir or not os.path.exists(assets_dir):
+        print(f"❌ 素材目录不存在: {assets_dir}")
         print("💡 请确保 assets 目录包含背景视频文件")
         sys.exit(1)
 
@@ -1525,6 +1926,8 @@ Book summary文字设置:
     print()
 
     print(f"🔤 强制单行显示: {'是' if args.force_single_line else '否'}")
+    print(f"🔒 固定字体大小: {'是' if args.fixed_font_size else '否'}")
+    print(f"📏 标题上边距: {args.title_top_margin}px {'(垂直居中)' if args.title_top_margin == 0 else '(距离顶部)'}")
     print(f"📝 显示Book summary: {'否' if args.no_book_summary else '是'}")
     if not args.no_book_summary:
         print(f"📝 Book summary字体大小: {args.summary_font_size}px")
@@ -1548,12 +1951,14 @@ Book summary文字设置:
         font_path=args.font_path,
         font_weight=args.font_weight,
         force_single_line=args.force_single_line,
+        fixed_font_size=args.fixed_font_size,
         show_book_summary=not args.no_book_summary,
         summary_font_size=args.summary_font_size,
         summary_top_margin=args.summary_top_margin,
         summary_right_margin=args.summary_right_margin,
         summary_icon_size=args.icon_size,
         icon_vertical_offset=args.icon_vertical_offset,
+        title_top_margin=args.title_top_margin,
     )
 
     if success:

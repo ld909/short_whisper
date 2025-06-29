@@ -249,142 +249,202 @@ def get_ref_audio_for_language(language):
         return REF_AUDIO_EN
 
 
-def synthesize_audio(source_file, ref_audio, output_file, model="F5TTS_v1_Base"):
+def synthesize_audio(source_file, ref_audio, output_file, model="F5TTS_v1_Base", max_retries=3):
     """
-    使用 f5-tts CLI 合成音频
+    使用 f5-tts CLI 合成音频（带重试机制）
 
     Args:
         source_file (str): 源文本文件路径
         ref_audio (str): 参考音频文件路径
         output_file (str): 输出音频文件路径
         model (str): 使用的模型名称
+        max_retries (int): 最大重试次数
 
     Returns:
         bool: 合成是否成功
     """
-    try:
-        # 确保输出目录存在
-        output_dir = os.path.dirname(output_file)
-        os.makedirs(output_dir, exist_ok=True)
+    for attempt in range(max_retries):
+        try:
+            # 确保输出目录存在
+            output_dir = os.path.dirname(output_file)
+            os.makedirs(output_dir, exist_ok=True)
 
-        # 直接使用源文件，构建 f5-tts 命令
-        cmd = [
-            "f5-tts_infer-cli",
-            "--model",
-            model,
-            "--ref_audio",
-            ref_audio,
-            "--ref_text",
-            "",  # 总是空的，但必须提供
-            "--gen_file",
-            source_file,  # 直接使用源文件
-            "--remove_silence",
-            "--output_dir",
-            output_dir,
-            "--output_file",
-            os.path.basename(output_file),
-        ]
+            # 如果不是第一次尝试，显示重试信息
+            if attempt > 0:
+                print(f"🔄 重试第 {attempt + 1}/{max_retries} 次: {os.path.basename(output_file)}")
+                # 重试前稍作等待
+                time.sleep(5)
 
-        print(f"🔄 执行命令: {' '.join(cmd)}")
-        print(f"📄 使用源文件: {source_file}")
+            # 直接使用源文件，构建 f5-tts 命令
+            cmd = [
+                "f5-tts_infer-cli",
+                "--model",
+                model,
+                "--ref_audio",
+                ref_audio,
+                "--ref_text",
+                "",  # 总是空的，但必须提供
+                "--gen_file",
+                source_file,  # 直接使用源文件
+                "--remove_silence",
+                "--output_dir",
+                output_dir,
+                "--output_file",
+                os.path.basename(output_file),
+            ]
 
-        # 执行命令
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=1800  # 30分钟超时
-        )
+            if attempt == 0:  # 只在第一次尝试时显示完整命令
+                print(f"🔄 执行命令: {' '.join(cmd)}")
+                print(f"📄 使用源文件: {source_file}")
 
-        if result.returncode == 0:
-            print(f"✅ 音频合成成功: {output_file}")
-            return True
-        else:
-            print(f"❌ 音频合成失败:")
-            print(f"   stdout: {result.stdout}")
-            print(f"   stderr: {result.stderr}")
+            # 执行命令
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=1800  # 30分钟超时
+            )
 
-            # 如果 --gen_file 参数不支持，回退到读取文件内容使用 --gen_text 方式
-            if "--gen_file" in result.stderr or "gen_file" in result.stderr:
-                print(f"⚠️  --gen_file 参数不支持，回退到 --gen_text 方式")
-                text_content = read_text_content(source_file)
-                if text_content:
-                    return synthesize_audio_fallback(
-                        text_content, ref_audio, output_file, model
-                    )
+            if result.returncode == 0:
+                # 验证输出文件是否真的生成且有效
+                if is_valid_audio_file(output_file):
+                    print(f"✅ 音频合成成功: {output_file}")
+                    return True
                 else:
+                    print(f"⚠️  音频文件生成但无效: {output_file}")
+                    if attempt < max_retries - 1:
+                        continue  # 重试
                     return False
+            else:
+                print(f"❌ 音频合成失败 (尝试 {attempt + 1}/{max_retries}):")
+                print(f"   stdout: {result.stdout}")
+                print(f"   stderr: {result.stderr}")
 
+                # 如果 --gen_file 参数不支持，回退到读取文件内容使用 --gen_text 方式
+                if "--gen_file" in result.stderr or "gen_file" in result.stderr:
+                    print(f"⚠️  --gen_file 参数不支持，回退到 --gen_text 方式")
+                    text_content = read_text_content(source_file)
+                    if text_content:
+                        return synthesize_audio_fallback(
+                            text_content, ref_audio, output_file, model, max_retries
+                        )
+                    else:
+                        return False
+
+                # 如果不是最后一次尝试，继续重试
+                if attempt < max_retries - 1:
+                    continue
+                return False
+
+        except subprocess.TimeoutExpired:
+            print(f"❌ 音频合成超时 (尝试 {attempt + 1}/{max_retries}): {output_file}")
+            if attempt < max_retries - 1:
+                print("⏳ 等待 10 秒后重试...")
+                time.sleep(10)
+                continue
+            return False
+        except Exception as e:
+            print(f"❌ 音频合成出错 (尝试 {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                print("⏳ 等待 5 秒后重试...")
+                time.sleep(5)
+                continue
             return False
 
-    except subprocess.TimeoutExpired:
-        print(f"❌ 音频合成超时: {output_file}")
-        return False
-    except Exception as e:
-        print(f"❌ 音频合成出错: {e}")
-        return False
+    return False
 
 
 def synthesize_audio_fallback(
-    text_content, ref_audio, output_file, model="F5TTS_v1_Base"
+    text_content, ref_audio, output_file, model="F5TTS_v1_Base", max_retries=3
 ):
     """
-    回退方案：直接使用 --gen_text 参数
+    回退方案：直接使用 --gen_text 参数（带重试机制）
 
     Args:
         text_content (str): 要合成的文本内容
         ref_audio (str): 参考音频文件路径
         output_file (str): 输出音频文件路径
         model (str): 使用的模型名称
+        max_retries (int): 最大重试次数
 
     Returns:
         bool: 合成是否成功
     """
-    try:
-        output_dir = os.path.dirname(output_file)
+    for attempt in range(max_retries):
+        try:
+            output_dir = os.path.dirname(output_file)
 
-        # 简单处理换行符，避免命令行参数问题
-        clean_text = text_content.replace("\n", " ").replace("\r", " ").strip()
+            # 如果不是第一次尝试，显示重试信息
+            if attempt > 0:
+                print(f"🔄 回退方案重试第 {attempt + 1}/{max_retries} 次: {os.path.basename(output_file)}")
+                time.sleep(5)
 
-        # 限制文本长度，避免命令行参数过长
-        if len(clean_text) > 1000:
-            clean_text = clean_text[:1000] + "..."
-            print(f"⚠️  文本过长，已截断到1000字符")
+            # 简单处理换行符，避免命令行参数问题
+            clean_text = text_content.replace("\n", " ").replace("\r", " ").strip()
 
-        # 构建 f5-tts 命令
-        cmd = [
-            "f5-tts_infer-cli",
-            "--model",
-            model,
-            "--ref_audio",
-            ref_audio,
-            "--ref_text",
-            "",
-            "--gen_text",
-            clean_text,
-            "--remove_silence",
-            "--output_dir",
-            output_dir,
-            "--output_file",
-            os.path.basename(output_file),
-        ]
+            # 限制文本长度，避免命令行参数过长
+            if len(clean_text) > 1000:
+                clean_text = clean_text[:1000] + "..."
+                if attempt == 0:  # 只在第一次尝试时显示警告
+                    print(f"⚠️  文本过长，已截断到1000字符")
 
-        print(f"🔄 回退方案执行命令（使用 --gen_text）")
+            # 构建 f5-tts 命令
+            cmd = [
+                "f5-tts_infer-cli",
+                "--model",
+                model,
+                "--ref_audio",
+                ref_audio,
+                "--ref_text",
+                "",
+                "--gen_text",
+                clean_text,
+                "--remove_silence",
+                "--output_dir",
+                output_dir,
+                "--output_file",
+                os.path.basename(output_file),
+            ]
 
-        # 执行命令
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=1800
-        )  # 30分钟超时
+            if attempt == 0:  # 只在第一次尝试时显示完整信息
+                print(f"🔄 回退方案执行命令（使用 --gen_text）")
 
-        if result.returncode == 0:
-            print(f"✅ 音频合成成功（回退方案）: {output_file}")
-            return True
-        else:
-            print(f"❌ 音频合成失败（回退方案）:")
-            print(f"   stdout: {result.stdout}")
-            print(f"   stderr: {result.stderr}")
+            # 执行命令
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=1800
+            )  # 30分钟超时
+
+            if result.returncode == 0:
+                # 验证输出文件是否真的生成且有效
+                if is_valid_audio_file(output_file):
+                    print(f"✅ 音频合成成功（回退方案）: {output_file}")
+                    return True
+                else:
+                    print(f"⚠️  音频文件生成但无效（回退方案）: {output_file}")
+                    if attempt < max_retries - 1:
+                        continue  # 重试
+                    return False
+            else:
+                print(f"❌ 音频合成失败（回退方案，尝试 {attempt + 1}/{max_retries}）:")
+                print(f"   stdout: {result.stdout}")
+                print(f"   stderr: {result.stderr}")
+                if attempt < max_retries - 1:
+                    continue
+                return False
+
+        except subprocess.TimeoutExpired:
+            print(f"❌ 音频合成超时（回退方案，尝试 {attempt + 1}/{max_retries}）: {output_file}")
+            if attempt < max_retries - 1:
+                print("⏳ 等待 10 秒后重试...")
+                time.sleep(10)
+                continue
+            return False
+        except Exception as e:
+            print(f"❌ 回退方案出错 (尝试 {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                print("⏳ 等待 5 秒后重试...")
+                time.sleep(5)
+                continue
             return False
 
-    except Exception as e:
-        print(f"❌ 回退方案出错: {e}")
-        return False
+    return False
 
 
 def get_book_directories(input_base_dir):
@@ -549,9 +609,10 @@ def process_single_chunk(
     model="F5TTS_v1_Base",
     force_regenerate=False,
     specified_lang=None,
+    max_retries=3,
 ):
     """
-    处理单个文本块，合成音频
+    处理单个文本块，合成音频（增强错误处理）
 
     Args:
         chunk_file (str): 文本块文件路径
@@ -562,77 +623,99 @@ def process_single_chunk(
         model (str): 使用的模型名称
         force_regenerate (bool): 是否强制重新生成
         specified_lang (str): 指定的语言（en/zh），如果提供则优先使用
+        max_retries (int): 最大重试次数
 
     Returns:
         bool: 处理是否成功
     """
-    # 检查源文件是否存在
-    if not os.path.exists(chunk_file):
-        print(f"❌ [UUID:{uuid[:8]}...] 源文件不存在: {chunk_file}")
-        return False
-
-    # 构建输出文件路径
-    book_output_dir = os.path.join(output_base_dir, uuid)
-    output_file = os.path.join(book_output_dir, f"{chunk_index}.mp3")
-
-    # 检查文件是否已存在且有效（除非强制重新生成）
-    if not force_regenerate and is_valid_audio_file(output_file):
-        file_size = os.path.getsize(output_file)
-        print(
-            f"⏭️  [UUID:{uuid[:8]}...] 文件已存在且有效，跳过: 块{chunk_index} ({file_size} 字节)"
-        )
-        return True
-
-    # 选择语言和参考音频
-    if specified_lang:
-        # 如果指定了语言，直接使用
-        actual_ref_audio = get_ref_audio_for_language(specified_lang)
-        lang_name = "中文" if specified_lang == "zh" else "英文"
-        print(f"🌐 [UUID:{uuid[:8]}...] 使用指定语言: {lang_name}")
-        print(
-            f"🎤 [UUID:{uuid[:8]}...] 使用参考音频: {os.path.basename(actual_ref_audio)}"
-        )
-    else:
-        # 如果没有指定语言，则读取文本内容并检测语言
-        text_content = read_text_content(chunk_file)
-        if text_content:
-            detected_language = detect_text_language(text_content)
-            actual_ref_audio = get_ref_audio_for_language(detected_language)
-
-            # 显示语言检测结果
-            lang_name = "中文" if detected_language == "zh" else "英文"
-            print(f"🔍 [UUID:{uuid[:8]}...] 自动检测到语言: {lang_name}")
-            print(
-                f"🎤 [UUID:{uuid[:8]}...] 使用参考音频: {os.path.basename(actual_ref_audio)}"
-            )
-        else:
-            actual_ref_audio = ref_audio  # 如果无法读取文本，使用传入的默认参考音频
-            print(f"⚠️  [UUID:{uuid[:8]}...] 无法读取文本内容，使用默认参考音频")
-
-    # 获取文件大小用于显示
     try:
-        file_size = os.path.getsize(chunk_file)
-        print(f"📝 [UUID:{uuid[:8]}...] 处理文本块: 块 {chunk_index}")
-        print(f"   输入: {chunk_file} ({file_size} 字节)")
-        print(f"   输出: {output_file}")
-    except Exception as e:
-        print(f"⚠️  [UUID:{uuid[:8]}...] 无法获取文件大小: {e}")
+        # 检查源文件是否存在
+        if not os.path.exists(chunk_file):
+            print(f"❌ [UUID:{uuid[:8]}...] 源文件不存在: {chunk_file}")
+            return False
 
-    # 合成音频
-    success = synthesize_audio(chunk_file, actual_ref_audio, output_file, model)
+        # 构建输出文件路径
+        book_output_dir = os.path.join(output_base_dir, uuid)
+        output_file = os.path.join(book_output_dir, f"{chunk_index}.mp3")
 
-    if success:
-        # 检查输出文件是否真的生成了且有效
-        if is_valid_audio_file(output_file):
+        # 检查文件是否已存在且有效（除非强制重新生成）
+        if not force_regenerate and is_valid_audio_file(output_file):
             file_size = os.path.getsize(output_file)
             print(
-                f"✅ [UUID:{uuid[:8]}...] 音频文件生成成功: 块{chunk_index} ({file_size} 字节)"
+                f"⏭️  [UUID:{uuid[:8]}...] 文件已存在且有效，跳过: 块{chunk_index} ({file_size} 字节)"
             )
             return True
-        else:
-            print(f"❌ [UUID:{uuid[:8]}...] 音频文件未生成或无效: {output_file}")
+
+        # 选择语言和参考音频
+        actual_ref_audio = ref_audio  # 默认使用传入的参考音频
+        
+        try:
+            if specified_lang:
+                # 如果指定了语言，直接使用
+                actual_ref_audio = get_ref_audio_for_language(specified_lang)
+                lang_name = "中文" if specified_lang == "zh" else "英文"
+                print(f"🌐 [UUID:{uuid[:8]}...] 使用指定语言: {lang_name}")
+                print(
+                    f"🎤 [UUID:{uuid[:8]}...] 使用参考音频: {os.path.basename(actual_ref_audio)}"
+                )
+            else:
+                # 如果没有指定语言，则读取文本内容并检测语言
+                text_content = read_text_content(chunk_file)
+                if text_content:
+                    detected_language = detect_text_language(text_content)
+                    actual_ref_audio = get_ref_audio_for_language(detected_language)
+
+                    # 显示语言检测结果
+                    lang_name = "中文" if detected_language == "zh" else "英文"
+                    print(f"🔍 [UUID:{uuid[:8]}...] 自动检测到语言: {lang_name}")
+                    print(
+                        f"🎤 [UUID:{uuid[:8]}...] 使用参考音频: {os.path.basename(actual_ref_audio)}"
+                    )
+                else:
+                    print(f"⚠️  [UUID:{uuid[:8]}...] 无法读取文本内容，使用默认参考音频")
+        except Exception as e:
+            print(f"⚠️  [UUID:{uuid[:8]}...] 语言检测出错，使用默认参考音频: {e}")
+            # 继续使用默认的参考音频
+
+        # 获取文件大小用于显示
+        try:
+            file_size = os.path.getsize(chunk_file)
+            print(f"📝 [UUID:{uuid[:8]}...] 处理文本块: 块 {chunk_index}")
+            print(f"   输入: {chunk_file} ({file_size} 字节)")
+            print(f"   输出: {output_file}")
+        except Exception as e:
+            print(f"⚠️  [UUID:{uuid[:8]}...] 无法获取文件大小: {e}")
+            print(f"📝 [UUID:{uuid[:8]}...] 处理文本块: 块 {chunk_index}")
+            print(f"   输入: {chunk_file}")
+            print(f"   输出: {output_file}")
+
+        # 确保参考音频文件存在
+        if not os.path.exists(actual_ref_audio):
+            print(f"❌ [UUID:{uuid[:8]}...] 参考音频文件不存在: {actual_ref_audio}")
             return False
-    else:
+
+        # 合成音频（带重试机制）
+        success = synthesize_audio(chunk_file, actual_ref_audio, output_file, model, max_retries)
+
+        if success:
+            # 检查输出文件是否真的生成了且有效
+            if is_valid_audio_file(output_file):
+                file_size = os.path.getsize(output_file)
+                print(
+                    f"✅ [UUID:{uuid[:8]}...] 音频文件生成成功: 块{chunk_index} ({file_size} 字节)"
+                )
+                return True
+            else:
+                print(f"❌ [UUID:{uuid[:8]}...] 音频文件未生成或无效: {output_file}")
+                return False
+        else:
+            print(f"❌ [UUID:{uuid[:8]}...] 音频合成失败: 块{chunk_index}")
+            return False
+
+    except Exception as e:
+        print(f"❌ [UUID:{uuid[:8]}...] 处理文件块{chunk_index}时发生异常: {e}")
+        import traceback
+        print(f"🔍 [UUID:{uuid[:8]}...] 异常详情: {traceback.format_exc()}")
         return False
 
 
@@ -646,6 +729,7 @@ def process_book_by_uuid(
     resume_mode=True,
     force_regenerate=False,
     specified_lang=None,
+    max_retries=3,
 ):
     """
     处理指定UUID书籍的所有文本块文件
@@ -660,6 +744,7 @@ def process_book_by_uuid(
         resume_mode (bool): 是否启用断点续传
         force_regenerate (bool): 是否强制重新生成
         specified_lang (str): 指定的语言（en/zh），如果提供则优先使用
+        max_retries (int): 最大重试次数
 
     Returns:
         dict: 处理结果统计
@@ -751,33 +836,54 @@ def process_book_by_uuid(
         start_time = time.time()
 
         for i, (chunk_file, chunk_index) in enumerate(pending_files, 1):
-            print(
-                f"\n[UUID:{uuid[:8]}...] 处理第 {i}/{len(pending_files)} 个文件: 块 {chunk_index}"
-            )
-            print(
-                f"[UUID:{uuid[:8]}...] 总体进度: {completed_files + i}/{total_files} ({(completed_files + i)/total_files*100:.1f}%)"
-            )
+            try:
+                print(
+                    f"\n[UUID:{uuid[:8]}...] 处理第 {i}/{len(pending_files)} 个文件: 块 {chunk_index}"
+                )
+                print(
+                    f"[UUID:{uuid[:8]}...] 总体进度: {completed_files + i}/{total_files} ({(completed_files + i)/total_files*100:.1f}%)"
+                )
 
-            success = process_single_chunk(
-                chunk_file,
-                uuid,
-                chunk_index,
-                ref_audio,
-                output_base_dir,
-                model,
-                force_regenerate,
-                specified_lang,
-            )
+                success = process_single_chunk(
+                    chunk_file,
+                    uuid,
+                    chunk_index,
+                    ref_audio,
+                    output_base_dir,
+                    model,
+                    force_regenerate,
+                    specified_lang,
+                    max_retries,
+                )
 
-            if success:
-                successful_count += 1
-            else:
+                if success:
+                    successful_count += 1
+                    print(f"✅ [UUID:{uuid[:8]}...] 文件处理成功: 块{chunk_index}")
+                else:
+                    failed_count += 1
+                    print(f"❌ [UUID:{uuid[:8]}...] 文件处理失败: 块{chunk_index}")
+
+                # 在每个文件处理后稍作停顿，让系统休息
+                if i < len(pending_files):
+                    print(f"[UUID:{uuid[:8]}...] ⏳ 等待 2 秒...")
+                    time.sleep(2)
+
+            except KeyboardInterrupt:
+                # 用户中断，立即退出循环
+                print(f"\n⚠️  [UUID:{uuid[:8]}...] 用户中断了程序执行")
+                raise
+            except Exception as e:
+                # 处理单个文件时的异常，记录但继续处理下一个文件
                 failed_count += 1
-
-            # 在每个文件处理后稍作停顿
-            if i < len(pending_files):
-                print(f"[UUID:{uuid[:8]}...] ⏳ 等待 2 秒...")
-                time.sleep(2)
+                print(f"❌ [UUID:{uuid[:8]}...] 处理文件 块{chunk_index} 时发生异常: {e}")
+                import traceback
+                print(f"🔍 [UUID:{uuid[:8]}...] 异常详情: {traceback.format_exc()}")
+                print(f"⏭️  [UUID:{uuid[:8]}...] 跳过此文件，继续处理下一个文件...")
+                
+                # 等待一段时间后继续
+                if i < len(pending_files):
+                    print(f"[UUID:{uuid[:8]}...] ⏳ 等待 5 秒后继续...")
+                    time.sleep(5)
 
         end_time = time.time()
         total_time = end_time - start_time
@@ -793,6 +899,13 @@ def process_book_by_uuid(
         if successful_count > 0:
             avg_time = total_time / successful_count
             print(f"📊 [UUID:{uuid[:8]}...] 平均每个文件: {avg_time:.1f} 秒")
+
+        # 如果有失败的文件，显示建议
+        if failed_count > 0:
+            print(f"\n💡 [UUID:{uuid[:8]}...] 处理建议:")
+            print(f"   - 有 {failed_count} 个文件处理失败，可以重新运行脚本进行重试")
+            print(f"   - 检查网络连接和系统资源是否充足")
+            print(f"   - 确认 f5-tts 工具运行正常")
 
         return {
             "uuid": uuid,
@@ -813,6 +926,8 @@ def process_book_by_uuid(
         }
     except Exception as e:
         print(f"\n❌ [UUID:{uuid[:8]}...] 程序执行出错: {e}")
+        import traceback
+        print(f"🔍 [UUID:{uuid[:8]}...] 异常详情: {traceback.format_exc()}")
         return {
             "uuid": uuid,
             "total": total_files,
@@ -896,6 +1011,12 @@ def main():
         help="禁用断点续传，重新处理所有文件",
     )
     parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=3,
+        help="音频合成失败时的最大重试次数 (默认: 3)"
+    )
+    parser.add_argument(
         "--proxy",
         action="store_true",
         default=True,
@@ -943,6 +1064,7 @@ def main():
     print(f"🎤 参考音频: {ref_audio}")
     print(f"🤖 使用模型: {model}")
     print(f"🔄 断点续传: {'启用' if resume_mode else '禁用'}")
+    print(f"🔁 最大重试次数: {args.max_retries}")
     print(f"🚫 自动排除Mac系统文件 (.DS_Store等)")
 
     if args.uuid:
@@ -1016,6 +1138,7 @@ def main():
                     resume_mode,
                     args.force_regenerate,
                     lang,
+                    args.max_retries,
                 )
                 all_results.append(result)
             except Exception as e:

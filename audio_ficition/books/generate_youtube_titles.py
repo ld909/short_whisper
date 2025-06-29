@@ -154,11 +154,11 @@ class YouTubeTitleGenerator:
         }
 
         if target_uuid:
-            self.process_single_book(target_uuid, force)
+            result = self.process_single_book(target_uuid, force)
             stats["total_targets"] = 1
-            stats["successful"] = 1 if stats["status"] == "success" else 0
-            stats["failed"] = 1 if stats["status"] == "failed" else 0
-            stats["skipped"] = 1 if stats["status"] == "skipped" else 0
+            stats["successful"] = 1 if result["status"] == "success" else 0
+            stats["failed"] = 1 if result["status"] == "failed" else 0
+            stats["skipped"] = 1 if result["status"] == "skipped" else 0
             return stats
 
         if max_count is None:
@@ -225,7 +225,7 @@ class YouTubeTitleGenerator:
         print(f"📖 书名: {book_title}")
 
         # 生成YouTube标题
-        youtube_title = self.generate_youtube_title(book_title)
+        youtube_title = self.generate_youtube_title(book_info)
         print(f"🎬 YouTube标题: {youtube_title}")
         print(f"📏 标题长度: {len(youtube_title)}")
 
@@ -289,7 +289,7 @@ class YouTubeTitleGenerator:
         """加载书籍信息"""
         info_file = os.path.join(self.info_dir, f"{uuid}.json")
 
-        if not self.is_title_exists(uuid):
+        if not os.path.exists(info_file):
             return None
 
         try:
@@ -306,31 +306,52 @@ class YouTubeTitleGenerator:
             print(f"❌ [UUID:{uuid[:8]}...] 读取书籍信息失败: {e}")
             return None
 
-    def generate_youtube_title(self, book_title):
+    def generate_youtube_title(self, book_info):
         """生成YouTube标题"""
+        book_title = book_info.get("title", "")
+        
         # 清理书名，移除多余的空白字符
         book_title = " ".join(book_title.split()).strip()
 
-        # 构建基础标题格式
-        title_template = "{}"
+        if self.language == "zh":
+            # 中文格式：书名 | 书籍总结
+            # "书籍总结"是固定文本，只处理书名
+            fixed_suffix = "书籍总结"
+            
+            # 计算固定部分的字符数：" | " + "书籍总结" = 6个字符
+            fixed_chars = 3 + len(fixed_suffix)  # " | " + 书籍总结
+            available_chars_for_title = 99 - fixed_chars  # 给书名留的字符数
+            
+            # 处理书名
+            if len(book_title) > available_chars_for_title:
+                # 如果书名太长，截断并添加省略号
+                truncated_title = book_title[:available_chars_for_title-3].rstrip() + "..."
+            else:
+                truncated_title = book_title
+            
+            # 生成最终标题
+            final_title = f"{truncated_title} | {fixed_suffix}"
+        else:
+            # 英文格式：保持原有逻辑
+            title_template = "{}"
+            
+            # 计算可用于书名的最大字符数
+            max_book_title_length = 100 - len(title_template.format(""))
 
-        # 计算可用于书名的最大字符数
-        # 减去后缀的字符数
-        max_book_title_length = 100 - len(title_template.format(""))
+            # 如果书名太长，截断并添加...
+            if len(book_title) > max_book_title_length:
+                # 为省略号留出空间
+                truncate_length = max_book_title_length - 3
+                book_title = book_title[:truncate_length].rstrip() + "..."
 
-        # 如果书名太长，截断并添加...
-        if len(book_title) > max_book_title_length:
-            # 为省略号留出空间
-            truncate_length = max_book_title_length - 3
-            book_title = book_title[:truncate_length].rstrip() + "..."
+            # 生成最终标题
+            final_title = title_template.format(book_title)
 
-        # 生成最终标题
-        final_title = title_template.format(book_title)
-
-        # 最终检查长度
-        if len(final_title) > 100:
-            # 如果仍然超长（理论上不应该发生），再次截断
-            final_title = final_title[:97] + "..."
+        # 最终检查长度（中文99字符，英文100字符）
+        max_length = 99 if self.language == "zh" else 100
+        if len(final_title) > max_length:
+            # 如果仍然超长，再次截断
+            final_title = final_title[:max_length-3].rstrip() + "..."
 
         return final_title
 

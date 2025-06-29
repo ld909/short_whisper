@@ -10,6 +10,7 @@
 - 检查音频数量与文本块数量是否一致
 - 按正确顺序合并所有音频片段
 - 生成完整的书籍音频文件
+- 支持音频播放速度调整（0.25x-4.0x）
 - 支持断点续传，跳过已存在的有效音频文件
 - 自动排除Mac系统产生的点文件
 
@@ -20,7 +21,9 @@
   * 英文: /home/dhl/Documents/audio/mp3_clips/book/book_en/{uuid}/{chunk_index}.mp3
 
 📤 输出信息:
-- 输出目录: /mnt/dhl/audio/books/en/mp3/{uuid}.mp3
+- 输出目录: 
+  * 中文: /mnt/dhl/audio/books/zh/mp3/{uuid}.mp3
+  * 英文: /mnt/dhl/audio/books/en/mp3/{uuid}.mp3
 - 自动排除Mac系统产生的点文件
 
 🔄 处理规则:
@@ -29,6 +32,7 @@
 3. 支持断点续传，跳过已存在的有效音频文件
 4. 自动排除以点开头的Mac系统文件
 5. 按块索引顺序合并音频
+6. 支持音频播放速度调整，使用ffmpeg的atempo滤镜
 
 💡 使用示例:
 # 合并英文书籍音频
@@ -45,6 +49,15 @@ python merge_book_audio.py --preview --lang zh
 
 # 强制重新生成
 python merge_book_audio.py --force-regenerate --lang en
+
+# 1.1倍速合并英文书籍音频
+python merge_book_audio.py --speed 1.1 --lang en
+
+# 1.15倍速合并中文书籍音频
+python merge_book_audio.py --speed 1.15 --lang zh
+
+# 1.2倍速合并指定UUID的书籍
+python merge_book_audio.py --speed 1.2 --uuid 12345678-abcd-efgh-ijkl-123456789012 --lang en
 """
 
 import os
@@ -57,13 +70,13 @@ from pathlib import Path
 
 # ============ 配置参数 ============
 # 文本块目录：chunk_book_summaries.py的输出目录
-DEFAULT_TEXT_BASE_DIR = "/home/dhl/Documents/book"
+# 注意：现在使用多语言路径结构 /home/dhl/Documents/book/{lang}
+def get_text_base_dir(language="en"):
+    """根据语言获取文本文件基础目录"""
+    return f"/home/dhl/Documents/book/{language}"
 
 # 音频片段目录：synthesize_book_audio.py的输出目录（支持多语言）
-# 默认为英文，具体路径在运行时根据语言参数确定
-
-# 最终输出目录：合并后的完整音频文件
-DEFAULT_OUTPUT_BASE_DIR = "/mnt/dhl/audio/books/en/mp3"
+# 与 synthesize_book_audio.py 的输出路径保持一致
 
 # 临时目录：用于存放合并过程中的临时文件
 DEFAULT_TEMP_DIR = "/tmp/book_audio_merge"
@@ -82,6 +95,14 @@ def get_audio_base_dir(language="en"):
         return "/home/dhl/Documents/audio/mp3_clips/book/book_zh"
     else:  # language == "en"
         return "/home/dhl/Documents/audio/mp3_clips/book/book_en"
+
+
+def get_output_base_dir(language="en"):
+    """根据语言获取输出文件基础目录"""
+    if language == "zh":
+        return "/mnt/dhl/audio/books/zh/mp3"
+    else:  # language == "en"
+        return "/mnt/dhl/audio/books/en/mp3"
 
 
 def check_ubuntu_system():
@@ -322,7 +343,7 @@ def check_file_consistency(uuid, text_dir, audio_dir):
     return is_consistent, text_files, audio_files, missing_audio, invalid_audio
 
 
-def merge_audio_files(uuid, audio_files, output_file, temp_dir):
+def merge_audio_files(uuid, audio_files, output_file, temp_dir, audio_speed=1.0):
     """
     使用 ffmpeg 合并音频文件
 
@@ -331,6 +352,7 @@ def merge_audio_files(uuid, audio_files, output_file, temp_dir):
         audio_files (list): 按顺序排列的音频文件路径列表
         output_file (str): 输出文件路径
         temp_dir (str): 临时目录
+        audio_speed (float): 音频播放速度倍数 (默认: 1.0)
 
     Returns:
         bool: 合并是否成功
@@ -338,6 +360,7 @@ def merge_audio_files(uuid, audio_files, output_file, temp_dir):
     print(f"\n🔄 [UUID:{uuid[:8]}...] 开始合并音频文件...")
     print(f"📝 [UUID:{uuid[:8]}...] 将合并 {len(audio_files)} 个音频片段")
     print(f"📁 [UUID:{uuid[:8]}...] 输出文件: {output_file}")
+    print(f"⚡ [UUID:{uuid[:8]}...] 音频播放速度: {audio_speed}x")
     
     # 检查所有音频片段是否有效
     valid_audio_files = []
@@ -381,9 +404,34 @@ def merge_audio_files(uuid, audio_files, output_file, temp_dir):
             "-b:a", "192k",  # 设置比特率
             "-ar", "44100",  # 设置采样率
             "-ac", "1",  # 单声道
-            "-y",  # 覆盖输出文件
-            output_file
         ]
+        
+        # 添加音频速度调整滤镜（如果不是1.0倍速）
+        if audio_speed != 1.0:
+            # atempo滤镜的范围是0.5到2.0，如果超出范围需要链式处理
+            audio_filters = []
+            current_speed = audio_speed
+            
+            # 处理速度大于2.0的情况
+            while current_speed > 2.0:
+                audio_filters.append("atempo=2.0")
+                current_speed /= 2.0
+            
+            # 处理速度小于0.5的情况
+            while current_speed < 0.5:
+                audio_filters.append("atempo=0.5")
+                current_speed /= 0.5
+            
+            # 添加最后的速度调整
+            if current_speed != 1.0:
+                audio_filters.append(f"atempo={current_speed:.3f}")
+            
+            if audio_filters:
+                filter_chain = ",".join(audio_filters)
+                cmd.extend(["-af", filter_chain])
+                print(f"🎧 [UUID:{uuid[:8]}...] 应用音频滤镜: {filter_chain}")
+        
+        cmd.extend(["-y", output_file])  # 覆盖输出文件
         
         print(f"🔄 [UUID:{uuid[:8]}...] 执行合并命令...")
         print(f"🔗 [UUID:{uuid[:8]}...] 准备合并 {len(valid_audio_files)} 个有效音频片段")
@@ -439,6 +487,7 @@ def process_book_by_uuid(
     temp_dir,
     preview_mode=False,
     force_regenerate=False,
+    audio_speed=1.0,
 ):
     """
     处理指定UUID书籍的音频合并
@@ -451,6 +500,7 @@ def process_book_by_uuid(
         temp_dir (str): 临时目录
         preview_mode (bool): 是否为预览模式
         force_regenerate (bool): 是否强制重新生成
+        audio_speed (float): 音频播放速度倍数 (默认: 1.0)
         
     Returns:
         dict: 处理结果
@@ -509,6 +559,7 @@ def process_book_by_uuid(
         print(f"\n📋 [UUID:{uuid[:8]}...] 预览模式 - 将要合并的文件:")
         print(f"   文本文件: {len(text_files)} 个")
         print(f"   音频文件: {len(audio_files)} 个")
+        print(f"   播放速度: {audio_speed}x")
         print(f"   输出文件: {output_file}")
         
         # 显示前几个和后几个文件
@@ -545,7 +596,7 @@ def process_book_by_uuid(
     # 执行音频合并
     print(f"\n🔄 [UUID:{uuid[:8]}...] 开始音频合并处理...")
     
-    success = merge_audio_files(uuid, audio_files, output_file, temp_dir)
+    success = merge_audio_files(uuid, audio_files, output_file, temp_dir, audio_speed)
     
     if success:
         return {
@@ -585,6 +636,8 @@ def main():
   python merge_book_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012 --lang en  # 合并指定UUID的书籍
   python merge_book_audio.py --preview --lang zh            # 预览模式
   python merge_book_audio.py --force-regenerate --lang en   # 强制重新生成
+  python merge_book_audio.py --speed 1.1 --lang en         # 1.1倍速合并英文书籍音频
+  python merge_book_audio.py --speed 1.15 --lang zh        # 1.15倍速合并中文书籍音频
         """
     )
     parser.add_argument(
@@ -593,8 +646,7 @@ def main():
     )
     parser.add_argument(
         "--text-base-dir", 
-        default=DEFAULT_TEXT_BASE_DIR, 
-        help=f"文本文件基础目录路径 (默认: {DEFAULT_TEXT_BASE_DIR})"
+        help="文本文件基础目录路径 (默认：根据语言自动确定)"
     )
     parser.add_argument(
         "--lang", "-l",
@@ -608,8 +660,7 @@ def main():
     )
     parser.add_argument(
         "--output-base-dir", 
-        default=DEFAULT_OUTPUT_BASE_DIR, 
-        help=f"输出基础目录路径 (默认: {DEFAULT_OUTPUT_BASE_DIR})"
+        help="输出基础目录路径 (默认：根据语言自动确定)"
     )
     parser.add_argument(
         "--temp-dir", 
@@ -626,17 +677,29 @@ def main():
         action="store_true",
         help="强制重新生成所有文件，忽略已存在的文件",
     )
+    parser.add_argument(
+        "--speed", "-s",
+        type=float,
+        default=1.0,
+        help="音频播放速度倍数 (默认: 1.0, 范围: 0.25-4.0)",
+    )
 
     args = parser.parse_args()
+
+    # 验证速度参数
+    if args.speed < 0.25 or args.speed > 4.0:
+        print(f"❌ 音频播放速度参数无效: {args.speed}")
+        print("💡 播放速度必须在 0.25 到 4.0 之间")
+        return
 
     # 根据语言设置路径
     language = args.lang
     
-    # 文本基础目录 - 支持语言参数
+    # 文本基础目录 - 根据语言确定
     if args.text_base_dir:
         text_base_dir = args.text_base_dir
     else:
-        text_base_dir = f"/home/dhl/Documents/book/{language}"
+        text_base_dir = get_text_base_dir(language)
     
     # 音频基础目录 - 根据语言确定
     if args.audio_base_dir:
@@ -644,13 +707,19 @@ def main():
     else:
         audio_base_dir = get_audio_base_dir(language)
     
-    output_base_dir = args.output_base_dir
+    # 输出基础目录 - 根据语言确定
+    if args.output_base_dir:
+        output_base_dir = args.output_base_dir
+    else:
+        output_base_dir = get_output_base_dir(language)
+    
     temp_dir = args.temp_dir
 
     lang_name = "中文" if language == "zh" else "英文"
     
     print(f"\n🎵 书籍音频合并器 (支持断点续传)")
     print(f"🌍 处理语言: {lang_name} ({language})")
+    print(f"⚡ 音频播放速度: {args.speed}x")
     print(f"📁 文本基础目录: {text_base_dir}")
     print(f"📁 音频基础目录: {audio_base_dir}")
     print(f"📁 输出基础目录: {output_base_dir}")
@@ -719,7 +788,8 @@ def main():
                     output_base_dir,
                     temp_dir,
                     args.preview, 
-                    args.force_regenerate
+                    args.force_regenerate,
+                    args.speed
                 )
                 all_results.append(result)
             except Exception as e:

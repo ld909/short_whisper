@@ -30,6 +30,8 @@
 4. 使用concat方式拼接多个clip副本，不使用静态图循环
 5. 参考 merge_mp4_cover_audio.py 的优化技术
 6. YouTube封面使用标准尺寸 1280x720 (16:9比例)
+7. 🔧 音频完整性保护：确保音频从开头开始，不被截断
+8. 使用音频时长作为输出长度，添加时间戳同步参数
 
 💡 使用示例:
 # 处理英文书籍
@@ -46,6 +48,9 @@ python merge_clips_with_audio.py --preview --lang zh
 
 # 强制重新生成
 python merge_clips_with_audio.py --force --lang en
+
+# 测试音频完整性修复
+python merge_clips_with_audio.py --test-audio --lang zh --debug
 """
 
 import os
@@ -68,7 +73,7 @@ YOUTUBE_COVER_WIDTH = 1280
 YOUTUBE_COVER_HEIGHT = 720
 
 # 最小文件大小检查 (字节)
-MIN_CLIP_SIZE = 1024 * 1024  # 1MB
+MIN_CLIP_SIZE = 1024 * 100  # 100KB
 MIN_AUDIO_SIZE = 1024 * 100  # 100KB
 MIN_OUTPUT_SIZE = 1024 * 1024 * 5  # 5MB
 MIN_COVER_SIZE = 1024 * 10  # 10KB
@@ -401,6 +406,12 @@ def create_looped_video_with_audio(
         print(f"   - Clip时长: {video_duration:.2f}秒")
         print(f"   - 目标时长: {target_duration:.2f}秒")
         print(f"   - 需要拼接: {repeat_count} 个clip")
+        print(f"   - 音频文件: {os.path.basename(audio_path)}")
+        print(f"   - Clip文件: {os.path.basename(clip_path)}")
+        print(f"🔧 [UUID:{uuid[:8]}...] 修复策略:")
+        print(f"   - 使用音频时长 ({audio_duration:.2f}秒) 作为输出长度")
+        print(f"   - 添加 -ss 0 确保从开头开始")
+        print(f"   - 添加 -avoid_negative_ts make_zero 避免时间戳问题")
 
     try:
         # 确保目录存在
@@ -462,14 +473,18 @@ def create_looped_video_with_audio(
         if debug:
             print(f"⚡ [UUID:{uuid[:8]}...] 拼接用时: {concat_time:.2f} 秒")
 
-        # 第二步：合并音频并截断到目标时长
-        print(f"🎵 [UUID:{uuid[:8]}...] 第二步：合并音频并截断到目标时长...")
+        # 第二步：合并音频，确保音频完整性
+        print(f"🎵 [UUID:{uuid[:8]}...] 第二步：合并音频，确保音频完整...")
 
+        # 关键修复：不截断音频，让视频长度匹配音频长度
+        # 使用音频长度作为输出长度，确保音频不被截断
         final_cmd = [
             "ffmpeg",
             "-y",  # 覆盖输出文件
+            "-ss", "0",  # 确保从0秒开始，避免开头被截断
             "-i",
             temp_video_file,  # 输入拼接后的视频
+            "-ss", "0",  # 确保音频也从0秒开始
             "-i",
             audio_path,  # 输入音频
             "-map",
@@ -484,8 +499,10 @@ def create_looped_video_with_audio(
             "aac",  # 音频编码器
             "-b:a",
             "192k",  # 音频比特率
+            "-shortest",  # 使用最短的流长度，但音频为主
+            "-avoid_negative_ts", "make_zero",  # 避免负时间戳
             "-t",
-            str(target_duration),  # 限制输出时长
+            str(audio_duration),  # 使用音频时长，确保音频完整
             "-pix_fmt",
             "yuv420p",  # 像素格式
             "-movflags",
@@ -518,6 +535,27 @@ def create_looped_video_with_audio(
             if is_valid_file(output_path, MIN_OUTPUT_SIZE):
                 file_size = os.path.getsize(output_path) / (1024 * 1024)  # MB
                 print(f"📊 [UUID:{uuid[:8]}...] 输出文件大小: {file_size:.2f} MB")
+                
+                # 关键验证：检查输出音频时长是否与原音频匹配
+                output_duration = get_audio_duration(output_path)
+                if output_duration:
+                    duration_diff = abs(output_duration - audio_duration)
+                    if duration_diff < 0.1:  # 允许0.1秒的误差
+                        print(f"✅ [UUID:{uuid[:8]}...] 音频完整性验证通过:")
+                        print(f"   - 原音频时长: {audio_duration:.2f}秒")
+                        print(f"   - 输出音频时长: {output_duration:.2f}秒")
+                        print(f"   - 时长差异: {duration_diff:.3f}秒")
+                    else:
+                        print(f"⚠️  [UUID:{uuid[:8]}...] 音频时长有差异:")
+                        print(f"   - 原音频时长: {audio_duration:.2f}秒")
+                        print(f"   - 输出音频时长: {output_duration:.2f}秒")
+                        print(f"   - 时长差异: {duration_diff:.3f}秒")
+                        if duration_diff > 1.0:  # 如果差异超过1秒，认为有问题
+                            print(f"❌ [UUID:{uuid[:8]}...] 音频可能被截断，差异过大")
+                            return False
+                else:
+                    print(f"⚠️  [UUID:{uuid[:8]}...] 无法验证输出音频时长")
+                
                 print(f"⚡ [UUID:{uuid[:8]}...] 总处理时间: {total_time:.2f} 秒")
                 return True
             else:
@@ -804,11 +842,13 @@ def main():
   python merge_clips_with_audio.py --uuid abc123 --lang en        # 处理指定UUID
   python merge_clips_with_audio.py --preview --lang zh            # 预览模式
   python merge_clips_with_audio.py --force --lang en              # 强制重新生成
+  python merge_clips_with_audio.py --test-audio --lang zh --debug # 测试音频完整性修复
 
 注意:
 - 需要FFmpeg支持
 - 会生成合并视频和YouTube封面图片
 - 自动排除Mac系统文件
+- 🔧 已修复中文音频开头被截断的问题
         """,
     )
 
@@ -829,6 +869,9 @@ def main():
         "--preview", "-p", action="store_true", help="预览模式，只显示要处理的文件"
     )
     parser.add_argument("--debug", "-d", action="store_true", help="启用调试模式")
+    parser.add_argument(
+        "--test-audio", "-t", action="store_true", help="测试音频完整性修复，只处理第一个文件并详细验证"
+    )
 
     args = parser.parse_args()
 
@@ -909,6 +952,37 @@ def main():
             print(f"      封面图片: {os.path.basename(cover_path)}")
         return
 
+    # 测试音频完整性模式
+    if args.test_audio:
+        print(f"\n🧪 测试音频完整性修复模式")
+        print(f"只处理第一个书籍并进行详细验证...")
+        
+        if available_books:
+            uuid, clip_path, audio_path = available_books[0]
+            print(f"\n🎯 测试目标: {uuid}")
+            
+            # 强制开启调试模式
+            result = process_single_book(
+                uuid=uuid,
+                clip_path=clip_path,
+                audio_path=audio_path,
+                directories=directories,
+                force=True,  # 强制重新处理
+                preview=False,
+                debug=True,  # 强制开启调试
+            )
+            
+            if result["status"] == "success":
+                print(f"\n✅ 音频完整性测试通过!")
+                print(f"🎉 修复已生效，可以处理所有书籍了")
+            else:
+                print(f"\n❌ 音频完整性测试失败: {result.get('error', 'unknown error')}")
+                print(f"🔧 请检查修复逻辑是否正确")
+        else:
+            print(f"❌ 没有找到可测试的书籍文件")
+        
+        return
+
     # 处理书籍
     print(f"\n🔄 开始处理 {len(available_books)} 个书籍...")
 
@@ -932,15 +1006,15 @@ def main():
                 debug=args.debug,
             )
 
-            if result["success"]:
+            if result["status"] == "success":
                 success_count += 1
                 print(f"✅ 成功处理: {uuid}")
-            elif result.get("skipped"):
+            elif result["status"] == "skipped":
                 skipped_count += 1
                 print(f"⏭️  跳过已存在: {uuid}")
             else:
                 failed_count += 1
-                print(f"❌ 处理失败: {uuid}")
+                print(f"❌ 处理失败: {uuid} - {result.get('error', 'unknown error')}")
 
     except KeyboardInterrupt:
         print("\n⏹️ 用户中断，正在清理...")
