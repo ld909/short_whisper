@@ -3,27 +3,33 @@
 """
 书籍YouTube上传脚本
 上传 merge_clips_with_audio.py 产生的MP4文件到YouTube
+支持中文和英文书籍上传到不同的YouTube频道
 
 📚 功能说明:
-- 读取 excel/book-en.xlsx 文件，获取待上传的书籍列表
+- 支持中文和英文书籍处理（通过 --language 参数选择）
+- 读取对应语言的Excel文件，获取待上传的书籍列表
 - 从 merge_clips_with_audio.py 的输出中读取MP4视频文件
 - 使用 generate_youtube_titles.py 的逻辑生成标题
 - 组合描述和hashtags作为视频描述
-- 使用指定的浏览器和频道进行上传
+- 自动选择对应语言的YouTube频道进行上传
 - 支持设定视频间隔时间
 - 智能Tab管理：每次上传使用新tab，达到限制后等待并清理
 - 更新Excel状态
 
+🌍 语言支持:
+- 英文 (en): books/en/ 目录，book-en.xlsx 文件
+- 中文 (zh): books/zh/ 目录，book-zh.xlsx 文件
+
 📥 输入信息:
-- Excel文件: excel/book-en.xlsx (列名: UUID | 是否发布 | 发布时间)
-- MP4文件: {media_path}/books/en/mp4_with_audio/{uuid}.mp4
-- 封面文件: {media_path}/books/en/ytb_cover/{uuid}.png
-- 标题信息: {media_path}/books/en/info/{uuid}.json
-- 描述文件: {media_path}/books/en/youtube_description/{uuid}.txt
-- 标签文件: {media_path}/books/en/youtube_hashtags/{uuid}.txt
+- Excel文件: excel/book-{language}.xlsx (列名: UUID | 是否发布 | 发布时间)
+- MP4文件: {media_path}/books/{language}/mp4_with_audio/{uuid}.mp4
+- 封面文件: {media_path}/books/{language}/ytb_cover/{uuid}.png
+- 标题信息: {media_path}/books/{language}/info/{uuid}.json
+- 描述文件: {media_path}/books/{language}/youtube_description/{uuid}.txt
+- 标签文件: {media_path}/books/{language}/youtube_hashtags/{uuid}.txt
 
 📤 输出信息:
-- YouTube视频上传
+- YouTube视频上传到对应语言的频道
 - 更新的Excel状态文件
 
 🔄 处理规则:
@@ -34,21 +40,26 @@
    - Ubuntu: /media/dhl/audio
 3. 支持断点续传，跳过已上传的视频（是否发布=1）
 4. 自动排除以点开头的Mac系统文件
-5. 使用指定的浏览器ID (k10i5y1s) 和频道URL
-6. 可设定视频上传间隔时间
+5. 根据语言使用对应的浏览器ID：
+   - 英文书籍: k10i5y1s
+   - 中文书籍: k10i7fjt
+6. 根据语言自动选择对应的YouTube频道：
+   - 英文频道: https://studio.youtube.com/channel/UCe4grZMmPMmnMcIoaTJc05w
+   - 中文频道: https://studio.youtube.com/channel/UCW0Or8f_oWL2V8QQzob-DQw
+7. 可设定视频上传间隔时间
 
 💡 使用示例:
-# 上传所有待发布的书籍
-python upload_books_to_youtube.py
+# 上传中文书籍
+python upload_books_to_youtube.py --language zh
 
-# 设定4小时间隔上传
-python upload_books_to_youtube.py --interval 4
+# 上传英文书籍，设定4小时间隔
+python upload_books_to_youtube.py --language en --interval 4
 
-# 限制上传数量
-python upload_books_to_youtube.py --max-count 3
+# 中文书籍限制上传数量
+python upload_books_to_youtube.py --language zh --max-count 3
 
-# 试运行模式
-python upload_books_to_youtube.py --dry-run
+# 试运行模式查看待上传的中文书籍
+python upload_books_to_youtube.py --language zh --dry-run
 """
 
 import os
@@ -68,12 +79,23 @@ from typing import Optional, Dict, List, Tuple
 
 # ============ 配置参数 ============
 # YouTube频道配置
-YOUTUBE_STUDIO_URL = "https://studio.youtube.com/channel/UCe4grZMmPMmnMcIoaTJc05w"
-ADSPOWER_BROWSER_ID = "k10i5y1s"
+YOUTUBE_CHANNELS = {
+    "en": "https://studio.youtube.com/channel/UCe4grZMmPMmnMcIoaTJc05w",  # 英文频道
+    "zh": "https://studio.youtube.com/channel/UCW0Or8f_oWL2V8QQzob-DQw",  # 中文频道
+}
+
+# AdsPower浏览器ID配置
+ADSPOWER_BROWSER_IDS = {
+    "en": "k10i5y1s",  # 英文浏览器
+    "zh": "k10i7fjt",  # 中文浏览器
+}
 
 # 标题配置
 MAX_TITLE_LENGTH = 99
-TITLE_SUFFIX = " | Book Summary"
+TITLE_SUFFIX = {
+    "en": " | Book Summary",
+    "zh": " | 书籍总结",
+}
 
 # 最小文件大小检查
 MIN_MP4_SIZE = 1024 * 1024 * 5  # 5MB
@@ -83,8 +105,11 @@ MIN_INFO_SIZE = 100  # 100字节
 # 默认发布间隔
 DEFAULT_INTERVAL_HOURS = 4
 
-# Excel文件路径
-EXCEL_FILE_PATH = "excel/book-en.xlsx"
+# Excel文件路径配置
+EXCEL_FILES = {
+    "en": "excel/book-en.xlsx",
+    "zh": "excel/book-zh.xlsx",
+}
 
 
 def get_base_media_path():
@@ -101,10 +126,10 @@ def get_base_media_path():
         return "/media/dhl/audio"
 
 
-def get_directories():
+def get_directories(language="en"):
     """获取所有相关目录路径"""
     base_media_path = get_base_media_path()
-    books_path = os.path.join(base_media_path, "books", "en")
+    books_path = os.path.join(base_media_path, "books", language)
 
     return {
         "mp4": os.path.join(books_path, "mp4_with_audio"),
@@ -112,7 +137,7 @@ def get_directories():
         "info": os.path.join(books_path, "info"),
         "descriptions": os.path.join(books_path, "youtube_description"),
         "hashtags": os.path.join(books_path, "youtube_hashtags"),
-        "excel": EXCEL_FILE_PATH,
+        "excel": EXCEL_FILES[language],
     }
 
 
@@ -170,12 +195,17 @@ def countdown_timer(total_seconds, description="等待中"):
 
 class BookYouTubeUploader:
     def __init__(
-        self, interval_hours=DEFAULT_INTERVAL_HOURS, max_tabs=6, wait_minutes=30
+        self,
+        language="en",
+        interval_hours=DEFAULT_INTERVAL_HOURS,
+        max_tabs=6,
+        wait_minutes=30,
     ):
+        self.language = language
         self.interval_hours = interval_hours
-        self.directories = get_directories()
-        self.browser_id = ADSPOWER_BROWSER_ID
-        self.studio_url = YOUTUBE_STUDIO_URL
+        self.directories = get_directories(language)
+        self.browser_id = ADSPOWER_BROWSER_IDS[language]
+        self.studio_url = YOUTUBE_CHANNELS[language]
         self.max_tabs = max_tabs  # 最大tab数量
         self.wait_minutes = wait_minutes  # tab限制时等待分钟数
         self.http = None
@@ -184,13 +214,26 @@ class BookYouTubeUploader:
         self.current_tabs = []  # 当前打开的tab列表
         self.context = None  # 浏览器上下文
 
+        # 设置语言配置
+        self.setup_language_config()
+
         print(f"📚 书籍YouTube上传系统初始化")
+        print(f"🌍 语言设置: {self.language_name}")
         print(f"⏱️  发布间隔: {self.interval_hours} 小时")
         print(f"🌐 YouTube频道: {self.studio_url}")
         print(f"🖥️  浏览器ID: {self.browser_id}")
         print(f"📁 Excel文件: {self.directories['excel']}")
         print(f"📑 最大tab数量: {self.max_tabs}")
         print(f"⏳ tab限制等待时间: {self.wait_minutes} 分钟")
+
+    def setup_language_config(self):
+        """根据语种设置配置"""
+        if self.language == "zh":
+            # 中文配置
+            self.language_name = "中文"
+        else:
+            # 英文配置（默认）
+            self.language_name = "English"
 
     def load_book_info(self, uuid: str) -> Optional[Dict]:
         """加载书籍基本信息"""
@@ -218,7 +261,7 @@ class BookYouTubeUploader:
         book_title = " ".join(book_title.split()).strip()
 
         # 构建基础标题格式
-        title_template = "{}" + TITLE_SUFFIX
+        title_template = "{}" + TITLE_SUFFIX[self.language]
 
         # 计算可用于书名的最大字符数
         max_book_title_length = MAX_TITLE_LENGTH - len(title_template.format(""))
@@ -1255,24 +1298,32 @@ def check_dependencies():
 def show_usage_examples():
     """显示使用示例"""
     print("\n💡 使用示例:")
-    print("# 试运行模式，查看待上传的书籍")
-    print("python upload_books_to_youtube.py --dry-run")
+    print("# 中文书籍试运行模式，查看待上传的书籍")
+    print("python upload_books_to_youtube.py --language zh --dry-run")
     print()
-    print("# 上传所有待发布的书籍，使用默认配置")
-    print("python upload_books_to_youtube.py")
+    print("# 英文书籍试运行模式")
+    print("python upload_books_to_youtube.py --language en --dry-run")
     print()
-    print("# 设定6小时间隔上传")
-    print("python upload_books_to_youtube.py --interval 6")
+    print("# 上传所有中文书籍，使用默认配置")
+    print("python upload_books_to_youtube.py --language zh")
     print()
-    print("# 限制只上传前3个书籍")
-    print("python upload_books_to_youtube.py --max-count 3")
+    print("# 上传所有英文书籍，使用默认配置")
+    print("python upload_books_to_youtube.py --language en")
     print()
-    print("# 设置tab管理：最多5个tab，等待45分钟")
-    print("python upload_books_to_youtube.py --max-tabs 5 --wait-minutes 45")
+    print("# 中文书籍设定6小时间隔上传")
+    print("python upload_books_to_youtube.py --language zh --interval 6")
     print()
-    print("# 组合使用：8小时间隔，最多2个书籍，3个tab，等待60分钟")
+    print("# 英文书籍限制只上传前3个")
+    print("python upload_books_to_youtube.py --language en --max-count 3")
+    print()
+    print("# 中文书籍设置tab管理：最多5个tab，等待45分钟")
     print(
-        "python upload_books_to_youtube.py --interval 8 --max-count 2 --max-tabs 3 --wait-minutes 60"
+        "python upload_books_to_youtube.py --language zh --max-tabs 5 --wait-minutes 45"
+    )
+    print()
+    print("# 组合使用：中文书籍，8小时间隔，最多2个书籍，3个tab，等待60分钟")
+    print(
+        "python upload_books_to_youtube.py --language zh --interval 8 --max-count 2 --max-tabs 3 --wait-minutes 60"
     )
 
 
@@ -1283,7 +1334,7 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 功能说明:
-  1. 读取 excel/book-en.xlsx 中的书籍列表
+  1. 读取对应语言的Excel文件中的书籍列表
   2. 跳过已上传的书籍（是否发布=1）
   3. 获取书籍MP4文件、封面、标题、描述和hashtags
   4. 按设定的时间间隔自动上传到指定YouTube频道
@@ -1295,18 +1346,24 @@ Excel文件格式要求:
   - '发布时间' 列: 日期时间字符串 (YYYY-MM-DD HH:MM:SS)
 
 使用示例:
-  python upload_books_to_youtube.py --dry-run           # 试运行模式
-  python upload_books_to_youtube.py                     # 上传所有书籍
-  python upload_books_to_youtube.py --interval 6        # 6小时间隔
-  python upload_books_to_youtube.py --max-count 3       # 限制3个书籍
+  python upload_books_to_youtube.py --language zh --dry-run    # 中文书籍试运行
+  python upload_books_to_youtube.py --language en             # 英文书籍上传
+  python upload_books_to_youtube.py --language zh --interval 6 # 中文书籍6小时间隔
 
 配置信息:
-  YouTube频道: https://studio.youtube.com/channel/UCe4grZMmPMmnMcIoaTJc05w
-  浏览器ID: k10i5y1s
-  Excel文件: excel/book-en.xlsx
+  英文频道: https://studio.youtube.com/channel/UCe4grZMmPMmnMcIoaTJc05w
+  中文频道: https://studio.youtube.com/channel/UCW0Or8f_oWL2V8QQzob-DQw
+  英文浏览器ID: k10i5y1s
+  中文浏览器ID: k10i7fjt
         """,
     )
 
+    parser.add_argument(
+        "--language",
+        choices=["en", "zh"],
+        default="en",
+        help="书籍语言 (en=英文, zh=中文) (默认: en)",
+    )
     parser.add_argument(
         "--interval",
         type=int,
@@ -1354,9 +1411,12 @@ Excel文件格式要求:
 
     # 显示配置信息
     print(f"\n🔧 配置信息:")
-    print(f"   YouTube频道: {YOUTUBE_STUDIO_URL}")
-    print(f"   浏览器ID: {ADSPOWER_BROWSER_ID}")
-    print(f"   Excel文件: {EXCEL_FILE_PATH}")
+    print(
+        f"   语言设置: {args.language} ({'中文' if args.language == 'zh' else 'English'})"
+    )
+    print(f"   YouTube频道: {YOUTUBE_CHANNELS[args.language]}")
+    print(f"   浏览器ID: {ADSPOWER_BROWSER_IDS[args.language]}")
+    print(f"   Excel文件: {EXCEL_FILES[args.language]}")
     print(f"   视频间隔: {args.interval} 小时")
     print(f"   最大数量: {args.max_count or '全部'}")
     print(f"   最大tab数量: {args.max_tabs}")
@@ -1366,6 +1426,7 @@ Excel文件格式要求:
 
     # 创建上传器实例
     uploader = BookYouTubeUploader(
+        language=args.language,
         interval_hours=args.interval,
         max_tabs=args.max_tabs,
         wait_minutes=args.wait_minutes,
@@ -1385,13 +1446,16 @@ Excel文件格式要求:
         print(f"\n❌ 系统错误: {e}")
         print("\n🔧 故障排除建议:")
         print("   1. 检查AdsPower是否正常运行")
-        print("   2. 确认浏览器ID (k10i5y1s) 是否正确")
+        print("   2. 确认浏览器ID是否正确 (英文: k10i5y1s, 中文: k10i7fjt)")
         print("   3. 检查网络连接")
         print("   4. 确认Excel文件格式正确，列名为：UUID、是否发布、发布时间")
         print("   5. 检查视频文件路径是否正确")
         print("   6. 确认生成的标题、描述、hashtags文件存在")
-        print("   7. 运行试运行模式检查：python upload_books_to_youtube.py --dry-run")
-        print("   8. 查看详细示例：python upload_books_to_youtube.py --help-examples")
+        print("   7. 检查语言参数是否正确 (--language en 或 --language zh)")
+        print(
+            "   8. 运行试运行模式检查：python upload_books_to_youtube.py --language zh --dry-run"
+        )
+        print("   9. 查看详细示例：python upload_books_to_youtube.py --help-examples")
         sys.exit(1)
 
 
