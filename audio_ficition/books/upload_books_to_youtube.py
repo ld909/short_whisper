@@ -14,6 +14,9 @@
 - 自动选择对应语言的YouTube频道进行上传
 - 支持设定视频间隔时间
 - 智能Tab管理：每次上传使用新tab，达到限制后等待并清理
+- CDP上传错误检测：自动检测"You already have access to this feature"对话框
+- 智能重试机制：检测到CDP错误时自动刷新重试，最多3次
+- 失败转移：重试失败时自动创建新tab继续处理下一个视频
 - 更新Excel状态
 
 🌍 语言支持:
@@ -42,24 +45,63 @@
 4. 自动排除以点开头的Mac系统文件
 5. 根据语言使用对应的浏览器ID：
    - 英文书籍: k10i5y1s
-   - 中文书籍: k10i7fjt
+   - 中文书籍: k10i5y1s
 6. 根据语言自动选择对应的YouTube频道：
    - 英文频道: https://studio.youtube.com/channel/UCe4grZMmPMmnMcIoaTJc05w
    - 中文频道: https://studio.youtube.com/channel/UCW0Or8f_oWL2V8QQzob-DQw
 7. 可设定视频上传间隔时间
+8. CDP上传错误处理流程：
+   - 检测到"You already have access to this feature"对话框时自动重试
+   - 每个视频最多重试3次，每次重试前刷新页面
+   - 如果3次重试都失败，创建新tab继续处理下一个视频
+   - 不关闭失败的tab，避免影响其他正在进行的操作
+
+⏰ 间隔时间设置:
+- 中文书籍默认间隔: 6小时 (可用 --interval-zh 覆盖)
+- 英文书籍默认间隔: 4小时 (可用 --interval-en 覆盖)
+- --interval 参数会覆盖所有语言特定设置
+- 优先级: --interval > --interval-zh/--interval-en > 默认值
+
+📑 Tab管理功能:
+- 智能Tab管理：每次上传使用新tab，避免页面冲突
+- 可设定最大Tab数量 (--max-tabs，默认6个)
+- 可设定等待时间 (--wait-minutes，默认30分钟)
+- 工作流程：
+  1. 正常工作: 每个视频上传都会创建新的tab
+  2. 达到限制: 当tab数量达到设定值时系统暂停
+  3. 开始等待: 系统等待指定分钟数
+  4. 清理tab: 等待结束后关闭所有现有tab
+  5. 继续工作: 创建新tab继续上传剩余视频
 
 💡 使用示例:
-# 上传中文书籍
-python upload_books_to_youtube.py --language zh
 
-# 上传英文书籍，设定4小时间隔
-python upload_books_to_youtube.py --language en --interval 4
+# 基础使用
+python upload_books_to_youtube.py --language zh                    # 中文书籍，默认6小时间隔
+python upload_books_to_youtube.py --language en                    # 英文书籍，默认4小时间隔
 
-# 中文书籍限制上传数量
-python upload_books_to_youtube.py --language zh --max-count 3
+# 间隔时间设置
+python upload_books_to_youtube.py --language zh --interval-zh 8    # 中文书籍8小时间隔
+python upload_books_to_youtube.py --language en --interval-en 2    # 英文书籍2小时间隔
+python upload_books_to_youtube.py --language zh --interval 6       # 通用6小时间隔
 
-# 试运行模式查看待上传的中文书籍
-python upload_books_to_youtube.py --language zh --dry-run
+# Tab管理设置
+python upload_books_to_youtube.py --language zh --max-tabs 3 --wait-minutes 60    # 最多3个tab，等待60分钟
+python upload_books_to_youtube.py --language en --max-tabs 10 --wait-minutes 15   # 最多10个tab，等待15分钟
+
+# 组合使用
+python upload_books_to_youtube.py --language zh --interval-zh 12 --max-tabs 5 --wait-minutes 45 --max-count 3
+# 中文书籍，12小时间隔，最多5个tab，等待45分钟，限制3个视频
+
+# 试运行模式
+python upload_books_to_youtube.py --language zh --dry-run          # 查看待上传的中文书籍
+python upload_books_to_youtube.py --language en --dry-run          # 查看待上传的英文书籍
+
+# 🔧 错误处理说明:
+# 脚本会自动检测和处理CDP上传错误：
+# 1. 检测到"You already have access to this feature"对话框
+# 2. 自动刷新页面重试，最多3次
+# 3. 重试失败时创建新tab继续处理
+# 4. 不会中断整个上传流程
 """
 
 import os
@@ -81,13 +123,13 @@ from typing import Optional, Dict, List, Tuple
 # YouTube频道配置
 YOUTUBE_CHANNELS = {
     "en": "https://studio.youtube.com/channel/UCe4grZMmPMmnMcIoaTJc05w",  # 英文频道
-    "zh": "https://studio.youtube.com/channel/UCW0Or8f_oWL2V8QQzob-DQw",  # 中文频道
+    "zh": "https://studio.youtube.com/channel/UCGT_hGqykWVkN8CGij2z4Vg",  # 中文频道
 }
 
 # AdsPower浏览器ID配置
 ADSPOWER_BROWSER_IDS = {
     "en": "k10i5y1s",  # 英文浏览器
-    "zh": "k10i7fjt",  # 中文浏览器
+    "zh": "k10i5y1s",  # 中文浏览器
 }
 
 # 标题配置
@@ -104,6 +146,12 @@ MIN_INFO_SIZE = 100  # 100字节
 
 # 默认发布间隔
 DEFAULT_INTERVAL_HOURS = 4
+
+# 默认发布间隔（按语言）
+DEFAULT_INTERVAL_HOURS_BY_LANG = {
+    "en": 4,  # 英文书籍默认4小时间隔
+    "zh": 6,  # 中文书籍默认6小时间隔
+}
 
 # Excel文件路径配置
 EXCEL_FILES = {
@@ -658,6 +706,51 @@ class BookYouTubeUploader:
 
         return date_str, time_str
 
+    def upload_video_to_youtube_with_retry(
+        self, video_content, page, publish_time=None, dry_run=False, max_retries=3
+    ):
+        """带重试逻辑的视频上传方法"""
+        for attempt in range(max_retries):
+            print(f"🔄 上传尝试 {attempt + 1}/{max_retries}")
+
+            result = self.upload_video_to_youtube(
+                video_content, page, publish_time, dry_run
+            )
+
+            if result == "cdp_retry_needed":
+                print(f"📝 第 {attempt + 1} 次尝试：检测到CDP错误，需要刷新重试")
+                if attempt < max_retries - 1:
+                    print("🔄 刷新页面并重试...")
+                    try:
+                        page.reload()
+                        countdown_timer(10, "页面刷新后等待")
+                        continue
+                    except Exception as refresh_error:
+                        print(f"❌ 刷新页面失败: {refresh_error}")
+                        return "need_new_tab"
+                else:
+                    print(f"❌ 已达到最大重试次数 ({max_retries})，需要新开tab")
+                    return "need_new_tab"
+            elif result is True:
+                print(f"✅ 第 {attempt + 1} 次尝试成功")
+                return True
+            elif result is False:
+                print(f"❌ 第 {attempt + 1} 次尝试失败")
+                if attempt < max_retries - 1:
+                    print("🔄 普通失败，刷新页面重试...")
+                    try:
+                        page.reload()
+                        countdown_timer(10, "页面刷新后等待")
+                        continue
+                    except Exception as refresh_error:
+                        print(f"❌ 刷新页面失败: {refresh_error}")
+                        return "need_new_tab"
+                else:
+                    print(f"❌ 已达到最大重试次数 ({max_retries})，需要新开tab")
+                    return "need_new_tab"
+
+        return "need_new_tab"
+
     def upload_video_to_youtube(
         self, video_content, page, publish_time=None, dry_run=False
     ):
@@ -720,6 +813,7 @@ class BookYouTubeUploader:
             print(f"📁 正在上传视频: {video_content['mp4_path']}")
 
             # 优先使用CDP方法上传大文件
+            cdp_upload_success = False
             try:
                 cdp_session = page.context.new_cdp_session(page)
                 dom_snapshot = cdp_session.send("DOM.getDocument")
@@ -741,6 +835,7 @@ class BookYouTubeUploader:
                     )
                     cdp_session.detach()
                     print("✅ 视频文件上传完成（CDP方法）")
+                    cdp_upload_success = True
                 else:
                     raise Exception("CDP方法失败")
 
@@ -750,13 +845,63 @@ class BookYouTubeUploader:
                 file_input.set_input_files(video_content["mp4_path"])
                 print("✅ 视频文件上传完成（标准方法）")
 
-            # 等待上传处理 - 使用固定时间等待，避免无限等待
+            # 等待上传处理 - 给YouTube充分时间处理视频，避免任何浏览器操作
             print("⏳ 等待视频上传处理...")
-            countdown_timer(6, "视频上传后等待页面稳定")
+            print("📋 重要提示：视频上传后需要充分等待，避免操作冲突")
+            countdown_timer(15, "视频上传后等待页面稳定")
 
-            # 输入标题前强制等待5秒
-            print("⏳ 输入标题前强制等待 5 秒...")
-            time.sleep(5)
+            # 如果使用了CDP上传，检查是否出现特定错误对话框（仅对英文频道检查）
+            if cdp_upload_success and self.language == "en":
+                print("🔍 检测CDP上传后是否出现错误对话框...")
+                # 检查是否出现特定的错误对话框
+                try:
+                    # 等待一下让对话框完全加载
+                    page.wait_for_timeout(3000)
+
+                    # 方法1: 检查特定的CSS选择器
+                    dialog_selector = (
+                        'ytcp-ve.style-scope.yt-trust-tiers-wizard[role="none"]'
+                    )
+                    dialog_elements = page.locator(dialog_selector)
+
+                    if dialog_elements.count() > 0:
+                        # 检查对话框内容
+                        dialog_text = dialog_elements.first.inner_text()
+                        if (
+                            "You already have access to this feature" in dialog_text
+                            and "Try refreshing the page" in dialog_text
+                        ):
+                            print(
+                                "❌ 检测到CDP上传错误对话框（CSS选择器方法），需要重试"
+                            )
+                            return "cdp_retry_needed"
+
+                    # 方法2: 检查页面整体内容（备用方法）
+                    page_content = page.content()
+                    if (
+                        "You already have access to this feature" in page_content
+                        and "Try refreshing the page" in page_content
+                    ):
+                        print("❌ 检测到CDP上传错误对话框（页面内容方法），需要重试")
+                        return "cdp_retry_needed"
+
+                    print("✅ 未检测到错误对话框，CDP上传成功")
+
+                except Exception as check_error:
+                    print(f"⚠️ 检查错误对话框时出错: {check_error}")
+                    # 如果检查失败，为了安全起见，继续正常流程
+            elif cdp_upload_success and self.language == "zh":
+                print("✅ 中文频道跳过弹窗检查，CDP上传完成")
+
+            # 输入标题前额外等待，确保页面完全稳定
+            if self.language == "zh":
+                print("⏳ 中文频道：较短等待后输入标题...")
+                countdown_timer(3, "标题输入前的等待")
+            else:
+                print("⏳ 输入标题前额外等待，确保页面完全稳定...")
+                countdown_timer(10, "标题输入前的安全等待")
+
+            print("✅ 等待完成，现在开始输入标题")
 
             # 输入标题 (参考 auto_youtube_publish.py 的简化逻辑)
             print("✏️  正在输入标题...")
@@ -1126,7 +1271,7 @@ class BookYouTubeUploader:
         pending_books = self.get_pending_books()
         if not pending_books:
             print("❌ 没有待上传的书籍")
-            return
+            return None
 
         # 限制上传数量
         if max_count:
@@ -1200,18 +1345,59 @@ class BookYouTubeUploader:
 
                 # 上传视频
                 print(f"🚀 开始上传第 {i} 个书籍...")
+                upload_result = None
+                current_upload_page = upload_page
+
                 try:
-                    success = self.upload_video_to_youtube(
-                        video_content, upload_page, publish_time, dry_run
+                    upload_result = self.upload_video_to_youtube_with_retry(
+                        video_content, current_upload_page, publish_time, dry_run
                     )
                 except Exception as upload_error:
                     print(f"❌ 上传视频时发生异常: {upload_error}")
-                    success = False
+                    upload_result = False
 
                 # 处理上传结果
-                if success:
+                if upload_result == "need_new_tab":
+                    print(f"📑 需要为书籍 {book_info['uuid']} 创建新tab重新上传")
+                    if not dry_run:
+                        # 创建新tab并重试一次
+                        new_tab = self.create_new_tab_for_upload()
+                        if new_tab:
+                            print("🆕 已创建新tab，尝试最后一次上传...")
+                            try:
+                                final_result = self.upload_video_to_youtube(
+                                    video_content, new_tab, publish_time, dry_run
+                                )
+                                if final_result is True:
+                                    print(
+                                        f"🎉 书籍 {book_info['uuid']} 在新tab中上传成功！"
+                                    )
+                                    upload_result = True
+                                else:
+                                    print(
+                                        f"❌ 书籍 {book_info['uuid']} 在新tab中也上传失败"
+                                    )
+                                    upload_result = False
+                            except Exception as final_error:
+                                print(f"❌ 新tab上传时发生异常: {final_error}")
+                                upload_result = False
+                        else:
+                            print(
+                                f"❌ 无法创建新tab，书籍 {book_info['uuid']} 上传失败"
+                            )
+                            upload_result = False
+                    else:
+                        print(
+                            f"❌ [试运行] 书籍 {book_info['uuid']} 模拟上传失败（需要新tab）"
+                        )
+                        upload_result = False
+                elif upload_result is True:
                     print(f"🎉 书籍 {book_info['uuid']} 上传成功！")
+                else:
+                    print(f"❌ 书籍 {book_info['uuid']} 上传失败")
 
+                # 最终结果处理
+                if upload_result is True:
                     if not dry_run:
                         # 更新Excel状态
                         update_success = self.update_excel_status(
@@ -1224,7 +1410,7 @@ class BookYouTubeUploader:
                     else:
                         print(f"✅ [试运行] 书籍处理完成")
                 else:
-                    print(f"❌ 书籍 {book_info['uuid']} 发布失败")
+                    print(f"❌ 书籍 {book_info['uuid']} 最终发布失败")
 
                 # 显示当前tab状态
                 if not dry_run:
@@ -1304,13 +1490,19 @@ def show_usage_examples():
     print("# 英文书籍试运行模式")
     print("python upload_books_to_youtube.py --language en --dry-run")
     print()
-    print("# 上传所有中文书籍，使用默认配置")
+    print("# 上传所有中文书籍，使用默认配置（中文默认6小时间隔）")
     print("python upload_books_to_youtube.py --language zh")
     print()
-    print("# 上传所有英文书籍，使用默认配置")
+    print("# 上传所有英文书籍，使用默认配置（英文默认4小时间隔）")
     print("python upload_books_to_youtube.py --language en")
     print()
-    print("# 中文书籍设定6小时间隔上传")
+    print("# 中文书籍设定8小时间隔上传（覆盖默认的6小时）")
+    print("python upload_books_to_youtube.py --language zh --interval-zh 8")
+    print()
+    print("# 英文书籍设定2小时间隔上传（覆盖默认的4小时）")
+    print("python upload_books_to_youtube.py --language en --interval-en 2")
+    print()
+    print("# 通用间隔设置（对所有语言都有效，会覆盖语言特定设置）")
     print("python upload_books_to_youtube.py --language zh --interval 6")
     print()
     print("# 英文书籍限制只上传前3个")
@@ -1321,10 +1513,17 @@ def show_usage_examples():
         "python upload_books_to_youtube.py --language zh --max-tabs 5 --wait-minutes 45"
     )
     print()
-    print("# 组合使用：中文书籍，8小时间隔，最多2个书籍，3个tab，等待60分钟")
+    print("# 组合使用：中文书籍，12小时间隔，最多2个书籍，3个tab，等待60分钟")
     print(
-        "python upload_books_to_youtube.py --language zh --interval 8 --max-count 2 --max-tabs 3 --wait-minutes 60"
+        "python upload_books_to_youtube.py --language zh --interval-zh 12 --max-count 2 --max-tabs 3 --wait-minutes 60"
     )
+    print()
+    print("📋 间隔时间说明:")
+    print(f"   • 中文书籍默认间隔: {DEFAULT_INTERVAL_HOURS_BY_LANG['zh']} 小时")
+    print(f"   • 英文书籍默认间隔: {DEFAULT_INTERVAL_HOURS_BY_LANG['en']} 小时")
+    print("   • --interval 参数会覆盖语言特定设置")
+    print("   • --interval-zh 和 --interval-en 分别设置中文和英文的间隔")
+    print("   • 优先级：--interval > --interval-zh/--interval-en > 默认值")
 
 
 def main():
@@ -1346,15 +1545,23 @@ Excel文件格式要求:
   - '发布时间' 列: 日期时间字符串 (YYYY-MM-DD HH:MM:SS)
 
 使用示例:
-  python upload_books_to_youtube.py --language zh --dry-run    # 中文书籍试运行
-  python upload_books_to_youtube.py --language en             # 英文书籍上传
-  python upload_books_to_youtube.py --language zh --interval 6 # 中文书籍6小时间隔
+  python upload_books_to_youtube.py --language zh --dry-run      # 中文书籍试运行
+  python upload_books_to_youtube.py --language en               # 英文书籍上传
+  python upload_books_to_youtube.py --language zh --interval-zh 8 # 中文书籍8小时间隔
+  python upload_books_to_youtube.py --language en --interval-en 2 # 英文书籍2小时间隔
+  python upload_books_to_youtube.py --language zh --interval 6   # 通用6小时间隔
+
+间隔时间设置:
+  • 中文书籍默认间隔: 6小时 (可用 --interval-zh 覆盖)
+  • 英文书籍默认间隔: 4小时 (可用 --interval-en 覆盖)
+  • --interval 参数会覆盖所有语言特定设置
+  • 优先级: --interval > --interval-zh/--interval-en > 默认值
 
 配置信息:
   英文频道: https://studio.youtube.com/channel/UCe4grZMmPMmnMcIoaTJc05w
   中文频道: https://studio.youtube.com/channel/UCW0Or8f_oWL2V8QQzob-DQw
   英文浏览器ID: k10i5y1s
-  中文浏览器ID: k10i7fjt
+  中文浏览器ID: k10i5y1s
         """,
     )
 
@@ -1367,8 +1574,20 @@ Excel文件格式要求:
     parser.add_argument(
         "--interval",
         type=int,
-        default=DEFAULT_INTERVAL_HOURS,
-        help=f"视频上传间隔小时数 (默认: {DEFAULT_INTERVAL_HOURS})",
+        default=None,
+        help=f"视频上传间隔小时数 (默认: 根据语言自动选择)",
+    )
+    parser.add_argument(
+        "--interval-en",
+        type=int,
+        default=DEFAULT_INTERVAL_HOURS_BY_LANG["en"],
+        help=f"英文书籍视频上传间隔小时数 (默认: {DEFAULT_INTERVAL_HOURS_BY_LANG['en']})",
+    )
+    parser.add_argument(
+        "--interval-zh",
+        type=int,
+        default=DEFAULT_INTERVAL_HOURS_BY_LANG["zh"],
+        help=f"中文书籍视频上传间隔小时数 (默认: {DEFAULT_INTERVAL_HOURS_BY_LANG['zh']})",
     )
     parser.add_argument("--max-count", type=int, help="最大上传数量 (默认: 全部)")
     parser.add_argument("--dry-run", action="store_true", help="试运行模式，不实际上传")
@@ -1409,6 +1628,20 @@ Excel文件格式要求:
     if not check_supported_system():
         print("⚠️  此脚本主要为macOS和Ubuntu系统设计，其他系统可能需要调整路径")
 
+    # 确定实际使用的间隔时间
+    if args.interval is not None:
+        # 如果指定了通用间隔，优先使用
+        actual_interval = args.interval
+        interval_source = f"通用设置 ({args.interval})"
+    else:
+        # 否则使用语言特定的间隔
+        if args.language == "zh":
+            actual_interval = args.interval_zh
+            interval_source = f"中文特定设置 ({args.interval_zh})"
+        else:
+            actual_interval = args.interval_en
+            interval_source = f"英文特定设置 ({args.interval_en})"
+
     # 显示配置信息
     print(f"\n🔧 配置信息:")
     print(
@@ -1417,7 +1650,7 @@ Excel文件格式要求:
     print(f"   YouTube频道: {YOUTUBE_CHANNELS[args.language]}")
     print(f"   浏览器ID: {ADSPOWER_BROWSER_IDS[args.language]}")
     print(f"   Excel文件: {EXCEL_FILES[args.language]}")
-    print(f"   视频间隔: {args.interval} 小时")
+    print(f"   视频间隔: {actual_interval} 小时 ({interval_source})")
     print(f"   最大数量: {args.max_count or '全部'}")
     print(f"   最大tab数量: {args.max_tabs}")
     print(f"   tab等待时间: {args.wait_minutes} 分钟")
@@ -1427,7 +1660,7 @@ Excel文件格式要求:
     # 创建上传器实例
     uploader = BookYouTubeUploader(
         language=args.language,
-        interval_hours=args.interval,
+        interval_hours=actual_interval,
         max_tabs=args.max_tabs,
         wait_minutes=args.wait_minutes,
     )
@@ -1446,7 +1679,7 @@ Excel文件格式要求:
         print(f"\n❌ 系统错误: {e}")
         print("\n🔧 故障排除建议:")
         print("   1. 检查AdsPower是否正常运行")
-        print("   2. 确认浏览器ID是否正确 (英文: k10i5y1s, 中文: k10i7fjt)")
+        print("   2. 确认浏览器ID是否正确 (英文: k10i5y1s, 中文: k10i5y1s)")
         print("   3. 检查网络连接")
         print("   4. 确认Excel文件格式正确，列名为：UUID、是否发布、发布时间")
         print("   5. 检查视频文件路径是否正确")

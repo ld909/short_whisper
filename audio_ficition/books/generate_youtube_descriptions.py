@@ -142,28 +142,6 @@ class YouTubeDescriptionGenerator:
         # 设置Gemini客户端
         self.client = setup_gemini_client()
 
-        # 系统提示词
-        self.system_instruction = [
-            "You are a content creator for a YouTube channel that produces audio summaries of important non-fiction books. Your writing style is the channel's brand: simple, direct, and sincere. You make profound ideas feel accessible and grounded, avoiding all marketing hype and jargon.",
-            "Your task is to write a YouTube video description based on the script I provide.",
-            "Adhere to these strict rules for every description you generate:",
-            "RULE 1: TONE",
-            "Write in a plain, earnest, and respectful voice. The style should be unpretentious but powerful. Use simple words to convey deep ideas. Avoid exclamation points and overly enthusiastic language.",
-            "RULE 2: STRUCTURE",
-            "Follow this 4 to 5 sentence structure precisely:",
-            "Sentence 1 is the hook. Start with a relatable question or a powerful, thought-provoking statement that gets to the heart of the book's central problem.",
-            "Sentence 2 is the introduction. Briefly introduce the book by its title and author, connecting it to the hook.",
-            "Sentence 3 is the core idea. State the book's single most important argument or central thesis in a clear, straightforward way.",
-            "Sentence 4 is the 'why'. Explain why this idea matters or how it challenges a common belief. Connect it to a universal human experience.",
-            "Sentence 5 is optional. It can be a gentle call to discover more in the summary. It can sometimes be combined with sentence 4.",
-            "RULE 3: LENGTH",
-            "The entire description must be between 4 and 5 sentences long. No more, no less.",
-            "RULE 4: FORMAT",
-            "Your final output must be plain text only. Do not use any markdown symbols like asterisks for bolding, italics, or lists.",
-            "RULE 5: Return content",
-            "Direct return your description. No others.",
-        ]
-
         print(f"🌍 语言主题: {self.language_name}")
         print(f"📁 书籍目录: {self.books_base_path}")
 
@@ -172,9 +150,51 @@ class YouTubeDescriptionGenerator:
         if self.language == "zh":
             # 中文配置
             self.language_name = "中文"
+            # 中文系统提示词
+            self.system_instruction = [
+                "你是一个专门制作重要非虚构类书籍音频总结的YouTube频道的内容创作者。你的写作风格是频道的品牌：简单、直接、真诚。你让深刻的思想变得易于理解和实用，避免所有营销炒作和行话。",
+                "你的任务是根据我提供的脚本来撰写YouTube视频描述。",
+                "严格遵守这些规则来生成每一个描述：",
+                "规则1：语调",
+                "用朴实、认真、尊重的语调写作。风格应该谦逊但有力。用简单的词语传达深刻的思想。避免感叹号和过于热情的语言。",
+                "规则2：结构",
+                "严格按照这个4到5句话的结构：",
+                "第1句是钩子。以一个相关的问题或有力的、发人深省的陈述开始，直达书籍核心问题的要害。",
+                "第2句是介绍。简要介绍书名和作者，将其与钩子联系起来。",
+                "第3句是核心思想。清楚、直接地陈述书籍最重要的论点或中心论题。",
+                "第4句是「为什么」。解释为什么这个想法重要，或者它如何挑战一个普遍信念。将其与普遍的人类经验联系起来。",
+                "第5句是可选的。可以是一个温和的号召，邀请读者在总结中发现更多。有时可以与第4句合并。",
+                "规则3：长度",
+                "整个描述必须是4到5句话长。不多不少。",
+                "规则4：格式",
+                "你的最终输出必须只是纯文本。不要使用任何markdown符号，如星号加粗、斜体或列表。",
+                "规则5：返回内容",
+                "直接返回你的描述。不要其他任何内容。",
+            ]
         else:
             # 英文配置（默认）
             self.language_name = "English"
+            # 英文系统提示词
+            self.system_instruction = [
+                "You are a content creator for a YouTube channel that produces audio summaries of important non-fiction books. Your writing style is the channel's brand: simple, direct, and sincere. You make profound ideas feel accessible and grounded, avoiding all marketing hype and jargon.",
+                "Your task is to write a YouTube video description based on the script I provide.",
+                "Adhere to these strict rules for every description you generate:",
+                "RULE 1: TONE",
+                "Write in a plain, earnest, and respectful voice. The style should be unpretentious but powerful. Use simple words to convey deep ideas. Avoid exclamation points and overly enthusiastic language.",
+                "RULE 2: STRUCTURE",
+                "Follow this 4 to 5 sentence structure precisely:",
+                "Sentence 1 is the hook. Start with a relatable question or a powerful, thought-provoking statement that gets to the heart of the book's central problem.",
+                "Sentence 2 is the introduction. Briefly introduce the book by its title and author, connecting it to the hook.",
+                "Sentence 3 is the core idea. State the book's single most important argument or central thesis in a clear, straightforward way.",
+                "Sentence 4 is the 'why'. Explain why this idea matters or how it challenges a common belief. Connect it to a universal human experience.",
+                "Sentence 5 is optional. It can be a gentle call to discover more in the summary. It can sometimes be combined with sentence 4.",
+                "RULE 3: LENGTH",
+                "The entire description must be between 4 and 5 sentences long. No more, no less.",
+                "RULE 4: FORMAT",
+                "Your final output must be plain text only. Do not use any markdown symbols like asterisks for bolding, italics, or lists.",
+                "RULE 5: Return content",
+                "Direct return your description. No others.",
+            ]
 
     def get_available_mp4_files(self):
         """获取所有可用的MP4视频文件"""
@@ -379,12 +399,7 @@ class YouTubeDescriptionGenerator:
             print("💡 请确保:")
             print("   1. 运行 merge_clips_with_audio.py 生成MP4文件")
             print("   2. 运行 generate_book_summary.py 生成总结文件")
-            return {
-                'total_targets': 0,
-                'successful': 0,
-                'failed': 0,
-                'skipped': 0
-            }
+            return {"total_targets": 0, "successful": 0, "failed": 0, "skipped": 0}
 
         # 如果指定了特定UUID
         if target_uuid:
@@ -393,12 +408,7 @@ class YouTubeDescriptionGenerator:
                 print(f"🎯 处理指定UUID: {target_uuid}")
             else:
                 print(f"❌ 未找到指定的UUID或该UUID缺少必要文件: {target_uuid}")
-                return {
-                    'total_targets': 0,
-                    'successful': 0,
-                    'failed': 0,
-                    'skipped': 0
-                }
+                return {"total_targets": 0, "successful": 0, "failed": 0, "skipped": 0}
 
         # 获取已存在的描述
         existing_descriptions = self.get_existing_descriptions()
@@ -422,10 +432,10 @@ class YouTubeDescriptionGenerator:
         if not books_to_process:
             print("🎉 所有已完成的MP4文件的YouTube描述都已生成完成！")
             return {
-                'total_targets': 0,
-                'successful': 0,
-                'failed': 0,
-                'skipped': len(processable_books)
+                "total_targets": 0,
+                "successful": 0,
+                "failed": 0,
+                "skipped": len(processable_books),
             }
 
         print(f"\n📊 处理统计:")
@@ -489,13 +499,13 @@ class YouTubeDescriptionGenerator:
             if (success_count + failed_count) > 0
             else "N/A"
         )
-        
+
         # 返回统计信息
         return {
-            'total_targets': len(books_to_process),
-            'successful': success_count,
-            'failed': failed_count,
-            'skipped': len(processable_books) - len(books_to_process)
+            "total_targets": len(books_to_process),
+            "successful": success_count,
+            "failed": failed_count,
+            "skipped": len(processable_books) - len(books_to_process),
         }
 
     def check_status(self):

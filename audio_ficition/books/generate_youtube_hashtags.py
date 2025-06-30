@@ -130,23 +130,6 @@ class YouTubeHashtagGenerator:
         # 设置Gemini客户端
         self.client = setup_gemini_client()
 
-        # 系统提示词
-        self.system_instruction = [
-            "You are a YouTube SEO expert specializing in creating hashtags for book summary videos.",
-            "Your task is to generate exactly 10 relevant, SEO-optimized hashtags based on the video description I provide.",
-            "Follow these rules:",
-            "1. Generate exactly 10 hashtags, no more, no less",
-            "2. Each hashtag should start with # symbol",
-            "3. Focus on book-related, self-improvement, and educational themes",
-            "4. Include a mix of broad and specific tags for maximum reach",
-            "5. Consider trending topics in personal development and learning",
-            "6. Keep hashtags concise but descriptive",
-            "7. Use CamelCase for multi-word hashtags (e.g., #BookSummary)",
-            "8. Include relevant genre or topic-specific tags",
-            "9. Add popular general tags like #Books, #Learning, #SelfImprovement",
-            "10. Return only the hashtags separated by spaces, nothing else"
-        ]
-
         print(f"🌍 语言主题: {self.language_name}")
         print(f"📁 书籍目录: {self.books_base_path}")
 
@@ -155,9 +138,41 @@ class YouTubeHashtagGenerator:
         if self.language == "zh":
             # 中文配置
             self.language_name = "中文"
+            # 中文系统提示词
+            self.system_instruction = [
+                "你是一位专门为书籍总结视频创建标签的YouTube SEO专家。",
+                "你的任务是根据我提供的视频描述，生成恰好10个相关的、SEO优化的标签。",
+                "请遵循以下规则：",
+                "1. 生成恰好10个标签，不多不少",
+                "2. 每个标签都应以#符号开头",
+                "3. 专注于书籍相关、自我提升和教育主题",
+                "4. 包含广泛和具体标签的组合，以获得最大影响力",
+                "5. 考虑个人发展和学习领域的热门话题",
+                "6. 保持标签简洁但具有描述性",
+                "7. 多词标签使用驼峰命名法（例如：#读书笔记）",
+                "8. 包含相关的类型或主题特定标签",
+                "9. 添加流行的通用标签，如#读书、#学习、#自我提升",
+                "10. 只返回用空格分隔的标签，不要其他内容",
+            ]
         else:
             # 英文配置（默认）
             self.language_name = "English"
+            # 英文系统提示词
+            self.system_instruction = [
+                "You are a YouTube SEO expert specializing in creating hashtags for book summary videos.",
+                "Your task is to generate exactly 10 relevant, SEO-optimized hashtags based on the video description I provide.",
+                "Follow these rules:",
+                "1. Generate exactly 10 hashtags, no more, no less",
+                "2. Each hashtag should start with # symbol",
+                "3. Focus on book-related, self-improvement, and educational themes",
+                "4. Include a mix of broad and specific tags for maximum reach",
+                "5. Consider trending topics in personal development and learning",
+                "6. Keep hashtags concise but descriptive",
+                "7. Use CamelCase for multi-word hashtags (e.g., #BookSummary)",
+                "8. Include relevant genre or topic-specific tags",
+                "9. Add popular general tags like #Books, #Learning, #SelfImprovement",
+                "10. Return only the hashtags separated by spaces, nothing else",
+            ]
 
     def get_available_description_files(self):
         """获取所有可用的YouTube描述文件"""
@@ -338,12 +353,7 @@ class YouTubeHashtagGenerator:
             print("💡 请确保:")
             print("   1. 运行 generate_youtube_descriptions.py 生成描述文件")
             print("   2. 描述文件内容有效且长度大于50字符")
-            return {
-                'total_targets': 0,
-                'successful': 0,
-                'failed': 0,
-                'skipped': 0
-            }
+            return {"total_targets": 0, "successful": 0, "failed": 0, "skipped": 0}
 
         # 如果指定了特定UUID
         if target_uuid:
@@ -352,12 +362,7 @@ class YouTubeHashtagGenerator:
                 print(f"🎯 处理指定UUID: {target_uuid}")
             else:
                 print(f"❌ 未找到指定的UUID的描述文件: {target_uuid}")
-                return {
-                    'total_targets': 0,
-                    'successful': 0,
-                    'failed': 0,
-                    'skipped': 0
-                }
+                return {"total_targets": 0, "successful": 0, "failed": 0, "skipped": 0}
 
         # 获取已存在的hashtag
         existing_hashtags = self.get_existing_hashtags()
@@ -381,10 +386,10 @@ class YouTubeHashtagGenerator:
         if not files_to_process:
             print("🎉 所有描述文件的YouTube hashtag都已生成完成！")
             return {
-                'total_targets': 0,
-                'successful': 0,
-                'failed': 0,
-                'skipped': len(description_files)
+                "total_targets": 0,
+                "successful": 0,
+                "failed": 0,
+                "skipped": len(description_files),
             }
 
         print(f"\n📊 处理统计:")
@@ -443,13 +448,13 @@ class YouTubeHashtagGenerator:
             if (success_count + failed_count) > 0
             else "N/A"
         )
-        
+
         # 返回统计信息
         return {
-            'total_targets': len(files_to_process),
-            'successful': success_count,
-            'failed': failed_count,
-            'skipped': len(description_files) - len(files_to_process)
+            "total_targets": len(files_to_process),
+            "successful": success_count,
+            "failed": failed_count,
+            "skipped": len(description_files) - len(files_to_process),
         }
 
     def check_status(self):
