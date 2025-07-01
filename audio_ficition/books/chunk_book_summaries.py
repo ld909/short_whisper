@@ -32,6 +32,7 @@
 2. 每个块去除换行符，变成一大段话
 3. 自动排除以点开头的Mac系统文件
 4. 支持断点续传，跳过已处理的书籍
+5. 中文模式下自动将阿拉伯数字转换为中文数字（如12→十二，199→一百九十九）
 
 💡 使用示例:
 # 处理英文书籍总结
@@ -52,6 +53,13 @@ python chunk_book_summaries.py --no-resume --lang zh
 # 强制重新处理所有文件（推荐用于确保清理功能正常工作）
 python chunk_book_summaries.py --force --lang zh
 
+🔢 数字转换功能 (仅中文模式):
+- 将文本中的阿拉伯数字自动转换为中文数字
+- 支持数字范围: 0-9999999999999（万亿以内）
+- 转换示例: 1→一, 12→十二, 199→一百九十九, 2024→二千零二十四
+- 正确处理零: 305→三百零五, 1001→一千零一
+- 适用于年份、页码、章节号等所有数字
+
 # 指定输入目录
 python chunk_book_summaries.py --input-dir /custom/path/to/summaries --lang en
 
@@ -63,6 +71,7 @@ import os
 import glob
 import argparse
 import platform
+import re
 from pathlib import Path
 
 
@@ -100,6 +109,242 @@ def get_default_input_dir(language="en"):
 def get_default_output_dir(language="en"):
     """获取默认输出目录（按语言分类）"""
     return f"/home/dhl/Documents/book/{language}"
+
+
+def arabic_to_chinese_number(text, debug=False):
+    """
+    将文本中的阿拉伯数字转换为中文数字
+
+    支持的数字范围：0-9999999999999（万亿以内）
+
+    Args:
+        text (str): 包含阿拉伯数字的文本
+        debug (bool): 是否显示调试信息
+
+    Returns:
+        str: 转换后的文本
+    """
+
+    def number_to_chinese(num):
+        """
+        将单个数字转换为中文数字
+
+        Args:
+            num (int): 阿拉伯数字
+
+        Returns:
+            str: 中文数字
+        """
+        if num == 0:
+            return "零"
+
+        # 中文数字字符
+        chinese_digits = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
+        chinese_units = ["", "十", "百", "千"]
+        chinese_big_units = ["", "万", "亿", "万亿"]
+
+        def convert_section(n):
+            """转换0-9999内的数字"""
+            if n == 0:
+                return ""
+
+            result = ""
+            str_n = str(n)
+            length = len(str_n)
+
+            for i, digit in enumerate(str_n):
+                digit_val = int(digit)
+                pos = length - i - 1  # 位置（0为个位，1为十位...）
+
+                if digit_val != 0:
+                    # 处理"一十"的特殊情况
+                    if digit_val == 1 and pos == 1 and length == 2:
+                        result += "十"
+                    else:
+                        result += chinese_digits[digit_val]
+                        if pos > 0:
+                            result += chinese_units[pos]
+                else:
+                    # 处理零的情况
+                    if result and i < length - 1:
+                        # 检查后面是否还有非零数字
+                        has_non_zero_after = any(int(d) != 0 for d in str_n[i + 1 :])
+                        # 避免连续的"零"
+                        if has_non_zero_after and not result.endswith("零"):
+                            result += "零"
+
+            return result
+
+        # 处理负数
+        if num < 0:
+            return "负" + number_to_chinese(-num)
+
+        # 分组处理：万亿、亿、万、个
+        groups = []
+        temp_num = num
+
+        # 分解成各个组
+        for i in range(4):  # 个、万、亿、万亿
+            groups.append(temp_num % 10000)
+            temp_num //= 10000
+            if temp_num == 0:
+                break
+
+        result = ""
+        for i, group in enumerate(reversed(groups)):
+            if group != 0:
+                group_text = convert_section(group)
+                if group_text:
+                    result += group_text
+                    unit_index = len(groups) - 1 - i
+                    if unit_index > 0:
+                        result += chinese_big_units[unit_index]
+            else:
+                # 处理中间的零
+                if result and i < len(groups) - 1:
+                    # 检查是否需要添加零
+                    remaining_groups = groups[: len(groups) - 1 - i]
+                    if any(g != 0 for g in remaining_groups):
+                        result += "零"
+
+        return result if result else "零"
+
+    # 查找所有数字并替换
+    converted_count = 0
+
+    def replace_number(match):
+        nonlocal converted_count
+        number_str = match.group(0)
+        try:
+            number = int(number_str)
+            chinese_num = number_to_chinese(number)
+            converted_count += 1
+            if debug:
+                print(f"         🔢 数字转换: {number_str} → {chinese_num}")
+            return chinese_num
+        except ValueError:
+            return number_str
+
+    # 使用正则表达式匹配数字（包括年份等）
+    # 匹配所有连续的数字
+    result = re.sub(r"\d+", replace_number, text)
+
+    if debug and converted_count > 0:
+        print(f"         📊 总共转换了 {converted_count} 个数字")
+
+    return result
+
+
+def clean_text_content(text, language="en", debug=False):
+    """
+    根据语言清理文本内容，去除不需要的符号
+
+    Args:
+        text (str): 原始文本
+        language (str): 语言类型 (en/zh)
+        debug (bool): 是否启用调试模式
+
+    Returns:
+        str: 清理后的文本
+    """
+    original_text = text
+
+    # 统一处理所有引号（中文和英文主题都去除引号）
+    # 定义所有可能的引号字符
+    quote_chars = [
+        '"',  # 标准英文双引号 (U+0022)
+        "'",  # 标准英文单引号 (U+0027)
+        "'",  # 左单引号 (U+2018)
+        "'",  # 右单引号 (U+2019)
+        """,    # 左双引号 (U+201C)
+        """,  # 右双引号 (U+201D)
+        "`",  # 反引号 (U+0060)
+        "´",  # 重音符 (U+00B4)
+        "„",  # 德文双引号下标 (U+201E)
+        "‚",  # 德文单引号下标 (U+201A)
+        "«",  # 法文左引号 (U+00AB)
+        "»",  # 法文右引号 (U+00BB)
+        "‹",  # 单角引号左 (U+2039)
+        "›",  # 单角引号右 (U+203A)
+        "〈",  # 中文角括号左 (U+3008)
+        "〉",  # 中文角括号右 (U+3009)
+        "《",  # 中文书名号左 (U+300A)
+        "》",  # 中文书名号右 (U+300B)
+        "「",  # 日文角引号左 (U+300C)
+        "」",  # 日文角引号右 (U+300D)
+        "『",  # 日文双角引号左 (U+300E)
+        "』",  # 日文双角引号右 (U+300F)
+        "〝",  # 中文引号上标左 (U+301D)
+        "〞",  # 中文引号上标右 (U+301E)
+        "〟",  # 中文引号下标 (U+301F)
+        # 额外添加常见的中文引号变体
+        "＂",  # 全角双引号 (U+FF02)
+        "＇",  # 全角单引号 (U+FF07)
+    ]
+
+    # 统计清理的字符
+    removed_quotes = 0
+
+    # 去除所有引号
+    for quote in quote_chars:
+        if quote in text:
+            count = text.count(quote)
+            text = text.replace(quote, "")
+            removed_quotes += count
+            if debug and count > 0:
+                print(f"         🔍 移除了 {count} 个 '{quote}' 字符")
+
+    # 破折号处理
+    dash_chars = [
+        "—",  # 长破折号 (em dash, U+2014)
+        "–",  # 短破折号 (en dash, U+2013)
+        "-",  # 连字符 (hyphen, U+002D)
+        "−",  # 减号 (U+2212)
+        "‐",  # 短连字符 (U+2010)
+        "‑",  # 不断行连字符 (U+2011)
+        "⁃",  # 三角连字符 (U+2043)
+        "﹣",  # 全角连字符 (U+FE63)
+        "－",  # 全角减号 (U+FF0D)
+        # 添加省略号（可能影响语音合成）
+        "……",  # 中文省略号 (U+2026重复)
+        "…",  # 省略号 (U+2026)
+    ]
+
+    removed_dashes = 0
+
+    if language == "zh":
+        # 中文处理：完全去除破折号和连字符
+        for dash in dash_chars:
+            if dash in text:
+                count = text.count(dash)
+                text = text.replace(dash, "")
+                removed_dashes += count
+                if debug and count > 0:
+                    print(f"         🔍 移除了 {count} 个 '{dash}' 字符")
+    else:
+        # 英文处理：破折号和连字符替换为空格
+        for dash in dash_chars:
+            if dash in text:
+                count = text.count(dash)
+                text = text.replace(dash, " ")
+                removed_dashes += count
+                if debug and count > 0:
+                    print(f"         🔍 替换了 {count} 个 '{dash}' 为空格")
+
+    # 中文模式下：将阿拉伯数字转换为中文数字
+    if language == "zh":
+        text = arabic_to_chinese_number(text, debug)
+
+    # 清理多余空格
+    text = " ".join(text.split())
+
+    if debug:
+        total_removed = len(original_text) - len(text)
+        print(
+            f"         📊 清理统计: 引号{removed_quotes}个, 破折号{removed_dashes}个, 总计{total_removed}个字符"
+        )
+
+    return text.strip()
 
 
 def split_content_into_chunks(content, max_chars=3000):
@@ -256,112 +501,6 @@ def get_processed_books(output_dir):
     return processed_books
 
 
-def clean_text_content(text, language="en", debug=False):
-    """
-    根据语言清理文本内容，去除不需要的符号
-    
-    Args:
-        text (str): 原始文本
-        language (str): 语言类型 (en/zh)
-        debug (bool): 是否启用调试模式
-        
-    Returns:
-        str: 清理后的文本
-    """
-    original_text = text
-    
-    # 统一处理所有引号（中文和英文主题都去除引号）
-    # 定义所有可能的引号字符
-    quote_chars = [
-        '"',    # 标准英文双引号 (U+0022)
-        "'",    # 标准英文单引号 (U+0027)
-        "‘",    # 左单引号 (U+2018)
-        "’",    # 右单引号 (U+2019)  
-        "“",    # 左双引号 (U+201C)
-        "”",    # 右双引号 (U+201D)
-        "`",    # 反引号 (U+0060)
-        "´",    # 重音符 (U+00B4)
-        "„",    # 德文双引号下标 (U+201E)
-        "‚",    # 德文单引号下标 (U+201A)
-        "«",    # 法文左引号 (U+00AB)
-        "»",    # 法文右引号 (U+00BB)
-        "‹",    # 单角引号左 (U+2039)
-        "›",    # 单角引号右 (U+203A)
-        "〈",   # 中文角括号左 (U+3008)
-        "〉",   # 中文角括号右 (U+3009)
-        "《",   # 中文书名号左 (U+300A)
-        "》",   # 中文书名号右 (U+300B)
-        "「",   # 日文角引号左 (U+300C)
-        "」",   # 日文角引号右 (U+300D)
-        "『",   # 日文双角引号左 (U+300E)
-        "』",   # 日文双角引号右 (U+300F)
-        "〝",   # 中文引号上标左 (U+301D)
-        "〞",   # 中文引号上标右 (U+301E)
-        "〟",   # 中文引号下标 (U+301F)
-        # 额外添加常见的中文引号变体
-        "＂",   # 全角双引号 (U+FF02)
-        "＇",   # 全角单引号 (U+FF07)
-    ]
-    
-    # 统计清理的字符
-    removed_quotes = 0
-    
-    # 去除所有引号
-    for quote in quote_chars:
-        if quote in text:
-            count = text.count(quote)
-            text = text.replace(quote, "")
-            removed_quotes += count
-            if debug and count > 0:
-                print(f"         🔍 移除了 {count} 个 '{quote}' 字符")
-    
-    # 破折号处理
-    dash_chars = [
-        "—",    # 长破折号 (em dash, U+2014)
-        "–",    # 短破折号 (en dash, U+2013)
-        "-",    # 连字符 (hyphen, U+002D)
-        "−",    # 减号 (U+2212)
-        "‐",    # 短连字符 (U+2010)
-        "‑",    # 不断行连字符 (U+2011)
-        "⁃",    # 三角连字符 (U+2043)
-        "﹣",   # 全角连字符 (U+FE63)
-        "－",   # 全角减号 (U+FF0D)
-        # 添加省略号（可能影响语音合成）
-        "……",  # 中文省略号 (U+2026重复)
-        "…",    # 省略号 (U+2026)
-    ]
-    
-    removed_dashes = 0
-    
-    if language == "zh":
-        # 中文处理：完全去除破折号和连字符
-        for dash in dash_chars:
-            if dash in text:
-                count = text.count(dash)
-                text = text.replace(dash, "")
-                removed_dashes += count
-                if debug and count > 0:
-                    print(f"         🔍 移除了 {count} 个 '{dash}' 字符")
-    else:
-        # 英文处理：破折号和连字符替换为空格
-        for dash in dash_chars:
-            if dash in text:
-                count = text.count(dash)
-                text = text.replace(dash, " ")
-                removed_dashes += count
-                if debug and count > 0:
-                    print(f"         🔍 替换了 {count} 个 '{dash}' 为空格")
-    
-    # 清理多余空格
-    text = " ".join(text.split())
-    
-    if debug:
-        total_removed = len(original_text) - len(text)
-        print(f"         📊 清理统计: 引号{removed_quotes}个, 破折号{removed_dashes}个, 总计{total_removed}个字符")
-    
-    return text.strip()
-
-
 def extract_uuid_from_filename(filename):
     """
     从文件名中提取UUID
@@ -426,47 +565,55 @@ def process_single_summary(input_file, output_base_dir, max_chars=3000, language
         # 保存每个块并显示每个块的信息
         chunk_sizes = []
         total_chars_cleaned = 0
-        
+
         for chunk_index, chunk_content in enumerate(chunks, 1):
             chunk_filename = f"{chunk_index}.txt"
             chunk_filepath = os.path.join(book_output_dir, chunk_filename)
 
             # 去掉换行符，变成一大段话
             chunk_content_no_newlines = chunk_content.replace("\n", " ").strip()
-            
+
             # 清理文本内容，去除各种引号和符号
-            chunk_content_cleaned = clean_text_content(chunk_content_no_newlines, language, debug=True)
-            
+            chunk_content_cleaned = clean_text_content(
+                chunk_content_no_newlines, language, debug=True
+            )
+
             # 显示清理前后的详细对比
             original_length = len(chunk_content_no_newlines)
             cleaned_length = len(chunk_content_cleaned)
             chars_removed = original_length - cleaned_length
-            
+
             # 总是显示每个chunk的处理信息
-            print(f"      📝 块 {chunk_index}: {original_length} → {cleaned_length} 字符 (清理了 {chars_removed} 个)")
-            
+            print(
+                f"      📝 块 {chunk_index}: {original_length} → {cleaned_length} 字符 (清理了 {chars_removed} 个)"
+            )
+
             # 如果有字符被清理，显示更详细的信息
             if chars_removed > 0:
                 print(f"         ✂️  成功清理了 {chars_removed} 个标点符号和特殊字符")
                 # 显示清理前后的片段对比（前50个字符）
-                before_preview = chunk_content_no_newlines[:100] + ("..." if len(chunk_content_no_newlines) > 100 else "")
-                after_preview = chunk_content_cleaned[:100] + ("..." if len(chunk_content_cleaned) > 100 else "")
+                before_preview = chunk_content_no_newlines[:100] + (
+                    "..." if len(chunk_content_no_newlines) > 100 else ""
+                )
+                after_preview = chunk_content_cleaned[:100] + (
+                    "..." if len(chunk_content_cleaned) > 100 else ""
+                )
                 print(f"         📄 清理前片段: {before_preview}")
                 print(f"         ✨ 清理后片段: {after_preview}")
-            
+
             # 确保写入文件
             try:
                 with open(chunk_filepath, "w", encoding="utf-8") as f:
                     f.write(chunk_content_cleaned)
                 print(f"         💾 已保存到: {chunk_filepath}")
-                
+
                 # 验证文件确实被写入
                 if os.path.exists(chunk_filepath):
                     actual_size = os.path.getsize(chunk_filepath)
                     print(f"         ✅ 文件大小: {actual_size} bytes")
                 else:
                     print(f"         ❌ 文件未找到: {chunk_filepath}")
-                    
+
             except Exception as write_error:
                 print(f"         ❌ 写入文件失败: {write_error}")
                 return False, 0
@@ -480,7 +627,9 @@ def process_single_summary(input_file, output_base_dir, max_chars=3000, language
 
         print(f"✅ {filename}: {len(chunks)} 个块 (总计 {total_chars} 字符)")
         print(f"   📁 UUID: {uuid_val}")
-        print(f"   📊 块大小: [{chunk_sizes_str}] 字符, 平均: {avg_chunk_size:.0f} 字符")
+        print(
+            f"   📊 块大小: [{chunk_sizes_str}] 字符, 平均: {avg_chunk_size:.0f} 字符"
+        )
         print(f"   🧹 总共清理了: {total_chars_cleaned} 个字符")
         print(f"   📂 输出目录: {book_output_dir}")
 
@@ -490,6 +639,7 @@ def process_single_summary(input_file, output_base_dir, max_chars=3000, language
         filename = os.path.basename(input_file)
         print(f"❌ 处理文件 {filename} 时出错: {e}")
         import traceback
+
         traceback.print_exc()
         return False, 0
 
@@ -609,7 +759,9 @@ def process_book_summaries(
 
         print(f"\n处理第 {i}/{len(files_to_process)} 个总结: {filename}")
 
-        success, chunk_count = process_single_summary(input_file, output_dir, max_chars, language)
+        success, chunk_count = process_single_summary(
+            input_file, output_dir, max_chars, language
+        )
 
         if success:
             successful_count += 1
@@ -679,7 +831,9 @@ def main():
         "--no-resume", action="store_true", help="禁用断点续传，重新处理所有书籍"
     )
     parser.add_argument(
-        "--force", action="store_true", help="强制重新处理所有文件，即使已存在（等同于--no-resume）"
+        "--force",
+        action="store_true",
+        help="强制重新处理所有文件，即使已存在（等同于--no-resume）",
     )
 
     args = parser.parse_args()
@@ -693,7 +847,7 @@ def main():
     # 如果用户没有手动指定input_dir或output_dir，重新计算正确的路径
     if args.input_dir == default_input_dir:
         input_dir = get_default_input_dir(language)
-    
+
     if args.output_dir == default_output_dir:
         output_dir = get_default_output_dir(language)
 

@@ -5,15 +5,19 @@ YouTube视频标题生成脚本
 
 功能说明：
 1. 读取书籍信息文件（由book_info_scraper.py生成）
-2. 使用 Google Gemini AI 生成吸引人的YouTube视频标题
-3. 确保标题符合YouTube标准，不超过100字符
-4. 自动保存生成的标题到对应目录
-5. 支持中文(zh)和英文(en)两种语言主题
+2. 使用 Google Gemini AI 结合书名和书籍总结生成病毒式传播的YouTube标题
+3. 中文和英文主题都使用AI生成，确保标题具有强烈的点击欲望
+4. 确保标题符合YouTube标准，不超过100字符（英文）或99字符（中文）
+5. 自动保存生成的标题到对应目录
+6. 支持中文(zh)和英文(en)两种语言主题
 
 输入依赖文件：
 • 书籍信息文件（由book_info_scraper.py生成）：
   - Intel Mac: /Volumes/dhl/audio/books/{language}/info/{uuid}.json
   - Apple Silicon: /Users/donghaoliu/Documents/audio/books/{language}/info/{uuid}.json
+• 书籍总结文件（中英文主题都需要，由generate_book_summary.py生成）：
+  - Intel Mac: /Volumes/dhl/audio/books/{language}/summary/{uuid}.txt
+  - Apple Silicon: /Users/donghaoliu/Documents/audio/books/{language}/summary/{uuid}.txt
 
 输出目标文件：
 • YouTube标题文件：
@@ -21,16 +25,17 @@ YouTube视频标题生成脚本
   - Apple Silicon: /Users/donghaoliu/Documents/audio/books/{language}/youtube_titles/{uuid}.txt
 
 使用方法：
-python generate_youtube_titles.py --lang en               # 处理英文书籍
-python generate_youtube_titles.py --lang zh               # 处理中文书籍
+python generate_youtube_titles.py --lang en               # 处理英文书籍（需要先运行generate_book_summary.py）
+python generate_youtube_titles.py --lang zh               # 处理中文书籍（需要先运行generate_book_summary.py）
 python generate_youtube_titles.py --count 10 --lang en    # 处理10个文件
 python generate_youtube_titles.py --force --lang zh       # 强制重新生成
 python generate_youtube_titles.py --uuid abc123 --lang en # 处理指定UUID
 
 前置条件：
-• 环境变量UNI_API_KEY: 必须设置有效的API密钥
+• 环境变量UNI_API_KEY: 必须设置有效的API密钥（中英文主题都需要）
 • 先决脚本: 需要运行book_info_scraper.py生成书籍信息文件
-• 网络环境: 需要稳定的网络连接访问Gemini API
+• 书籍总结: 需要先运行generate_book_summary.py生成书籍总结文件（中英文都需要）
+• 网络环境: 需要稳定的网络连接访问Gemini API（中英文主题都需要）
 """
 
 import os
@@ -309,51 +314,203 @@ class YouTubeTitleGenerator:
     def generate_youtube_title(self, book_info):
         """生成YouTube标题"""
         book_title = book_info.get("title", "")
-        
+
         # 清理书名，移除多余的空白字符
         book_title = " ".join(book_title.split()).strip()
 
-        if self.language == "zh":
-            # 中文格式：书名 | 书籍总结
-            # "书籍总结"是固定文本，只处理书名
-            fixed_suffix = "书籍总结"
-            
-            # 计算固定部分的字符数：" | " + "书籍总结" = 6个字符
-            fixed_chars = 3 + len(fixed_suffix)  # " | " + 书籍总结
-            available_chars_for_title = 99 - fixed_chars  # 给书名留的字符数
-            
-            # 处理书名
-            if len(book_title) > available_chars_for_title:
-                # 如果书名太长，截断并添加省略号
-                truncated_title = book_title[:available_chars_for_title-3].rstrip() + "..."
+        uuid_val = book_info.get("uuid", "")
+
+        # 读取书籍总结内容（中英文都需要）
+        summary_content = self.load_book_summary(uuid_val)
+        if not summary_content:
+            print(f"⚠️ 未找到书籍总结，使用简化标题格式")
+            # 如果没有总结，回退到简化格式
+            max_length = 99 if self.language == "zh" else 100
+            if len(book_title) > max_length - 3:  # 为 "..." 留出空间
+                book_title = book_title[: max_length - 6] + "..."
+            return book_title
+
+        # 使用AI生成标题（中英文都使用AI）
+        try:
+            if self.language == "zh":
+                ai_title = self.generate_ai_title_zh(book_title, summary_content)
             else:
-                truncated_title = book_title
-            
-            # 生成最终标题
-            final_title = f"{truncated_title} | {fixed_suffix}"
-        else:
-            # 英文格式：保持原有逻辑
-            title_template = "{}"
-            
-            # 计算可用于书名的最大字符数
-            max_book_title_length = 100 - len(title_template.format(""))
+                ai_title = self.generate_ai_title_en(book_title, summary_content)
 
-            # 如果书名太长，截断并添加...
-            if len(book_title) > max_book_title_length:
-                # 为省略号留出空间
-                truncate_length = max_book_title_length - 3
-                book_title = book_title[:truncate_length].rstrip() + "..."
+            if ai_title:
+                # 长度检查并截断
+                max_length = 99 if self.language == "zh" else 100
+                if len(ai_title) > max_length:
+                    ai_title = ai_title[: max_length - 3] + "..."
+                return ai_title
+            else:
+                print(f"⚠️ AI生成失败，使用简化标题格式")
+                # AI生成失败，回退到简化格式
+                max_length = 99 if self.language == "zh" else 100
+                if len(book_title) > max_length - 3:
+                    book_title = book_title[: max_length - 6] + "..."
+                return book_title
+        except Exception as e:
+            print(f"⚠️ AI生成出错: {e}，使用简化标题格式")
+            # 出错时回退到简化格式
+            max_length = 99 if self.language == "zh" else 100
+            if len(book_title) > max_length - 3:
+                book_title = book_title[: max_length - 6] + "..."
+            return book_title
 
-            # 生成最终标题
-            final_title = title_template.format(book_title)
+    def load_book_summary(self, uuid_val):
+        """加载书籍总结内容"""
+        summary_dir = os.path.join(self.books_base_path, "summary")
+        summary_file = os.path.join(summary_dir, f"{uuid_val}.txt")
 
-        # 最终检查长度（中文99字符，英文100字符）
-        max_length = 99 if self.language == "zh" else 100
-        if len(final_title) > max_length:
-            # 如果仍然超长，再次截断
-            final_title = final_title[:max_length-3].rstrip() + "..."
+        if not os.path.exists(summary_file):
+            return None
 
-        return final_title
+        try:
+            with open(summary_file, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+
+            if len(content) < 100:  # 内容太短，可能不是有效的总结
+                return None
+
+            return content
+        except Exception as e:
+            print(f"⚠️ 读取总结文件失败 {summary_file}: {e}")
+            return None
+
+    def generate_ai_title_zh(self, book_title, summary_content):
+        """使用AI生成中文标题"""
+        # 限制总结内容长度，避免prompt过长
+        if len(summary_content) > 3000:
+            summary_content = summary_content[:3000] + "..."
+
+        # 新的中文提示词模板
+        prompt = f"""# 角色与目标
+你是一位世界顶级的 YouTube 内容策略专家和文案大师。你的任务是为一个书籍总结音频频道，创作一个具有病毒式传播潜力的、可以直接使用的最终视频标题。你深谙人性心理学和第一性原理，能精准地激发观众的好奇心，让他们在看到标题的瞬间就产生强烈的点击欲望。
+
+# 背景信息
+我的 YouTube 频道内容是书籍的精华总结音频。我需要你为我生成一个极具吸引力的视频标题。
+
+# 核心任务
+根据我提供的书名和书籍核心思想，直接生成 1 个最能激发点击欲望的最终 YouTube 标题。
+
+# 生成指令与原则
+你生成的标题必须综合运用以下原则，并选择最优角度进行创作：
+
+运用第一性原理：
+直击本质： 提炼出书中最根本、最颠覆性的核心观点。
+
+运用心理学扳机：
+制造知识鸿沟： 透露部分信息，但隐藏关键部分。
+承诺收益/解决痛点： 清晰地告诉观众能获得什么或解决什么问题。
+提出一个意想不到的问题： 用一个引人深思的问题开头。
+揭示秘密/设定框架： 让观众感觉将要了解到少数人才知道的"秘密"。
+
+# 格式与要求
+直接返回最终标题： 你只需要返回最终的那一句话标题，它将作为视频的完整标题。
+无需解释： 不需要任何解释、分析或备选选项。
+包含书名： 生成的话术中必须清晰地包含完整的书名。
+
+# 我将提供的内容
+书名： {book_title}
+书籍核心思想：{summary_content}"""
+
+        try:
+            # 使用Gemini API生成标题
+            response = self.client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.8,
+                    max_output_tokens=200,
+                    top_p=0.9,
+                ),
+            )
+
+            if response and response.text:
+                generated_title = response.text.strip()
+
+                # 清理可能的格式字符
+                generated_title = generated_title.replace("\n", " ").replace("\r", " ")
+                generated_title = " ".join(generated_title.split())
+
+                print(f"🤖 AI生成标题: {generated_title}")
+                return generated_title
+            else:
+                print("⚠️ AI返回空响应")
+                return None
+
+        except Exception as e:
+            print(f"❌ AI生成标题失败: {e}")
+            return None
+
+    def generate_ai_title_en(self, book_title, summary_content):
+        """使用AI生成英文标题"""
+        # 限制总结内容长度，避免prompt过长
+        if len(summary_content) > 3000:
+            summary_content = summary_content[:3000] + "..."
+
+        # 平衡长度的英文提示词模板 - 适中长度但有力
+        prompt = f"""# Task
+Create a compelling YouTube title for a book summary. Aim for 70-90 characters - long enough to be descriptive, short enough to be punchy.
+
+# Requirements
+- MUST include book title: "{book_title}"
+- Target length: 70-90 characters (optimal range)
+- Maximum 100 characters (hard limit)
+- Balance information with curiosity
+- Use compelling but not excessive language
+- Include specific benefits or revelations
+
+# Style Examples (BALANCED LENGTH):
+- "Why [Book] Will Change How You Think About Success Forever"
+- "The Shocking Truth Behind [Book] That Nobody Talks About"
+- "[Book]: The Revolutionary Ideas That Challenge Everything We Know"
+- "How [Book] Reveals the Hidden Psychology of Human Behavior"
+- "The Life-Changing Lessons from [Book] You Need to Hear"
+- "[Book] Exposes the Secrets of [Core Topic] - Mind Blowing!"
+
+# Psychology Triggers (Use strategically):
+1. Transformation: "Change How You Think", "Revolutionary Ideas"
+2. Forbidden knowledge: "Hidden Truth", "Nobody Talks About"
+3. Challenge conventional: "Challenge Everything", "Shocking Truth"
+4. Personal benefit: "Life-Changing", "You Need to Hear"
+5. Exclusive insight: "Reveals", "Exposes", "Behind the Scenes"
+
+# Book Core Ideas:
+{summary_content}
+
+# Output
+Return ONLY the final title (70-90 chars preferred, max 100). No explanations."""
+
+        try:
+            # 使用Gemini API生成标题
+            response = self.client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.8,
+                    max_output_tokens=200,
+                    top_p=0.9,
+                ),
+            )
+
+            if response and response.text:
+                generated_title = response.text.strip()
+
+                # 清理可能的格式字符
+                generated_title = generated_title.replace("\n", " ").replace("\r", " ")
+                generated_title = " ".join(generated_title.split())
+
+                print(f"🤖 AI生成标题: {generated_title}")
+                return generated_title
+            else:
+                print("⚠️ AI返回空响应")
+                return None
+
+        except Exception as e:
+            print(f"❌ AI生成标题失败: {e}")
+            return None
 
     def save_title_to_file(self, uuid, title, titles_dir):
         """保存标题到文件"""
@@ -384,8 +541,8 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 使用示例:
-  python generate_youtube_titles.py --lang en               # 处理英文书籍
-  python generate_youtube_titles.py --lang zh               # 处理中文书籍
+  python generate_youtube_titles.py --lang en               # 处理英文书籍（需要先运行generate_book_summary.py）
+  python generate_youtube_titles.py --lang zh               # 处理中文书籍（需要先运行generate_book_summary.py）
   python generate_youtube_titles.py --count 10 --lang en    # 处理10个文件
   python generate_youtube_titles.py --force --lang zh       # 强制重新生成
   python generate_youtube_titles.py --uuid abc123 --lang en # 处理指定UUID
@@ -393,6 +550,7 @@ def main():
 注意:
 - 需要设置环境变量 UNI_API_KEY
 - 确保已运行 book_info_scraper.py 生成书籍信息文件
+- 中英文都需要先运行 generate_book_summary.py 生成书籍总结文件
         """,
     )
 
