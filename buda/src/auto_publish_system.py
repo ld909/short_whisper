@@ -444,7 +444,7 @@ class AutoPublishSystem:
         elif self.language == "ko":
             # 韩文佛学标签
             tags = "#불교 #명상 #마음챙김 #불법 #깨달음 #카르마 #지혜 #힐링 #인생수업 #불교이야기"
-            description_with_tags += f"对韩文佛学 (Korean Buddhism)：\n{tags}"
+            description_with_tags += tags
         else:
             # 其他语言暂时不添加标签
             return base_description
