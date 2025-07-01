@@ -33,6 +33,7 @@
 3. 自动排除以点开头的Mac系统文件
 4. 支持断点续传，跳过已处理的书籍
 5. 中文模式下自动将阿拉伯数字转换为中文数字（如12→十二，199→一百九十九）
+6. 中文模式下自动将英文逗号","替换为中文逗号"，"
 
 💡 使用示例:
 # 处理英文书籍总结
@@ -302,6 +303,7 @@ def clean_text_content(text, language="en", debug=False):
     removed_quotes = 0
     removed_dashes = 0
     removed_colons = 0
+    replaced_commas = 0
 
     # 统一处理：中文和英文都去除所有引号
     for quote in quote_chars:
@@ -332,6 +334,14 @@ def clean_text_content(text, language="en", debug=False):
                 if debug and count > 0:
                     print(f"         🔍 移除了 {count} 个 '{colon}' 字符")
         
+        # 中文模式下，将英文逗号替换为中文逗号
+        if "," in text:
+            count = text.count(",")
+            text = text.replace(",", "，")
+            replaced_commas += count
+            if debug and count > 0:
+                print(f"         🔍 替换了 {count} 个 ',' 为 '，'")
+        
         # 中文模式下：将阿拉伯数字转换为中文数字
         text = arabic_to_chinese_number(text, debug)
     else:
@@ -349,9 +359,14 @@ def clean_text_content(text, language="en", debug=False):
 
     if debug:
         total_removed = len(original_text) - len(text)
-        print(
-            f"         📊 清理统计: 引号{removed_quotes}个, 破折号{removed_dashes}个, 冒号{removed_colons}个, 总计清理了 {total_removed} 个字符"
-        )
+        if language == "zh":
+            print(
+                f"         📊 清理统计: 引号{removed_quotes}个, 破折号{removed_dashes}个, 冒号{removed_colons}个, 逗号替换{replaced_commas}个, 总计处理了 {total_removed} 个字符"
+            )
+        else:
+            print(
+                f"         📊 清理统计: 引号{removed_quotes}个, 破折号{removed_dashes}个, 冒号{removed_colons}个, 总计清理了 {total_removed} 个字符"
+            )
 
     return text.strip()
 
