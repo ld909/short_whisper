@@ -22,7 +22,7 @@
 📤 输出信息:
 - 输出根目录: /home/dhl/Documents/book/{language}/
 - 完整输出路径格式: /home/dhl/Documents/book/{language}/{uuid}/{chunk_index}.txt
-- 完整路径示例(中文): /home/dhl/Documents/book/zh/12345678-abcd-efgh-ijkl-123456789012/1.txt
+- 完整路径示例(中文): /home/dhl/Documents/book/zh-before-refine/12345678-abcd-efgh-ijkl-123456789012/1.txt
 - 完整路径示例(英文): /home/dhl/Documents/book/en/12345678-abcd-efgh-ijkl-123456789012/1.txt
 - 按语言分目录存储，每个书籍有自己的子目录，按UUID命名
 - 每个子目录内的文件按块索引命名（1.txt, 2.txt, 3.txt...）
@@ -108,6 +108,8 @@ def get_default_input_dir(language="en"):
 
 def get_default_output_dir(language="en"):
     """获取默认输出目录（按语言分类）"""
+    if language == "zh":
+        return "/home/dhl/Documents/book/zh-before-refine"
     return f"/home/dhl/Documents/book/{language}"
 
 
@@ -250,42 +252,58 @@ def clean_text_content(text, language="en", debug=False):
     original_text = text
 
     # 统一处理所有引号（中文和英文主题都去除引号）
-    # 定义所有可能的引号字符
+    # 定义所有可能的引号字符 - 使用Unicode码点确保字符正确
     quote_chars = [
-        '"',  # 标准英文双引号 (U+0022)
-        "'",  # 标准英文单引号 (U+0027)
-        "'",  # 左单引号 (U+2018)
-        "'",  # 右单引号 (U+2019)
-        """,    # 左双引号 (U+201C)
-        """,  # 右双引号 (U+201D)
-        "`",  # 反引号 (U+0060)
-        "´",  # 重音符 (U+00B4)
-        "„",  # 德文双引号下标 (U+201E)
-        "‚",  # 德文单引号下标 (U+201A)
-        "«",  # 法文左引号 (U+00AB)
-        "»",  # 法文右引号 (U+00BB)
-        "‹",  # 单角引号左 (U+2039)
-        "›",  # 单角引号右 (U+203A)
-        "〈",  # 中文角括号左 (U+3008)
-        "〉",  # 中文角括号右 (U+3009)
-        "《",  # 中文书名号左 (U+300A)
-        "》",  # 中文书名号右 (U+300B)
-        "「",  # 日文角引号左 (U+300C)
-        "」",  # 日文角引号右 (U+300D)
-        "『",  # 日文双角引号左 (U+300E)
-        "』",  # 日文双角引号右 (U+300F)
-        "〝",  # 中文引号上标左 (U+301D)
-        "〞",  # 中文引号上标右 (U+301E)
-        "〟",  # 中文引号下标 (U+301F)
-        # 额外添加常见的中文引号变体
-        "＂",  # 全角双引号 (U+FF02)
-        "＇",  # 全角单引号 (U+FF07)
+        chr(0x0022),  # 标准英文双引号 " (U+0022)
+        chr(0x0027),  # 标准英文单引号 ' (U+0027)
+        chr(0x2018),  # 左单引号 ' (U+2018)
+        chr(0x2019),  # 右单引号 ' (U+2019)
+        chr(0x201C),  # 左双引号 " (U+201C) ★ 文件中实际使用的字符
+        chr(0x201D),  # 右双引号 " (U+201D) ★ 文件中实际使用的字符
+        chr(0x0060),  # 反引号 ` (U+0060)
+        chr(0x00B4),  # 重音符 ´ (U+00B4)
+        chr(0x201E),  # 德文双引号下标 „ (U+201E)
+        chr(0x201A),  # 德文单引号下标 ‚ (U+201A)
+        chr(0x00AB),  # 法文左引号 « (U+00AB)
+        chr(0x00BB),  # 法文右引号 » (U+00BB)
+        chr(0x2039),  # 单角引号左 ‹ (U+2039)
+        chr(0x203A),  # 单角引号右 › (U+203A)
+        chr(0x3008),  # 中文角括号左 〈 (U+3008)
+        chr(0x3009),  # 中文角括号右 〉 (U+3009)
+        chr(0x300A),  # 中文书名号左 《 (U+300A)
+        chr(0x300B),  # 中文书名号右 》 (U+300B)
+        chr(0x300C),  # 日文角引号左 「 (U+300C)
+        chr(0x300D),  # 日文角引号右 」 (U+300D)
+        chr(0x300E),  # 日文双角引号左 『 (U+300E)
+        chr(0x300F),  # 日文双角引号右 』 (U+300F)
+        chr(0x301D),  # 中文引号上标左 〝 (U+301D)
+        chr(0x301E),  # 中文引号上标右 〞 (U+301E)
+        chr(0x301F),  # 中文引号下标 〟 (U+301F)
+        chr(0xFF02),  # 全角双引号 ＂ (U+FF02)
+        chr(0xFF07),  # 全角单引号 ＇ (U+FF07)
     ]
 
-    # 统计清理的字符
-    removed_quotes = 0
+    # 破折号处理 - 使用Unicode码点确保字符正确
+    dash_chars = [
+        chr(0x2014),  # 长破折号 — (em dash, U+2014)
+        chr(0x2013),  # 短破折号 – (en dash, U+2013)
+        chr(0x002D),  # 连字符 - (hyphen, U+002D)
+        chr(0x2212),  # 减号 − (U+2212)
+        chr(0x2010),  # 短连字符 ‐ (U+2010)
+        chr(0x2011),  # 不断行连字符 ‑ (U+2011)
+        chr(0x2043),  # 三角连字符 ⁃ (U+2043)
+        chr(0xFE63),  # 全角连字符 ﹣ (U+FE63)
+        chr(0xFF0D),  # 全角减号 － (U+FF0D)
+        # 添加省略号（可能影响语音合成）
+        chr(0x2026) + chr(0x2026),  # 中文省略号 …… (两个U+2026)
+        chr(0x2026),  # 省略号 … (U+2026)
+    ]
 
-    # 去除所有引号
+    removed_quotes = 0
+    removed_dashes = 0
+    removed_colons = 0
+
+    # 统一处理：中文和英文都去除所有引号
     for quote in quote_chars:
         if quote in text:
             count = text.count(quote)
@@ -293,24 +311,6 @@ def clean_text_content(text, language="en", debug=False):
             removed_quotes += count
             if debug and count > 0:
                 print(f"         🔍 移除了 {count} 个 '{quote}' 字符")
-
-    # 破折号处理
-    dash_chars = [
-        "—",  # 长破折号 (em dash, U+2014)
-        "–",  # 短破折号 (en dash, U+2013)
-        "-",  # 连字符 (hyphen, U+002D)
-        "−",  # 减号 (U+2212)
-        "‐",  # 短连字符 (U+2010)
-        "‑",  # 不断行连字符 (U+2011)
-        "⁃",  # 三角连字符 (U+2043)
-        "﹣",  # 全角连字符 (U+FE63)
-        "－",  # 全角减号 (U+FF0D)
-        # 添加省略号（可能影响语音合成）
-        "……",  # 中文省略号 (U+2026重复)
-        "…",  # 省略号 (U+2026)
-    ]
-
-    removed_dashes = 0
 
     if language == "zh":
         # 中文处理：完全去除破折号和连字符
@@ -321,6 +321,19 @@ def clean_text_content(text, language="en", debug=False):
                 removed_dashes += count
                 if debug and count > 0:
                     print(f"         🔍 移除了 {count} 个 '{dash}' 字符")
+
+        # 中文模式下，去除冒号
+        colon_chars = [":", "："]  # 英文冒号和中文冒号
+        for colon in colon_chars:
+            if colon in text:
+                count = text.count(colon)
+                text = text.replace(colon, "")
+                removed_colons += count
+                if debug and count > 0:
+                    print(f"         🔍 移除了 {count} 个 '{colon}' 字符")
+        
+        # 中文模式下：将阿拉伯数字转换为中文数字
+        text = arabic_to_chinese_number(text, debug)
     else:
         # 英文处理：破折号和连字符替换为空格
         for dash in dash_chars:
@@ -331,17 +344,13 @@ def clean_text_content(text, language="en", debug=False):
                 if debug and count > 0:
                     print(f"         🔍 替换了 {count} 个 '{dash}' 为空格")
 
-    # 中文模式下：将阿拉伯数字转换为中文数字
-    if language == "zh":
-        text = arabic_to_chinese_number(text, debug)
-
     # 清理多余空格
     text = " ".join(text.split())
 
     if debug:
         total_removed = len(original_text) - len(text)
         print(
-            f"         📊 清理统计: 引号{removed_quotes}个, 破折号{removed_dashes}个, 总计{total_removed}个字符"
+            f"         📊 清理统计: 引号{removed_quotes}个, 破折号{removed_dashes}个, 冒号{removed_colons}个, 总计清理了 {total_removed} 个字符"
         )
 
     return text.strip()
