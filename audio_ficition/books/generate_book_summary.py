@@ -14,15 +14,18 @@
 3. 支持PDF文件上传到 AI Studio（先点击Insert assets按钮，等待激活后上传）
 4. 发送书籍信息到 AI Studio 生成讲稿总结（发送前按两次ESC确保按钮可见）
 5. 每次启动动态检查已生成的总结（不依赖进度文件）
-6. 多语言目录结构：
+6. 智能跳过机制：如果某个UUID连续5次无法统计到token，将自动跳过该书籍
+7. JSON跟踪记录：在summary_json目录保存每个UUID的处理记录和失败次数
+8. 多语言目录结构：
    - 英文主题：/Volumes/dhl/audio/books/en/
    - 中文主题：/Volumes/dhl/audio/books/zh/
-7. 智能保存到对应语言目录：{基础路径}/books/{语言}/summary/[uuid].txt
+9. 智能保存到对应语言目录：{基础路径}/books/{语言}/summary/[uuid].txt
 
 使用方法：
 # 基础操作
+python generate_book_summary.py                     # 生成所有可用的总结（默认行为）
 python generate_book_summary.py --count 10          # 生成10个总结（默认英文主题）
-python generate_book_summary.py --all               # 生成所有可用的总结
+python generate_book_summary.py --all               # 生成所有可用的总结（与默认行为相同）
 python generate_book_summary.py --ads-id your_id    # 指定浏览器ID
 python generate_book_summary.py --check-status      # 检查当前状态
 
@@ -46,6 +49,7 @@ import random
 import argparse
 import platform
 import glob
+import datetime
 from pathlib import Path
 from tqdm import tqdm
 
@@ -127,8 +131,15 @@ class BookSummaryGenerator:
         self.info_dir = os.path.join(self.books_base_path, "info")
         self.summary_dir = os.path.join(self.books_base_path, "summary")
 
+        # JSON跟踪文件路径
+        self.summary_json_dir = os.path.join(self.books_base_path, "summary_json")
+        self.tracking_json_file = os.path.join(
+            self.summary_json_dir, f"token_tracking_{lang}.json"
+        )
+
         # 创建目录
         os.makedirs(self.summary_dir, exist_ok=True)
+        os.makedirs(self.summary_json_dir, exist_ok=True)
 
         # 输出语言主题信息
         print(f"🌐 语言主题: {self.lang}")
@@ -138,6 +149,9 @@ class BookSummaryGenerator:
         self.playwright = None
         self.browser = None
         self.page = None
+
+        # 初始化跟踪数据
+        self.tracking_data = self.load_tracking_data()
 
         # 根据语言主题选择对应的提示词模板
         if self.lang == "zh":
@@ -289,6 +303,10 @@ Ensure the total word count reaches at least 5000 words.
                 books_already_done += 1
                 if self.debug:
                     print(f"⏭️  跳过已完成: {book.get('title', uuid_val)}")
+                continue
+
+            # 检查是否应该跳过（连续5次token失败）
+            if self.should_skip_uuid(uuid_val):
                 continue
 
             # 检查是否有对应的PDF文件
@@ -795,7 +813,7 @@ Ensure the total word count reaches at least 5000 words.
 
                 # 等待上传完成，并检查token计数
                 print("⏳ 等待PDF上传和处理完成...")
-                upload_success = self.wait_for_pdf_token_count(title)
+                upload_success = self.wait_for_pdf_token_count(title, uuid_val, title)
 
                 if upload_success:
                     print("✅ PDF文件上传并处理成功")
@@ -817,7 +835,7 @@ Ensure the total word count reaches at least 5000 words.
         print(f"❌ PDF上传失败，已尝试 {max_attempts} 次")
         return False
 
-    def wait_for_pdf_token_count(self, title="PDF文件"):
+    def wait_for_pdf_token_count(self, title="PDF文件", uuid_val="", book_title=""):
         """等待PDF token计数显示，用于验证上传成功"""
         print("🔍 等待token计数显示...")
 
@@ -885,6 +903,11 @@ Ensure the total word count reaches at least 5000 words.
                         continue
 
                 print(f"✅ PDF上传验证成功 - {token_text}")
+
+                # 更新成功记录
+                if uuid_val:
+                    self.update_token_success(uuid_val, book_title)
+
                 return True
 
             print(f"⏳ 等待token计数... 已等待 {elapsed_time}s")
@@ -892,6 +915,11 @@ Ensure the total word count reaches at least 5000 words.
             elapsed_time += check_interval
 
         print(f"⚠️ 等待token计数超时 ({max_wait_time}s)，跳过此PDF文件")
+
+        # 更新失败记录
+        if uuid_val:
+            self.update_token_failure(uuid_val, book_title)
+
         return False
 
     def send_generation_request(self):
@@ -1088,6 +1116,90 @@ Ensure the total word count reaches at least 5000 words.
             print(f"❌ 生成总结失败: {e}")
             return False
 
+    def load_tracking_data(self):
+        """加载UUID处理跟踪数据"""
+        if os.path.exists(self.tracking_json_file):
+            try:
+                with open(self.tracking_json_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    print(f"📊 加载跟踪数据: {len(data)} 个UUID记录")
+                    return data
+            except Exception as e:
+                print(f"⚠️ 加载跟踪数据失败: {e}")
+
+        print("📊 创建新的跟踪数据文件")
+        return {}
+
+    def save_tracking_data(self):
+        """保存UUID处理跟踪数据"""
+        try:
+            with open(self.tracking_json_file, "w", encoding="utf-8") as f:
+                json.dump(self.tracking_data, f, ensure_ascii=False, indent=2)
+            if self.debug:
+                print(f"💾 跟踪数据已保存: {self.tracking_json_file}")
+        except Exception as e:
+            print(f"❌ 保存跟踪数据失败: {e}")
+
+    def update_token_failure(self, uuid_val, title=""):
+        """更新token统计失败次数"""
+        if uuid_val not in self.tracking_data:
+            self.tracking_data[uuid_val] = {
+                "title": title,
+                "total_attempts": 0,
+                "token_failures": 0,
+                "last_failure_time": None,
+            }
+
+        self.tracking_data[uuid_val]["total_attempts"] += 1
+        self.tracking_data[uuid_val]["token_failures"] += 1
+        self.tracking_data[uuid_val][
+            "last_failure_time"
+        ] = datetime.datetime.now().isoformat()
+
+        if title:
+            self.tracking_data[uuid_val]["title"] = title
+
+        print(
+            f"📊 UUID {uuid_val} token失败次数: {self.tracking_data[uuid_val]['token_failures']}"
+        )
+
+        # 立即保存数据
+        self.save_tracking_data()
+
+    def update_token_success(self, uuid_val, title=""):
+        """更新token统计成功（重置失败计数）"""
+        if uuid_val not in self.tracking_data:
+            self.tracking_data[uuid_val] = {
+                "title": title,
+                "total_attempts": 0,
+                "token_failures": 0,
+                "last_failure_time": None,
+            }
+
+        self.tracking_data[uuid_val]["total_attempts"] += 1
+        # token成功时，重置失败计数
+        self.tracking_data[uuid_val]["token_failures"] = 0
+
+        if title:
+            self.tracking_data[uuid_val]["title"] = title
+
+        print(f"✅ UUID {uuid_val} token统计成功，失败计数已重置")
+
+        # 立即保存数据
+        self.save_tracking_data()
+
+    def should_skip_uuid(self, uuid_val):
+        """检查是否应该跳过某个UUID（连续5次token失败）"""
+        if uuid_val in self.tracking_data:
+            failures = self.tracking_data[uuid_val].get("token_failures", 0)
+            if failures >= 5:
+                title = self.tracking_data[uuid_val].get("title", "Unknown")
+                print(
+                    f"⏭️  跳过UUID {uuid_val} ({title}) - 连续{failures}次token统计失败"
+                )
+                return True
+        return False
+
     def generate_summaries(self, max_count=None):
         """批量生成书籍总结"""
         print("📚 书籍总结生成器")
@@ -1178,6 +1290,24 @@ Ensure the total word count reaches at least 5000 words.
 
         print(f"⏳ 待处理数量: {len(processable_books)} (有PDF且未生成总结)")
 
+        # 显示跟踪统计信息
+        if self.tracking_data:
+            failed_uuids = {
+                uuid: data
+                for uuid, data in self.tracking_data.items()
+                if data.get("token_failures", 0) >= 5
+            }
+            print(f"🚫 跳过数量: {len(failed_uuids)} (连续5次token失败)")
+
+            if failed_uuids:
+                print("\n📋 被跳过的书籍 (连续5次token失败):")
+                for uuid, data in list(failed_uuids.items())[:5]:
+                    title = data.get("title", "Unknown")
+                    failures = data.get("token_failures", 0)
+                    print(f"   - {title} (UUID: {uuid}, 失败{failures}次)")
+                if len(failed_uuids) > 5:
+                    print(f"   ... 还有 {len(failed_uuids) - 5} 本被跳过的书籍")
+
         if len(processable_books) > 0:
             print("\n📋 待处理书籍示例 (前5本):")
             for i, book in enumerate(processable_books[:5]):
@@ -1236,8 +1366,8 @@ def main():
     if args.count:
         max_count = args.count
     elif not args.all:
-        # 默认生成5个
-        max_count = 5
+        # 默认处理所有PDF文件
+        max_count = None
 
     print(f"🌐 使用 AdsPower ID: {args.ads_id}")
     print(f"🗣️ 语言主题: {args.lang}")
@@ -1260,7 +1390,7 @@ def main():
     if max_count:
         print(f"🎯 生成数量: {max_count}")
     else:
-        print("🎯 生成所有可用的总结")
+        print("🎯 生成所有可用的总结（默认行为）")
 
     try:
         generator.generate_summaries(max_count=max_count)

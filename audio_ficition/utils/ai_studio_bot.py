@@ -49,7 +49,7 @@ AI Studio 多主题故事生成自动化脚本
    - 支持指定生成数量：--count 或 -c 参数（每个主题的数量）
    - 支持指定浏览器ID：--ads-id 参数
    - 支持指定主题：--theme 或 -t 参数（可选，默认所有主题）
-   - 默认每个主题生成2个故事，使用 kyencl7 浏览器配置
+   - 默认每个主题生成2个故事，使用 k10i5y1s 浏览器配置
 
 🗂️ 路径结构说明：
 Intel Mac (x86_64) 系统:
@@ -1484,7 +1484,7 @@ def main():
         "--count", "-c", type=int, default=2, help="每个主题要生成的故事数量 (默认: 2)"
     )
     parser.add_argument(
-        "--ads-id", default="kyencl7", help="AdsPower 浏览器ID (默认: kyencl7)"
+        "--ads-id", default="k10i5y1s", help="AdsPower 浏览器ID (默认: k10i5y1s)"
     )
     parser.add_argument(
         "--theme",

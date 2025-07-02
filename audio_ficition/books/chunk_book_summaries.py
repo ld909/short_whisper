@@ -333,7 +333,7 @@ def clean_text_content(text, language="en", debug=False):
                 removed_colons += count
                 if debug and count > 0:
                     print(f"         🔍 移除了 {count} 个 '{colon}' 字符")
-        
+
         # 中文模式下，将英文逗号替换为中文逗号
         if "," in text:
             count = text.count(",")
@@ -341,7 +341,7 @@ def clean_text_content(text, language="en", debug=False):
             replaced_commas += count
             if debug and count > 0:
                 print(f"         🔍 替换了 {count} 个 ',' 为 '，'")
-        
+
         # 中文模式下：将阿拉伯数字转换为中文数字
         text = arabic_to_chinese_number(text, debug)
     else:
