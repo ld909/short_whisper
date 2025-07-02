@@ -335,12 +335,13 @@ def get_optimal_encoder_settings():
     for encoder, preset in encoders_to_test:
         try:
             # 简单测试编码器是否可用
+            # 注意：NVIDIA编码器要求最小分辨率为256x256
             test_cmd = [
                 "ffmpeg",
                 "-f",
                 "lavfi",
                 "-i",
-                "testsrc=duration=0.1:size=32x32:rate=1",
+                "testsrc=duration=0.1:size=256x256:rate=1",
                 "-c:v",
                 encoder,
                 "-preset",
