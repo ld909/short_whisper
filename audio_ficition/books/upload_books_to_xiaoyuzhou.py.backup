@@ -738,116 +738,38 @@ def upload_podcast_to_xiaoyuzhou(book_content, page, publish_time=None, dry_run=
         else:
             print("⚠️ 未找到封面文件，跳过封面上传")
 
-        # 6. 点击"创建"按钮
-        print("🎬 正在点击创建按钮...")
+        # 6. 最终发布或保存
+        print("📤 正在确认发布...")
+        # 小宇宙可能有发布/保存按钮，需要点击完成
         try:
-            # 使用用户提供的精确选择器
-            create_button_selector = 'div[data-disabled="false"][data-type="primary"].css-k4ekfx.e169k0uu3[style*="width: 117px"][style*="margin-left: 25px"]:has-text("创建")'
-
-            # 备选选择器
-            create_button_selectors = [
-                create_button_selector,  # 用户提供的精确选择器
-                'div[data-type="primary"]:has-text("创建")',  # 简化版本
-                'div.css-k4ekfx:has-text("创建")',  # CSS类选择器
-                'div:has-text("创建")',  # 包含创建文本的div
-                "button:has-text('创建')",  # 如果是button元素
+            # 尝试查找发布或保存按钮
+            publish_buttons = [
+                "button:has-text('发布')",
+                "button:has-text('保存')",
+                "button:has-text('确认')",
+                "button:has-text('提交')",
             ]
 
-            create_success = False
-            for selector in create_button_selectors:
+            for button_selector in publish_buttons:
                 try:
-                    print(f"🎯 尝试创建按钮选择器: {selector}")
-                    create_button = page.locator(selector)
-
-                    if create_button.count() > 0 and create_button.first.is_visible():
-                        print(f"✅ 找到创建按钮")
-
-                        # 尝试点击创建按钮
-                        try:
-                            # 优先使用强制点击
-                            create_button.first.click(force=True)
-                            print("✅ 已强制点击创建按钮")
-                            create_success = True
-                            break
-                        except Exception as click_error:
-                            print(f"⚠️ 强制点击失败: {click_error}")
-                            try:
-                                # 备选普通点击
-                                create_button.first.click()
-                                print("✅ 已点击创建按钮")
-                                create_success = True
-                                break
-                            except Exception as normal_click_error:
-                                print(f"⚠️ 普通点击也失败: {normal_click_error}")
-                                continue
-                    else:
-                        print(f"⚠️ 选择器 {selector} 未找到可见元素")
-                        continue
-
-                except Exception as selector_error:
-                    print(f"⚠️ 选择器 {selector} 失败: {selector_error}")
+                    if page.locator(button_selector).count() > 0:
+                        page.locator(button_selector).click()
+                        print(f"✅ 已点击按钮: {button_selector}")
+                        break
+                except:
                     continue
 
-            if not create_success:
-                print("❌ 所有创建按钮选择器都失败，尝试JavaScript方法...")
-                try:
-                    # JavaScript查找并点击创建按钮
-                    js_create_script = """
-                    () => {
-                        // 方法1：查找包含"创建"文本的div元素
-                        const divs = document.querySelectorAll('div');
-                        for (const div of divs) {
-                            if (div.textContent && div.textContent.trim() === '创建') {
-                                if (div.offsetParent !== null && div.getAttribute('data-disabled') !== 'true') {
-                                    div.click();
-                                    return 'text-content';
-                                }
-                            }
-                        }
-                        
-                        // 方法2：通过data-type属性查找
-                        const primaryButtons = document.querySelectorAll('div[data-type="primary"]');
-                        for (const button of primaryButtons) {
-                            if (button.textContent && button.textContent.includes('创建')) {
-                                if (button.offsetParent !== null && button.getAttribute('data-disabled') !== 'true') {
-                                    button.click();
-                                    return 'data-type';
-                                }
-                            }
-                        }
-                        
-                        return false;
-                    }
-                    """
-
-                    result = page.evaluate(js_create_script)
-                    if result:
-                        print(f"✅ JavaScript成功点击创建按钮 (方法: {result})")
-                        create_success = True
-                    else:
-                        print("❌ JavaScript方法也无法找到创建按钮")
-
-                except Exception as js_error:
-                    print(f"⚠️ JavaScript方法失败: {js_error}")
-
-            if create_success:
-                print("✅ 创建按钮点击完成")
-            else:
-                print("⚠️ 无法点击创建按钮，可能需要手动处理")
+            page.wait_for_timeout(3000)
+            print("✅ 播客上传流程完成")
+            return True
 
         except Exception as e:
-            print(f"⚠️ 处理创建按钮时出错: {e}")
-            print("💡 提示：可能需要手动点击创建按钮")
-
-        # 7. 等待5秒完成所有流程
-        print("⏳ 等待5秒完成上传流程...")
-        page.wait_for_timeout(5000)
-
-        print("✅ 播客上传流程完成")
-        return True
+            print(f"⚠️  最终确认步骤出错: {e}")
+            print("✅ 播客内容已填写完成，可能需要手动确认")
+            return True
 
     except Exception as e:
-        print(f"❌ 上传过程中发生错误: {e}")
+        print(f"❌ 上传播客时出错: {e}")
         return False
 
 
@@ -2013,7 +1935,7 @@ class XiaoyuzhouPodcastUploader:
             print(f"⚠️ 处理服务协议checkbox时出错: {e}")
             print("💡 提示：可能需要手动勾选服务协议")
 
-        # 6. 点击"创建"按钮
+        # 7. 点击"创建"按钮
         print("🎬 正在点击创建按钮...")
         try:
             # 使用用户提供的精确选择器
@@ -2114,12 +2036,16 @@ class XiaoyuzhouPodcastUploader:
             print(f"⚠️ 处理创建按钮时出错: {e}")
             print("💡 提示：可能需要手动点击创建按钮")
 
-        # 7. 等待5秒完成所有流程
+        # 8. 等待5秒完成所有流程
         print("⏳ 等待5秒完成上传流程...")
         page.wait_for_timeout(5000)
 
         print("✅ 播客上传流程完成")
         return True
+
+    except Exception as e:
+        print(f"❌ 上传过程中发生错误: {e}")
+        return False
 
     def update_excel_status(self, book_info, publish_time):
         """更新Excel中的发布状态"""
