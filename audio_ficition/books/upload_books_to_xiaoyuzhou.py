@@ -1815,48 +1815,168 @@ class XiaoyuzhouPodcastUploader:
             else:
                 print("⚠️ 未找到封面文件，跳过封面上传")
 
-            # 6. 确认发布
-            print("📤 正在确认发布...")
-            try:
-                # 查找发布按钮（可能是"发布"、"提交"等文本）
-                publish_selectors = [
-                    "button:has-text('发布')",
-                    "button:has-text('提交')",
-                    "button:has-text('确认')",
-                    "button[type='submit']",
-                    "button.primary",  # 主要按钮样式
-                ]
+        except Exception as e:
+            print(f"❌ 上传过程中发生错误: {e}")
+            return False
 
-                publish_success = False
-                for selector in publish_selectors:
-                    try:
-                        publish_button = page.locator(selector)
-                        if publish_button.count() > 0:
-                            publish_button.first.click()
-                            print(f"✅ 发布确认完成 (使用选择器: {selector})")
-                            publish_success = True
+        # 6. 同意服务协议checkbox（在封面上传完成后）
+        print("📋 准备同意服务协议...")
+        try:
+            # 等待10秒让页面稳定
+            print("⏳ 等待10秒让页面稳定...")
+            page.wait_for_timeout(10000)
+
+            # 多种选择器策略找到服务协议checkbox
+            checkbox_selectors = [
+                'div.css-1i5dn6c[style*="width: 25px"][style*="height: 25px"]',  # 用户提供的新选择器（优先尝试）
+                "div.css-1i5dn6c",  # 简化版本的用户提供选择器
+                '[data-cy="checkbox"]',  # 最精确的选择器
+                "div.css-18ivdps.e169k0uu10",  # CSS类选择器
+                'div:has-text("阅读并同意")',  # 包含文本的选择器
+                'div:has-text("小宇宙创作中心服务协议")',  # 包含协议文本
+                'div:has(a[href*="xiaoyuzhoufm.com"])',  # 包含链接的div
+            ]
+
+            checkbox_clicked = False
+            for selector in checkbox_selectors:
+                try:
+                    print(f"🎯 尝试checkbox选择器: {selector}")
+                    checkbox_element = page.locator(selector)
+
+                    if (
+                        checkbox_element.count() > 0
+                        and checkbox_element.first.is_visible()
+                    ):
+                        print(f"✅ 找到服务协议checkbox")
+
+                        # 尝试点击checkbox
+                        try:
+                            # 优先使用强制点击
+                            checkbox_element.first.click(force=True)
+                            print("✅ 已强制点击服务协议checkbox")
+                            checkbox_clicked = True
                             break
-                    except:
+                        except Exception as click_error:
+                            print(f"⚠️ 强制点击失败: {click_error}")
+                            try:
+                                # 备选普通点击
+                                checkbox_element.first.click()
+                                print("✅ 已点击服务协议checkbox")
+                                checkbox_clicked = True
+                                break
+                            except Exception as normal_click_error:
+                                print(f"⚠️ 普通点击也失败: {normal_click_error}")
+                                continue
+                    else:
+                        print(f"⚠️ 选择器 {selector} 未找到可见元素")
                         continue
 
-                if not publish_success:
-                    print("⚠️ 未找到发布按钮，可能需要手动确认")
+                except Exception as selector_error:
+                    print(f"⚠️ 选择器 {selector} 失败: {selector_error}")
+                    continue
 
-                # 等待发布完成
-                time.sleep(5)
+            if not checkbox_clicked:
+                print("❌ 所有checkbox选择器都失败，尝试JavaScript方法...")
+                try:
+                    # JavaScript查找并点击checkbox
+                    js_checkbox_script = """
+                    () => {
+                        // 方法1：通过data-cy属性查找
+                        let checkbox = document.querySelector('[data-cy="checkbox"]');
+                        if (checkbox && checkbox.offsetParent !== null) {
+                            checkbox.click();
+                            return 'data-cy';
+                        }
+                        
+                        // 方法2：通过文本内容查找
+                        const divs = document.querySelectorAll('div');
+                        for (const div of divs) {
+                            if (div.textContent && div.textContent.includes('阅读并同意')) {
+                                if (div.offsetParent !== null) {
+                                    div.click();
+                                    return 'text-content';
+                                }
+                            }
+                        }
+                        
+                        // 方法3：查找包含协议链接的元素
+                        const links = document.querySelectorAll('a[href*="xiaoyuzhoufm.com"]');
+                        for (const link of links) {
+                            const parent = link.closest('div[data-cy="checkbox"]') || link.parentElement;
+                            if (parent && parent.offsetParent !== null) {
+                                parent.click();
+                                return 'link-parent';
+                            }
+                        }
+                        
+                        return false;
+                    }
+                    """
 
-                # 检查是否发布成功（这里可以根据实际页面反馈来判断）
-                current_url = page.url
-                if "create/episode" not in current_url:
-                    print("✅ 音频发布成功")
-                    return True
-                else:
-                    print("✅ 音频内容已填写完成")
-                    return True
+                    result = page.evaluate(js_checkbox_script)
+                    if result:
+                        print(f"✅ JavaScript成功点击checkbox (方法: {result})")
+                        checkbox_clicked = True
+                    else:
+                        print("❌ JavaScript方法也无法找到checkbox")
 
-            except Exception as e:
-                print(f"❌ 确认发布失败: {e}")
-                return False
+                except Exception as js_error:
+                    print(f"⚠️ JavaScript方法失败: {js_error}")
+
+            if checkbox_clicked:
+                # 点击成功后等待2秒
+                print("⏳ 等待2秒确认checkbox状态...")
+                page.wait_for_timeout(2000)
+                print("✅ 服务协议checkbox处理完成")
+            else:
+                print("⚠️ 无法点击服务协议checkbox，可能需要手动处理")
+
+        except Exception as e:
+            print(f"⚠️ 处理服务协议checkbox时出错: {e}")
+            print("💡 提示：可能需要手动勾选服务协议")
+
+        # 6. 确认发布
+        print("📤 正在确认发布...")
+        try:
+            # 查找发布按钮（可能是"发布"、"提交"等文本）
+            publish_selectors = [
+                "button:has-text('发布')",
+                "button:has-text('提交')",
+                "button:has-text('确认')",
+                "button[type='submit']",
+                "button.primary",  # 主要按钮样式
+            ]
+
+            publish_success = False
+            for selector in publish_selectors:
+                try:
+                    publish_button = page.locator(selector)
+                    if publish_button.count() > 0:
+                        publish_button.first.click()
+                        print(f"✅ 发布确认完成 (使用选择器: {selector})")
+                        publish_success = True
+                        break
+                except:
+                    continue
+
+            if not publish_success:
+                print("⚠️ 未找到发布按钮，可能需要手动确认")
+
+            # 等待发布完成
+            time.sleep(5)
+
+            # 检查是否发布成功（这里可以根据实际页面反馈来判断）
+            current_url = page.url
+            if "create/episode" not in current_url:
+                print("✅ 音频发布成功")
+                return True
+            else:
+                print("✅ 音频内容已填写完成")
+                return True
+
+        except Exception as e:
+            print(f"❌ 确认发布失败: {e}")
+            return False
 
         except Exception as e:
             print(f"❌ 上传过程中发生错误: {e}")
