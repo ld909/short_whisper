@@ -35,6 +35,9 @@ python generate_book_summary.py --count 10 --lang zh  # 生成中文主题总结
 python generate_book_summary.py --all --lang zh       # 生成所有中文主题总结
 python generate_book_summary.py --check-status --lang zh  # 检查中文主题状态
 
+# 自定义参数
+python generate_book_summary.py --token-wait-time 120  # 设置token等待时间为120秒（默认100秒）
+
 注意：
 - 脚本会自动检测 book_pdf_downloader.py 输出的PDF文件并上传到AI Studio
 - 不同语言主题完全独立，拥有独立的目录结构和数据源
@@ -118,10 +121,11 @@ def get_adspower_info(ads_id):
 class BookSummaryGenerator:
     """书籍总结生成器 - 使用浏览器自动化"""
 
-    def __init__(self, ads_id="k10i5y1s", debug=False, lang="en"):
+    def __init__(self, ads_id="k10i5y1s", debug=False, lang="en", token_wait_time=100):
         self.ads_id = ads_id
         self.debug = debug
         self.lang = lang
+        self.token_wait_time = token_wait_time
         self.base_media_path = get_base_media_path()
         self.books_base_path = os.path.join(self.base_media_path, "books", lang)
         # 自动设置 PDF 目录（与 book_pdf_downloader.py 保持一致）
@@ -630,210 +634,68 @@ Ensure the total word count reaches at least 5000 words.
             print(f"📄 未找到PDF文件: {title} (UUID: {uuid_val})")
         return False
 
-    def upload_pdf_file(self, book_info):
-        """上传PDF文件到AI Studio - 支持重试和token验证"""
-        uuid_val = book_info.get("uuid", "")
-        title = book_info.get("title", "未知标题")
+    def close_ripple_element(self):
+        """点击关闭PDF文件的close图标"""
+        print("🔘 正在关闭PDF文件...")
 
-        # 根据 book_pdf_downloader.py 的规则，PDF文件名为 {uuid}.pdf
-        pdf_file_path = os.path.join(self.pdf_dir, f"{uuid_val}.pdf")
+        # 更新选择器，针对mat-icon close元素
+        close_icon_selectors = [
+            'mat-icon:has-text("close")',
+            'mat-icon.material-symbols-outlined:has-text("close")',
+            'mat-icon[class*="material-symbols-outlined"]:has-text("close")',
+            '.mat-icon.material-symbols-outlined:has-text("close")',
+            '.material-symbols-outlined:has-text("close")',
+            'mat-icon[role="img"]:has-text("close")',
+            '[class*="mat-icon"]:has-text("close")',
+            'button mat-icon:has-text("close")',
+            'button .mat-icon:has-text("close")',
+        ]
 
-        if not os.path.exists(pdf_file_path):
-            print(f"⚠️ PDF文件不存在: {pdf_file_path}")
-            return False
-
-        print(f"📎 使用PDF文件: {pdf_file_path}")
-
-        # 最多尝试3次
-        max_attempts = 3
-        for attempt in range(1, max_attempts + 1):
-            print(f"🔄 尝试上传PDF文件 (第 {attempt}/{max_attempts} 次)...")
-
+        pdf_closed = False
+        for selector in close_icon_selectors:
             try:
-                # 第一步：点击"Insert assets"按钮来激活文件输入元素
-                print("🔘 点击'Insert assets'按钮...")
-                insert_button_selectors = [
-                    'button[aria-label*="Insert assets"]',
-                    "button.add-chunk-menu-button",
-                    'button:has(.material-symbols-outlined:has-text("add_circle"))',
-                    'button[mat-icon-button][aria-label*="Insert"]',
-                    'button[aria-label*="Insert assets such as images, videos, files"]',
-                ]
-
-                insert_button = None
-                for selector in insert_button_selectors:
-                    try:
-                        if self.page.locator(selector).count() > 0:
-                            insert_button = self.page.locator(selector).first
-                            print(f"✅ 找到Insert assets按钮，使用选择器: {selector}")
-                            break
-                    except:
-                        continue
-
-                if not insert_button:
-                    print("❌ 未找到Insert assets按钮")
-                    if attempt < max_attempts:
-                        print(f"💫 等待3秒后重试...")
-                        time.sleep(3)
-                        continue
-                    return False
-
-                # 点击Insert assets按钮
-                insert_button.click()
-                print("✅ 已点击Insert assets按钮")
-
-                # 等待1-2秒让input元素激活
-                print("⏳ 等待input元素激活...")
-                time.sleep(2)
-
-                # 第二步：找到文件输入框
-                file_input_selectors = [
-                    'input[type="file"][multiple]',
-                    'input[type="file"]',
-                    'input[type="file"][style*="display: none"]',
-                ]
-
-                file_input = None
-                for selector in file_input_selectors:
-                    try:
-                        if self.page.locator(selector).count() > 0:
-                            file_input = self.page.locator(selector).first
-                            print(f"✅ 找到文件输入框，使用选择器: {selector}")
-                            break
-                    except:
-                        continue
-
-                if not file_input:
-                    print("❌ 未找到文件输入框")
-                    if attempt < max_attempts:
-                        print(f"💫 等待3秒后重试...")
-                        time.sleep(3)
-                        continue
-                    return False
-
-                # 第三步：上传文件
-                print("📤 正在上传PDF文件...")
-
-                # 优先使用CDP方法上传大文件，绕过50MB限制
-                upload_success_cdp = False
-                try:
-                    # 检查文件大小
-                    file_size = os.path.getsize(pdf_file_path)
-                    file_size_mb = file_size / (1024 * 1024)
-                    print(f"📊 PDF文件大小: {file_size_mb:.2f} MB")
-
-                    if file_size_mb > 50:
-                        print(f"🔧 文件大于50MB，使用CDP方法上传...")
-                    else:
-                        print(f"📁 文件小于50MB，但优先尝试CDP方法...")
-
-                    # 获取文件输入选择器
-                    file_input_selectors = [
-                        'input[type="file"][multiple]',
-                        'input[type="file"]',
-                        'input[type="file"][style*="display: none"]',
-                    ]
-
-                    # 找到有效的文件输入选择器
-                    active_file_selector = None
-                    for selector in file_input_selectors:
-                        try:
-                            if self.page.locator(selector).count() > 0:
-                                active_file_selector = selector
-                                print(f"✅ 找到文件输入选择器: {selector}")
-                                break
-                        except:
-                            continue
-
-                    if not active_file_selector:
-                        print("❌ 未找到文件输入选择器")
-                        raise Exception("无法找到文件输入选择器")
-
-                    # 创建CDP会话
-                    print("🔗 创建CDP会话...")
-                    cdp_session = self.page.context.new_cdp_session(self.page)
-
-                    # 启用DOM
-                    cdp_session.send("DOM.enable")
-
-                    # 获取DOM文档
-                    print("📄 获取DOM文档...")
-                    dom_snapshot = cdp_session.send("DOM.getDocument", {"depth": -1})
-
-                    # 查找文件输入节点
-                    print("🔍 查找文件输入节点...")
-                    node_result = cdp_session.send(
-                        "DOM.querySelector",
-                        {
-                            "nodeId": dom_snapshot["root"]["nodeId"],
-                            "selector": active_file_selector,
-                        },
-                    )
-
-                    if not node_result.get("nodeId"):
-                        print("❌ 无法找到文件输入节点!")
-                        cdp_session.detach()
-                        raise Exception("无法找到文件输入节点")
-
-                    # 使用CDP设置文件
-                    print("📁 使用CDP方法设置文件...")
-                    cdp_session.send(
-                        "DOM.setFileInputFiles",
-                        {
-                            "nodeId": node_result["nodeId"],
-                            "files": [pdf_file_path],
-                        },
-                    )
-
-                    # 关闭CDP会话
-                    cdp_session.detach()
-                    print("✅ PDF文件上传完成（使用CDP方法）")
-                    upload_success_cdp = True
-
-                except Exception as cdp_error:
-                    print(f"❌ CDP上传方法失败: {cdp_error}")
-                    print("🔄 尝试使用标准Playwright方法...")
-
-                    # 如果CDP方法失败，回退到标准方法
-                    try:
-                        file_input.set_input_files(pdf_file_path)
-                        print("✅ PDF文件上传完成（使用标准方法）")
-                        upload_success_cdp = True
-                    except Exception as standard_error:
-                        print(f"❌ 标准上传方法也失败: {standard_error}")
-                        upload_success_cdp = False
-
-                if not upload_success_cdp:
-                    print(f"❌ 第 {attempt} 次上传失败（所有方法都失败）")
-                    if attempt < max_attempts:
-                        print(f"💫 等待5秒后重试...")
-                        time.sleep(5)
-                        continue
-                    return False
-
-                # 等待上传完成，并检查token计数
-                print("⏳ 等待PDF上传和处理完成...")
-                upload_success = self.wait_for_pdf_token_count(title, uuid_val, title)
-
-                if upload_success:
-                    print("✅ PDF文件上传并处理成功")
-                    return True
-                else:
-                    print(f"❌ 第 {attempt} 次上传失败（上传成功但token验证失败）")
-                    if attempt < max_attempts:
-                        print(f"💫 等待5秒后重试...")
-                        time.sleep(5)
-                        continue
-
+                elements = self.page.locator(selector)
+                if elements.count() > 0:
+                    print(f"🔍 找到 {elements.count()} 个close图标元素")
+                    # 点击最后一个（最新的）close图标元素
+                    elements.last.click()
+                    print(f"✅ 成功点击close图标，使用选择器: {selector}")
+                    pdf_closed = True
+                    break
             except Exception as e:
-                print(f"❌ 第 {attempt} 次上传出错: {e}")
-                if attempt < max_attempts:
-                    print(f"💫 等待5秒后重试...")
-                    time.sleep(5)
+                if self.debug:
+                    print(f"尝试点击close图标选择器失败 {selector}: {e}")
+                continue
+
+        if not pdf_closed:
+            print("⚠️ 未找到close图标元素，尝试备用方法...")
+
+            # 备用方法：尝试原来的ripple选择器
+            backup_selectors = [
+                "span.mat-mdc-button-persistent-ripple.mdc-icon-button__ripple",
+                "span.mat-mdc-button-persistent-ripple",
+                "span.mdc-icon-button__ripple",
+                'button[aria-label*="Close"] span.mat-mdc-button-persistent-ripple',
+                ".mat-mdc-button-persistent-ripple",
+            ]
+
+            for selector in backup_selectors:
+                try:
+                    elements = self.page.locator(selector)
+                    if elements.count() > 0:
+                        elements.last.click()
+                        print(f"✅ 使用备用方法成功点击，选择器: {selector}")
+                        pdf_closed = True
+                        break
+                except Exception as e:
+                    if self.debug:
+                        print(f"备用方法失败 {selector}: {e}")
                     continue
 
-        print(f"❌ PDF上传失败，已尝试 {max_attempts} 次")
-        return False
+        if not pdf_closed:
+            print("❌ 无法找到可点击的关闭元素")
+
+        return pdf_closed
 
     def wait_for_pdf_token_count(self, title="PDF文件", uuid_val="", book_title=""):
         """等待PDF token计数显示，用于验证上传成功"""
@@ -854,7 +716,9 @@ Ensure the total word count reaches at least 5000 words.
             ".file-chunk-container span.name",
         ]
 
-        max_wait_time = 240  # 最多等待240秒（4分钟），确保有足够时间处理大文件
+        max_wait_time = (
+            self.token_wait_time
+        )  # 等待token计算的时间（可通过命令行参数设定）
         check_interval = 3  # 每3秒检查一次
         elapsed_time = 0
 
@@ -1017,13 +881,243 @@ Ensure the total word count reaches at least 5000 words.
 
         raise Exception("无法发送生成请求或AI未开始运行")
 
+    def setup_ai_studio_and_input_prompt(self, book_info):
+        """设置AI Studio并输入提示词"""
+        title = book_info.get("title", "未知标题")
+        author = book_info.get("author", "未知作者")
+        description = book_info.get("description", "暂无简介")
+        year = book_info.get("publication_year", "未知年份")
+
+        # 导航到AI Studio
+        print("🌐 正在打开AI Studio...")
+        self.page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
+        self.page.wait_for_load_state("networkidle")
+        self.page.wait_for_timeout(8000)
+
+        # 构建提示词
+        prompt = self.prompt_template.format(
+            title=title, author=author, description=description, year=year
+        )
+
+        # 查找并输入文本框
+        textarea_selectors = [
+            ".text-wrapper textarea",
+            "ms-autosize-textarea textarea",
+            'textarea[aria-label*="Type something"]',
+            'textarea[class*="textarea"]',
+            "textarea",
+        ]
+
+        textarea = None
+        for selector in textarea_selectors:
+            try:
+                if self.page.locator(selector).count() > 0:
+                    textarea = self.page.locator(selector)
+                    print(f"✅ 找到文本框，使用选择器: {selector}")
+                    break
+            except:
+                continue
+
+        if not textarea or textarea.count() == 0:
+            raise Exception("无法找到文本框")
+
+        # 输入提示词
+        print("📝 正在输入提示词...")
+        textarea.click()
+        self.page.wait_for_timeout(500)
+        textarea.focus()
+        self.page.wait_for_timeout(500)
+        textarea.fill(prompt)
+        self.page.wait_for_timeout(1000)
+
+        print(f"📊 提示词长度: {len(prompt)} 字符")
+        return True
+
+    def upload_pdf_file_without_retry(self, book_info):
+        """上传PDF文件到AI Studio - 不带重试机制的版本"""
+        uuid_val = book_info.get("uuid", "")
+        title = book_info.get("title", "未知标题")
+
+        # 根据 book_pdf_downloader.py 的规则，PDF文件名为 {uuid}.pdf
+        pdf_file_path = os.path.join(self.pdf_dir, f"{uuid_val}.pdf")
+
+        if not os.path.exists(pdf_file_path):
+            print(f"⚠️ PDF文件不存在: {pdf_file_path}")
+            return False
+
+        print(f"📎 使用PDF文件: {pdf_file_path}")
+
+        try:
+            # 第一步：点击"+"按钮（Insert assets）打开菜单
+            print("🔘 点击'+'按钮打开上传菜单...")
+            insert_button_selectors = [
+                'button[aria-label*="Insert assets"]',
+                "button.add-chunk-menu-button",
+                'button:has(.material-symbols-outlined:has-text("add_circle"))',
+                'button[mat-icon-button][aria-label*="Insert"]',
+                'button[aria-label*="Insert assets such as images, videos, files"]',
+            ]
+
+            insert_button = None
+            for selector in insert_button_selectors:
+                try:
+                    if self.page.locator(selector).count() > 0:
+                        insert_button = self.page.locator(selector).first
+                        print(f"✅ 找到'+'按钮，使用选择器: {selector}")
+                        break
+                except:
+                    continue
+
+            if not insert_button:
+                print("❌ 未找到'+'按钮")
+                return False
+
+            # 点击+按钮打开菜单
+            insert_button.click()
+            print("✅ 已点击'+'按钮，菜单应已打开")
+
+            # 等待菜单打开
+            print("⏳ 等待上传菜单打开...")
+            time.sleep(2)
+
+            # 第二步：在菜单中找到"Upload File"按钮并点击
+            print("🔍 寻找菜单中的'Upload File'按钮...")
+            upload_file_button_selectors = [
+                'button[aria-label="Upload File"]',
+                'button.mat-mdc-menu-item[aria-label="Upload File"]',
+                'button:has-text("Upload File")',
+                'button[mattooltip*="Upload a file"]',
+                'button.mat-mdc-menu-item:has(.material-symbols-outlined:has-text("upload"))',
+            ]
+
+            upload_file_button = None
+            for selector in upload_file_button_selectors:
+                try:
+                    if self.page.locator(selector).count() > 0:
+                        upload_file_button = self.page.locator(selector).first
+                        print(f"✅ 找到'Upload File'按钮，使用选择器: {selector}")
+                        break
+                except:
+                    continue
+
+            if not upload_file_button:
+                print("❌ 未找到'Upload File'按钮")
+                return False
+
+            # 第三步：找到Upload File按钮内部的input元素
+            print("🔍 寻找'Upload File'按钮内部的input元素...")
+
+            # 先找到Upload File按钮内部的input
+            upload_file_input = None
+            try:
+                # 在Upload File按钮内部查找input元素
+                input_in_button = upload_file_button.locator('input[type="file"]')
+                if input_in_button.count() > 0:
+                    upload_file_input = input_in_button.first
+                    print("✅ 找到'Upload File'按钮内部的input元素")
+                else:
+                    print("❌ 未找到'Upload File'按钮内部的input元素")
+                    return False
+            except Exception as e:
+                print(f"❌ 查找input元素失败: {e}")
+                return False
+
+            # 第四步：上传文件
+            print("📤 正在上传PDF文件...")
+
+            # 优先使用CDP方法上传大文件，绕过50MB限制
+            upload_success_cdp = False
+            try:
+                # 检查文件大小
+                file_size = os.path.getsize(pdf_file_path)
+                file_size_mb = file_size / (1024 * 1024)
+                print(f"📊 PDF文件大小: {file_size_mb:.2f} MB")
+
+                if file_size_mb > 50:
+                    print(f"🔧 文件大于50MB，使用CDP方法上传...")
+                else:
+                    print(f"📁 文件小于50MB，但优先尝试CDP方法...")
+
+                # 创建CDP会话
+                print("🔗 创建CDP会话...")
+                cdp_session = self.page.context.new_cdp_session(self.page)
+
+                # 启用DOM
+                cdp_session.send("DOM.enable")
+
+                # 获取DOM文档
+                print("📄 获取DOM文档...")
+                dom_snapshot = cdp_session.send("DOM.getDocument", {"depth": -1})
+
+                # 使用更具体的选择器查找Upload File按钮内的input
+                input_selector = 'button[aria-label="Upload File"] input[type="file"]'
+                print(f"🔍 使用选择器查找input: {input_selector}")
+
+                node_result = cdp_session.send(
+                    "DOM.querySelector",
+                    {
+                        "nodeId": dom_snapshot["root"]["nodeId"],
+                        "selector": input_selector,
+                    },
+                )
+
+                if not node_result.get("nodeId"):
+                    print("❌ 无法找到Upload File按钮内的input节点!")
+                    cdp_session.detach()
+                    raise Exception("无法找到Upload File按钮内的input节点")
+
+                # 使用CDP设置文件
+                print("📁 使用CDP方法设置文件...")
+                cdp_session.send(
+                    "DOM.setFileInputFiles",
+                    {
+                        "nodeId": node_result["nodeId"],
+                        "files": [pdf_file_path],
+                    },
+                )
+
+                # 关闭CDP会话
+                cdp_session.detach()
+                print("✅ PDF文件上传完成（使用CDP方法）")
+                upload_success_cdp = True
+
+            except Exception as cdp_error:
+                print(f"❌ CDP上传方法失败: {cdp_error}")
+                print("🔄 尝试使用标准Playwright方法...")
+
+                # 如果CDP方法失败，回退到标准方法
+                try:
+                    upload_file_input.set_input_files(pdf_file_path)
+                    print("✅ PDF文件上传完成（使用标准方法）")
+                    upload_success_cdp = True
+                except Exception as standard_error:
+                    print(f"❌ 标准上传方法也失败: {standard_error}")
+                    upload_success_cdp = False
+
+            if not upload_success_cdp:
+                print("❌ PDF上传失败（所有方法都失败）")
+                return False
+
+            # 等待上传完成，并检查token计数
+            print("⏳ 等待PDF上传和处理完成...")
+            upload_success = self.wait_for_pdf_token_count(title, uuid_val, title)
+
+            if upload_success:
+                print("✅ PDF文件上传并处理成功")
+                return True
+            else:
+                print("❌ PDF上传失败（上传成功但token验证失败）")
+                return False
+
+        except Exception as e:
+            print(f"❌ PDF上传出错: {e}")
+            return False
+
     def generate_summary_for_book(self, book_info):
         """为单本书生成总结"""
         uuid_val = book_info.get("uuid", "")
         title = book_info.get("title", "未知标题")
         author = book_info.get("author", "未知作者")
-        description = book_info.get("description", "暂无简介")
-        year = book_info.get("publication_year", "未知年份")
 
         print(f"\n📖 正在检查书籍: {title}")
         print(f"   作者: {author}")
@@ -1038,82 +1132,91 @@ Ensure the total word count reaches at least 5000 words.
         print("✅ 发现PDF文件，开始生成总结...")
 
         try:
-            # 导航到AI Studio
-            print("🌐 正在打开AI Studio...")
-            self.page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
-            self.page.wait_for_load_state("networkidle")
-            self.page.wait_for_timeout(8000)
+            # 第一步：设置AI Studio并输入提示词（只执行一次）
+            print("🔄 设置AI Studio并输入提示词...")
+            if not self.setup_ai_studio_and_input_prompt(book_info):
+                print("❌ 设置AI Studio失败")
+                return False
 
-            # 构建提示词
-            prompt = self.prompt_template.format(
-                title=title, author=author, description=description, year=year
-            )
+            # 第二步：在同一页面内最多尝试3次PDF上传和处理
+            max_pdf_attempts = 3
+            for attempt in range(1, max_pdf_attempts + 1):
+                print(f"\n🔄 PDF上传尝试 {attempt}/{max_pdf_attempts}...")
 
-            # 第一步：查找并输入文本框
-            textarea_selectors = [
-                ".text-wrapper textarea",
-                "ms-autosize-textarea textarea",
-                'textarea[aria-label*="Type something"]',
-                'textarea[class*="textarea"]',
-                "textarea",
-            ]
-
-            textarea = None
-            for selector in textarea_selectors:
                 try:
-                    if self.page.locator(selector).count() > 0:
-                        textarea = self.page.locator(selector)
-                        print(f"✅ 找到文本框，使用选择器: {selector}")
-                        break
-                except:
-                    continue
+                    # 上传PDF文件
+                    pdf_uploaded = self.upload_pdf_file_without_retry(book_info)
 
-            if not textarea or textarea.count() == 0:
-                raise Exception("无法找到文本框")
+                    if pdf_uploaded:
+                        print("✅ PDF上传成功，开始生成总结...")
 
-            # 输入提示词
-            print("📝 正在输入提示词...")
-            textarea.click()
-            self.page.wait_for_timeout(500)
-            textarea.focus()
-            self.page.wait_for_timeout(500)
-            textarea.fill(prompt)
-            self.page.wait_for_timeout(1000)
+                        # 发送请求
+                        self.send_generation_request()
 
-            print(f"📊 提示词长度: {len(prompt)} 字符")
+                        # 等待AI完成
+                        self.wait_for_ai_completion()
 
-            # 第二步：上传PDF文件
-            print("📎 正在上传PDF文件...")
-            pdf_uploaded = self.upload_pdf_file(book_info)
-            if not pdf_uploaded:
-                print("❌ PDF上传失败，跳过该书籍")
-                return False
+                        # 提取生成的内容
+                        content = self.extract_generated_summary()
 
-            # 第三步：发送请求
-            self.send_generation_request()
+                        if content:
+                            # 保存到文件
+                            summary_file = os.path.join(
+                                self.summary_dir, f"{uuid_val}.txt"
+                            )
+                            with open(summary_file, "w", encoding="utf-8") as f:
+                                f.write(content)
 
-            # 等待AI完成
-            self.wait_for_ai_completion()
+                            print(f"✅ 总结已保存: {summary_file}")
+                            print(f"   内容长度: {len(content)} 字符")
+                            return True
+                        else:
+                            print(f"❌ 第 {attempt} 次未能提取到生成的内容")
+                            if attempt < max_pdf_attempts:
+                                print("💫 准备重试...")
+                                continue
+                            else:
+                                print("❌ 达到最大尝试次数，生成失败")
+                                return False
+                    else:
+                        print(f"❌ 第 {attempt} 次PDF上传失败")
+                        if attempt < max_pdf_attempts:
+                            # PDF上传失败，需要先清理然后重试
+                            print("🧹 准备清理并重试...")
 
-            # 提取生成的内容
-            content = self.extract_generated_summary()
+                            # 按两次ESC键关闭菜单
+                            print("⌨️ 按两次ESC键关闭菜单...")
+                            self.page.keyboard.press("Escape")
+                            self.page.wait_for_timeout(500)
+                            self.page.keyboard.press("Escape")
+                            self.page.wait_for_timeout(1000)
 
-            if content:
-                # 保存到文件
-                summary_file = os.path.join(self.summary_dir, f"{uuid_val}.txt")
-                with open(summary_file, "w", encoding="utf-8") as f:
-                    f.write(content)
+                            # 如果有PDF文件需要关闭
+                            self.close_ripple_element()
 
-                print(f"✅ 总结已保存: {summary_file}")
-                print(f"   内容长度: {len(content)} 字符")
+                            # 等待一下再重试
+                            print("⏳ 等待3秒后重试...")
+                            time.sleep(3)
+                            continue
+                        else:
+                            print("❌ 达到最大尝试次数，PDF上传失败")
+                            return False
 
-                return True
-            else:
-                print("❌ 未能提取到生成的内容")
-                return False
+                except Exception as e:
+                    print(f"❌ 第 {attempt} 次PDF处理过程出错: {e}")
+                    if attempt < max_pdf_attempts:
+                        print("💫 等待3秒后重试...")
+                        time.sleep(3)
+                        continue
+                    else:
+                        print("❌ 达到最大尝试次数，处理失败")
+                        return False
+
+            print("❌ 所有PDF上传尝试都失败")
+            return False
 
         except Exception as e:
-            print(f"❌ 生成总结失败: {e}")
+            print(f"❌ 生成总结过程出错: {e}")
             return False
 
     def load_tracking_data(self):
@@ -1331,6 +1434,7 @@ def main():
   python generate_book_summary.py --check-status      # 检查当前状态
   python generate_book_summary.py --count 10 --lang zh  # 生成中文主题总结
   python generate_book_summary.py --count 10 --lang en  # 生成英文主题总结
+  python generate_book_summary.py --token-wait-time 120  # 设置token等待时间为120秒
 
 注意：脚本会自动检测并使用 book_pdf_downloader.py 下载的PDF文件
         """,
@@ -1348,12 +1452,22 @@ def main():
     parser.add_argument(
         "--lang", "-l", default="en", help="语言主题 (en: 英文, zh: 中文) (默认: en)"
     )
+    parser.add_argument(
+        "--token-wait-time",
+        "-t",
+        type=int,
+        default=100,
+        help="等待PDF文件token计算的最大时间（秒） (默认: 100)",
+    )
 
     args = parser.parse_args()
 
     # 创建生成器实例
     generator = BookSummaryGenerator(
-        ads_id=args.ads_id, debug=args.debug, lang=args.lang
+        ads_id=args.ads_id,
+        debug=args.debug,
+        lang=args.lang,
+        token_wait_time=args.token_wait_time,
     )
 
     # 检查断点续传状态
@@ -1371,6 +1485,7 @@ def main():
 
     print(f"🌐 使用 AdsPower ID: {args.ads_id}")
     print(f"🗣️ 语言主题: {args.lang}")
+    print(f"⏱️ Token等待时间: {args.token_wait_time}秒")
 
     # 检查PDF目录状态
     pdf_dir = os.path.join(generator.books_base_path, "pdf")
