@@ -1,0 +1,2190 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+小宇宙播客上传脚本
+上传 merge_book_audio.py 产生的音频文件到小宇宙播客平台
+
+📚 功能说明:
+- 支持中文书籍音频上传到小宇宙播客平台
+- 读取中文Excel文件，获取待上传的书籍列表
+- 从 merge_book_audio.py 的输出中读取音频文件
+- 使用 generate_youtube_titles.py 的中文标题
+- 使用 generate_youtube_descriptions.py 的中文描述
+- 使用 generate_square_cover_zh.py 的方形封面
+- 支持设定音频间隔时间
+- 智能Tab管理：每次上传使用新tab，达到限制后等待并清理
+- 支持定时发布，时间格式：YYYY.MM.DD HH:MM（24小时制）
+- 发布时间限制：不超过13天（小宇宙限制）
+- 优化上传顺序：标题 → 描述 → 设定日期 → 上传音频 → 上传封面
+- 增强封面上传：优先使用SVG加号图标，备用单集封面区域点击
+- 更新Excel状态
+
+📥 输入信息:
+- Excel文件: excel/book-zh-xiaoyuzhou.xlsx (列名: UUID | 是否发布 | 发布时间)
+- 音频文件: {media_path}/books/zh/mp3/{uuid}.mp3
+- 封面文件: {media_path}/books/zh/square_cover/{uuid}.png 或 {uuid}.jpg
+- 标题信息: {media_path}/books/zh/youtube_titles/{uuid}.txt (由generate_youtube_titles.py --lang zh生成)
+- 描述文件: {media_path}/books/zh/youtube_description/{uuid}.txt
+
+📤 输出信息:
+- 小宇宙播客平台音频上传
+- 更新的Excel状态文件
+
+🔄 处理规则:
+1. 支持macOS（Intel和Apple Silicon）和Ubuntu系统
+2. 媒体路径配置：
+   - Intel Mac: /Volumes/dhl/audio
+   - Apple Silicon Mac: /Users/donghaoliu/Documents/audio
+   - Ubuntu: /media/dhl/audio
+3. 支持断点续传，跳过已上传的音频（是否发布=1）
+4. 自动排除以点开头的Mac系统文件
+5. 使用浏览器ID：k10i5y1s
+6. 平台URL：https://podcaster.xiaoyuzhoufm.com/podcasts/6865f2aa95ec18c5e6706091/create/episode
+7. 可设定音频上传间隔时间（默认12小时）
+8. 上传流程优化：标题 → 描述 → 设定日期（定时发布）→ 上传音频 → 上传封面（多重策略：SVG加号图标优先，单集封面区域备用）
+9. 每个步骤完成后sleep 2秒
+
+🔄 前置条件:
+# 需要先生成YouTube标题文件
+python generate_youtube_titles.py --lang zh            # 生成中文标题
+
+💡 使用示例:
+# 基础使用
+python upload_books_to_xiaoyuzhou.py                   # 默认12小时间隔
+python upload_books_to_xiaoyuzhou.py --interval 8      # 8小时间隔
+
+# Tab管理设置
+python upload_books_to_xiaoyuzhou.py --max-tabs 3 --wait-minutes 60    # 最多3个tab，等待60分钟
+
+# 限制数量
+python upload_books_to_xiaoyuzhou.py --max-count 5     # 限制5个音频
+
+# 试运行模式
+python upload_books_to_xiaoyuzhou.py --dry-run         # 查看待上传的书籍
+"""
+
+import os
+import sys
+import time
+import json
+import random
+import argparse
+import platform
+import urllib3
+import pandas as pd
+from datetime import datetime, timedelta
+from pathlib import Path
+from playwright.sync_api import sync_playwright
+from tqdm import tqdm
+from typing import Optional, Dict, List, Tuple
+
+# ============ 配置参数 ============
+# 小宇宙播客平台配置
+XIAOYUZHOU_URL = "https://podcaster.xiaoyuzhoufm.com/podcasts/6865f2aa95ec18c5e6706091/create/episode"
+ADSPOWER_BROWSER_ID = "k10i5y1s"
+
+# 页面元素选择器
+SELECTORS = {
+    "title_input": "#root > div.css-z5rur8.e169k0uu10 > div > div.css-zdzaty.e169k0uu10 > div.css-1ansy9r.e169k0uu10 > div.css-jv6rwp.e169k0uu10 > input",
+    "description_input": 'div[role="textbox"][contenteditable="true"]',
+    "audio_upload_container": "div",  # 包含音频上传input的容器
+    "audio_upload_input": 'input#upload[accept="audio/*"][type="file"]',
+    "schedule_button": "button",  # 定时发布按钮的详细选择器
+    "date_input": 'input[type="date"]',
+    "time_input": 'input[type="time"]',
+    "cover_upload_button": "button.css-qhis2c",
+}
+
+# 标题配置
+MAX_TITLE_LENGTH = 99
+TITLE_SUFFIX = " | 书籍总结"
+
+# 最小文件大小检查
+MIN_AUDIO_SIZE = 1024 * 1024 * 1  # 1MB
+MIN_COVER_SIZE = 1024 * 10  # 10KB
+MIN_INFO_SIZE = 100  # 100字节
+
+# 默认发布间隔
+DEFAULT_INTERVAL_HOURS = 12
+
+# 小宇宙发布时间限制（最多13天）
+MAX_PUBLISH_DAYS = 13
+
+# Excel文件路径
+EXCEL_FILE = "excel/book-zh-xiaoyuzhou.xlsx"
+
+
+def get_base_media_path():
+    """根据操作系统和芯片类型返回适当的媒体路径"""
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        # 检查芯片类型
+        arch = platform.machine()
+        if arch == "x86_64":  # Intel Mac
+            return "/Volumes/dhl/audio"
+        else:  # Apple Silicon (arm64)
+            return "/Users/donghaoliu/Documents/audio"
+    else:  # 默认为Linux/Ubuntu
+        return "/media/dhl/audio"
+
+
+def get_directories():
+    """获取所有相关目录路径"""
+    base_media_path = get_base_media_path()
+    books_path = os.path.join(base_media_path, "books", "zh")
+
+    return {
+        "audio": os.path.join(books_path, "mp3"),
+        "covers": os.path.join(books_path, "square_cover"),
+        "info": os.path.join(books_path, "info"),
+        "titles": os.path.join(books_path, "youtube_titles"),
+        "descriptions": os.path.join(books_path, "youtube_description"),
+        "excel": EXCEL_FILE,
+    }
+
+
+def check_supported_system():
+    """检查是否为支持的系统（macOS或Ubuntu）"""
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        return True
+    elif system == "Linux":  # Linux/Ubuntu
+        return True
+    else:
+        return False
+
+
+def is_valid_file(file_path: str, min_size: int = 1024) -> bool:
+    """
+    检查文件是否有效
+
+    Args:
+        file_path: 文件路径
+        min_size: 最小文件大小（字节）
+
+    Returns:
+        bool: 文件是否有效
+    """
+    if not os.path.exists(file_path):
+        return False
+
+    try:
+        file_size = os.path.getsize(file_path)
+        return file_size >= min_size
+    except Exception:
+        return False
+
+
+def countdown_timer(total_seconds, description="等待中"):
+    """
+    显示倒计时器
+
+    Args:
+        total_seconds: 等待总秒数
+        description: 等待描述
+    """
+    for remaining in range(total_seconds, 0, -1):
+        print(f"\r⏳ {description}: {remaining} 秒", end="", flush=True)
+        time.sleep(1)
+    print(f"\r✅ {description}: 完成" + " " * 20)
+
+
+def get_book_content(directories, uuid):
+    """获取书籍的所有内容（音频、标题、描述、封面）"""
+    print(f"📖 [UUID:{uuid[:8]}...] 获取书籍内容...")
+
+    # 检查MP3音频文件
+    mp3_path = os.path.join(directories["audio"], f"{uuid}.mp3")
+    if not is_valid_file(mp3_path, MIN_AUDIO_SIZE):
+        print(f"❌ [UUID:{uuid[:8]}...] MP3文件不存在或无效: {mp3_path}")
+        return None
+
+    # 检查标题文件（从youtube_titles目录）
+    title_path = os.path.join(directories["titles"], f"{uuid}.txt")
+    if not is_valid_file(title_path, MIN_INFO_SIZE):
+        print(f"❌ [UUID:{uuid[:8]}...] 标题文件不存在或无效: {title_path}")
+        print(f"💡 提示：请先运行 generate_youtube_titles.py --lang zh 生成标题文件")
+        return None
+
+    # 检查描述文件
+    desc_path = os.path.join(directories["descriptions"], f"{uuid}.txt")
+    if not is_valid_file(desc_path, MIN_INFO_SIZE):
+        print(f"❌ [UUID:{uuid[:8]}...] 描述文件不存在或无效: {desc_path}")
+        return None
+
+    # 检查封面文件（优先png，其次jpg）
+    cover_path_png = os.path.join(directories["covers"], f"{uuid}.png")
+    cover_path_jpg = os.path.join(directories["covers"], f"{uuid}.jpg")
+
+    cover_path = None
+    if is_valid_file(cover_path_png, MIN_COVER_SIZE):
+        cover_path = cover_path_png
+    elif is_valid_file(cover_path_jpg, MIN_COVER_SIZE):
+        cover_path = cover_path_jpg
+
+    if not cover_path:
+        print(
+            f"❌ [UUID:{uuid[:8]}...] 封面文件不存在或无效: {cover_path_png} 或 {cover_path_jpg}"
+        )
+        return None
+
+    # 读取标题（从youtube_titles目录的txt文件）
+    try:
+        with open(title_path, "r", encoding="utf-8") as f:
+            title = f.read().strip()
+        if not title:
+            print(f"❌ [UUID:{uuid[:8]}...] 标题文件为空")
+            return None
+    except Exception as e:
+        print(f"❌ [UUID:{uuid[:8]}...] 读取标题文件失败: {e}")
+        return None
+
+    # 读取描述
+    try:
+        with open(desc_path, "r", encoding="utf-8") as f:
+            description = f.read().strip()
+        if not description:
+            print(f"❌ [UUID:{uuid[:8]}...] 描述文件为空")
+            return None
+    except Exception as e:
+        print(f"❌ [UUID:{uuid[:8]}...] 读取描述文件失败: {e}")
+        return None
+
+    print(f"✅ [UUID:{uuid[:8]}...] 所有内容文件检查通过")
+    print(f"🎵 [UUID:{uuid[:8]}...] 音频文件: {os.path.basename(mp3_path)}")
+    print(f"📝 [UUID:{uuid[:8]}...] 标题: {title[:50]}...")
+    print(f"📄 [UUID:{uuid[:8]}...] 描述长度: {len(description)} 字符")
+    print(f"🖼️  [UUID:{uuid[:8]}...] 封面文件: {os.path.basename(cover_path)}")
+
+    return {
+        "uuid": uuid,
+        "mp3_path": mp3_path,
+        "title": title,
+        "description": description,
+        "cover_path": cover_path,
+        "valid": True,
+    }
+
+
+def format_publish_time_xiaoyuzhou(publish_time):
+    """格式化发布时间为小宇宙需要的格式: YYYY.MM.DD HH:MM"""
+    return publish_time.strftime("%Y.%m.%d %H:%M")
+
+
+def check_publish_time_limit(publish_time):
+    """检查发布时间是否在13天限制内"""
+    current_time = datetime.now()
+    days_diff = (publish_time - current_time).days
+
+    if days_diff > MAX_PUBLISH_DAYS:
+        print(f"❌ 发布时间超过{MAX_PUBLISH_DAYS}天限制: {days_diff}天")
+        return False
+    elif days_diff < 0:
+        print(f"❌ 发布时间不能早于当前时间")
+        return False
+    else:
+        print(f"✅ 发布时间检查通过: {days_diff}天内")
+        return True
+
+
+def upload_podcast_to_xiaoyuzhou(book_content, page, publish_time=None, dry_run=False):
+    """上传播客到小宇宙"""
+    if dry_run:
+        print(f"[试运行] 将要上传播客:")
+        print(f"  音频文件: {book_content['mp3_path']}")
+        print(f"  标题: {book_content['title']}")
+        print(f"  描述长度: {len(book_content['description'])} 字符")
+        print(f"  封面: {book_content['cover_path']}")
+        print(f"  计划发布时间: {publish_time}")
+        return True
+
+    if not book_content["valid"]:
+        print("❌ 播客内容无效，跳过上传")
+        return False
+
+    try:
+        # 导航到小宇宙播客创建页面
+        print(f"🌐 正在导航到小宇宙播客创建页面...")
+        page.goto(XIAOYUZHOU_URL)
+
+        # 等待页面加载
+        print("⏳ 等待页面加载...")
+        page.wait_for_load_state("domcontentloaded", timeout=15000)
+        page.wait_for_timeout(3000)
+
+        # 1. 输入标题
+        print("✏️  正在输入标题...")
+        title_input = page.locator(SELECTORS["title_input"])
+        page.wait_for_selector(SELECTORS["title_input"], state="visible", timeout=10000)
+        title_input.click()
+        title_input.fill(book_content["title"])
+        print(f"✅ 已输入标题: {book_content['title'][:50]}...")
+        page.wait_for_timeout(2000)
+
+        # 2. 输入描述
+        print("✏️  正在输入描述...")
+        try:
+            # 尝试多种方式定位描述输入框
+            desc_input = None
+
+            # 方法1：使用角色选择器，选择第二个textbox（第一个通常是标题）
+            try:
+                page.wait_for_selector(
+                    'div[role="textbox"]', state="visible", timeout=10000
+                )
+                desc_inputs = page.locator('div[role="textbox"]')
+                if desc_inputs.count() > 1:
+                    desc_input = desc_inputs.nth(1)  # 选择第二个textbox
+                    print("🎯 使用第二个textbox作为描述输入框")
+                else:
+                    desc_input = desc_inputs.first
+                    print("🎯 使用第一个textbox作为描述输入框")
+            except:
+                pass
+
+            # 方法2：如果上述方法失败，尝试使用更具体的选择器
+            if not desc_input:
+                try:
+                    desc_input = page.locator(
+                        'div[contenteditable="true"]:not(input)'
+                    ).nth(1)
+                    print("🎯 使用contenteditable div作为描述输入框")
+                except:
+                    pass
+
+            # 方法3：最后的备选方案
+            if not desc_input:
+                desc_input = page.locator(
+                    'div[role="textbox"][contenteditable="true"]'
+                ).first
+                print("🎯 使用备选选择器作为描述输入框")
+
+            # 执行输入操作
+            desc_input.click()
+            desc_input.fill(book_content["description"])
+            print("✅ 已输入描述")
+
+        except Exception as e:
+            print(f"❌ 输入描述失败: {e}")
+            print("🔍 尝试手动检查页面上的描述输入框")
+            # 这里不返回False，继续后续步骤
+
+        page.wait_for_timeout(2000)
+
+        # 3. 设置定时发布（优先设定日期）
+        if publish_time:
+            # 检查发布时间限制
+            if not check_publish_time_limit(publish_time):
+                print("❌ 发布时间不符合要求，退出上传")
+                return False
+
+            print(f"⏰ 正在设置定时发布...")
+            schedule_button = page.locator(SELECTORS["schedule_button"])
+            page.wait_for_selector(
+                SELECTORS["schedule_button"], state="visible", timeout=10000
+            )
+            schedule_button.click()
+            print("✅ 已点击定时发布选项")
+            page.wait_for_timeout(2000)
+
+            # 输入发布时间
+            time_str = format_publish_time_xiaoyuzhou(publish_time)
+            print(f"⏰ 正在输入发布时间: {time_str}")
+            time_input = page.locator(SELECTORS["time_input"])
+            page.wait_for_selector(
+                SELECTORS["time_input"], state="visible", timeout=10000
+            )
+            time_input.click()
+            time_input.fill(time_str)
+            print(f"✅ 已设置发布时间: {time_str}")
+            page.wait_for_timeout(2000)
+
+        # 4. 上传音频文件（在上传封面之前）
+        print(f"🎵 正在上传音频文件: {book_content['mp3_path']}")
+
+        # 等待音频上传输入框出现
+        page.wait_for_selector(
+            SELECTORS["audio_upload_input"], state="attached", timeout=10000
+        )
+
+        # 优先使用CDP方法上传大文件
+        cdp_upload_success = False
+        try:
+            cdp_session = page.context.new_cdp_session(page)
+            dom_snapshot = cdp_session.send("DOM.getDocument")
+            node_result = cdp_session.send(
+                "DOM.querySelector",
+                {
+                    "nodeId": dom_snapshot["root"]["nodeId"],
+                    "selector": SELECTORS["audio_upload_input"],
+                },
+            )
+
+            if node_result.get("nodeId"):
+                cdp_session.send(
+                    "DOM.setFileInputFiles",
+                    {
+                        "nodeId": node_result["nodeId"],
+                        "files": [book_content["mp3_path"]],
+                    },
+                )
+                cdp_session.detach()
+                print("✅ 音频文件上传开始（CDP方法）")
+                cdp_upload_success = True
+            else:
+                raise Exception("CDP方法失败")
+
+        except Exception as cdp_error:
+            print(f"⚠️ CDP上传失败: {cdp_error}")
+            # 回退到标准方法
+            try:
+                audio_input = page.locator(SELECTORS["audio_upload_input"])
+                audio_input.set_input_files(book_content["mp3_path"])
+                print("✅ 音频文件上传开始（标准方法）")
+            except Exception as standard_error:
+                print(f"❌ 标准上传方法也失败: {standard_error}")
+                return False
+
+        # 简化的上传进度等待逻辑
+        print("⏳ 等待音频上传完成...")
+        try:
+            # 检查是否有上传进度相关的元素
+            has_upload_progress = False
+
+            # 等待一小段时间让上传开始
+            page.wait_for_timeout(3000)
+
+            # 检查页面上是否有"上传进度"相关的文本
+            upload_elements = page.get_by_text("上传进度", exact=False)
+            if upload_elements.count() > 0:
+                has_upload_progress = True
+                print("📊 检测到上传进度元素，开始等待上传完成...")
+
+                # 简单的轮询等待策略：每5秒检查一次是否还有上传进度
+                max_wait_time = 120  # 最多等待2分钟
+                wait_count = 0
+
+                while wait_count < max_wait_time and upload_elements.count() > 0:
+                    page.wait_for_timeout(5000)  # 等待5秒
+                    wait_count += 5
+                    upload_elements = page.get_by_text("上传进度", exact=False)
+                    print(f"⏳ 仍在上传中... (已等待 {wait_count} 秒)")
+
+                if upload_elements.count() == 0:
+                    print("✅ 上传进度完成")
+                else:
+                    print("⚠️ 上传等待超时，继续后续步骤")
+            else:
+                print("📊 未检测到上传进度元素，可能上传很快完成")
+
+            # 上传完成后额外等待
+            print("⏳ 等待5秒进行后续处理...")
+            page.wait_for_timeout(5000)
+            print("✅ 音频文件上传处理完成")
+
+        except Exception as e:
+            print(f"⚠️ 等待上传进度时出现异常: {e}")
+            print("⏳ 使用备用等待策略...")
+            page.wait_for_timeout(20000)  # 备用等待20秒
+
+        # 5. 上传封面（最后步骤）
+        if book_content.get("cover_path") and os.path.exists(
+            book_content["cover_path"]
+        ):
+            cover_path = book_content["cover_path"]
+            print(f"🎨 正在上传单集封面: {cover_path}")
+
+            try:
+                # 尝试多种方式找到触发文件选择器的元素
+                print("🔍 查找封面上传触发元素...")
+
+                # 多种可能的选择器策略
+                upload_selectors = [
+                    # 优先尝试点击path元素（加号图标）- 这个是覆盖层元素
+                    'path[d="M9 16h14M16 9v14"]',
+                    'path[stroke-width="2"]',
+                    # SVG容器元素（推荐方案：点击父容器）
+                    'svg:has(circle[cx="16"][cy="16"])',
+                    'svg:has(path[d="M9 16h14M16 9v14"])',
+                    # 包含加号图标的div容器
+                    'div:has(svg:has(circle[cx="16"][cy="16"]))',
+                    # SVG圆形元素（最后尝试，可能被拦截）
+                    'circle[cx="16"][cy="16"][r="16"]',
+                    'svg circle[cx="16"][cy="16"]',
+                    # 包含上传文本的元素
+                    'text:has-text("点击上传封面")',
+                    'div:has-text("点击上传封面")',
+                    'span:has-text("点击上传封面")',
+                    # SVG元素本身
+                    'svg[viewBox*="0 0 32 32"]',
+                    "svg:has(circle)",
+                    # 可能的按钮或区域
+                    '[role="button"]:has(svg)',
+                    'div[style*="cursor: pointer"]:has(svg)',
+                    # 通用的可点击区域
+                    ".upload-area",
+                    ".cover-upload",
+                ]
+
+                upload_success = False
+
+                for selector in upload_selectors:
+                    try:
+                        print(f"🎯 尝试选择器: {selector}")
+                        upload_element = page.locator(selector)
+
+                        if upload_element.count() > 0:
+                            print(f"✅ 找到触发元素，准备监听文件选择器...")
+
+                            # 使用 expect_file_chooser 监听文件选择器弹出
+                            with page.expect_file_chooser(timeout=10000) as fc_info:
+                                # 优先使用强制点击，忽略覆盖元素
+                                try:
+                                    # 方法1：使用force点击忽略拦截
+                                    upload_element.first.click(force=True)
+                                    print("📂 已强制点击触发元素...")
+                                except Exception as force_error:
+                                    print(f"⚠️ 强制点击失败: {force_error}")
+                                    # 方法2：普通点击
+                                    upload_element.first.click()
+                                    print("📂 已点击触发元素...")
+
+                            # 获取文件选择器并设置文件
+                            file_chooser = fc_info.value
+                            file_chooser.set_files(cover_path)
+                            print("✅ 成功通过文件选择器上传封面文件")
+
+                            upload_success = True
+                            break
+
+                    except Exception as selector_error:
+                        print(f"⚠️ 选择器 {selector} 失败: {selector_error}")
+                        continue
+
+                if not upload_success:
+                    print("❌ 所有选择器都失败，尝试JavaScript强制点击方法...")
+
+                    # 最后的备选方案：使用JavaScript强制点击
+                    try:
+                        print("🔍 尝试JavaScript强制点击...")
+
+                        # 方法1：JavaScript查找并点击SVG容器
+                        js_click_script = """
+                        () => {
+                            // 查找包含加号图标的SVG元素
+                            const svgElements = document.querySelectorAll('svg');
+                            for (const svg of svgElements) {
+                                const circle = svg.querySelector('circle[cx="16"][cy="16"]');
+                                const path = svg.querySelector('path[d="M9 16h14M16 9v14"]');
+                                if (circle && path) {
+                                    console.log('Found target SVG with circle and path');
+                                    svg.click();
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }
+                        """
+
+                        # 监听文件选择器并执行JavaScript点击
+                        with page.expect_file_chooser(timeout=10000) as fc_info:
+                            result = page.evaluate(js_click_script)
+                            if result:
+                                print("✅ JavaScript点击成功")
+                            else:
+                                print("❌ JavaScript点击失败")
+                                raise Exception("JavaScript点击没有找到目标元素")
+
+                        # 获取文件选择器并设置文件
+                        file_chooser = fc_info.value
+                        file_chooser.set_files(cover_path)
+                        print("✅ 成功通过JavaScript方法上传封面文件")
+                        upload_success = True
+
+                    except Exception as js_error:
+                        print(f"⚠️ JavaScript方法失败: {js_error}")
+
+                        # 方法2：直接查找所有可能的父容器
+                        try:
+                            print("🔍 查找所有可能的父容器...")
+
+                            # 查找所有包含SVG的div元素
+                            container_selectors = [
+                                "div:has(svg:has(circle))",
+                                "div:has(svg:has(path))",
+                                "button:has(svg)",
+                                '[data-testid*="upload"]',
+                                '[class*="upload"]',
+                                '[class*="cover"]',
+                            ]
+
+                            for container_selector in container_selectors:
+                                try:
+                                    containers = page.locator(container_selector)
+                                    if containers.count() > 0:
+                                        print(
+                                            f"🎯 尝试容器选择器: {container_selector}"
+                                        )
+
+                                        with page.expect_file_chooser(
+                                            timeout=5000
+                                        ) as fc_info:
+                                            containers.first.click(force=True)
+                                            print(f"✅ 容器点击成功")
+
+                                        file_chooser = fc_info.value
+                                        file_chooser.set_files(cover_path)
+                                        print("✅ 成功通过容器方法上传封面文件")
+                                        upload_success = True
+                                        break
+
+                                except Exception:
+                                    continue
+
+                        except Exception as container_error:
+                            print(f"⚠️ 容器方法失败: {container_error}")
+
+                        if not upload_success:
+                            # 最终备选方案：查找所有可见的SVG元素并尝试点击
+                            try:
+                                print("🔍 查找所有可见SVG元素...")
+                                svg_elements = page.locator("svg:visible")
+                                print(f"📊 找到 {svg_elements.count()} 个可见SVG元素")
+
+                                for i in range(
+                                    min(svg_elements.count(), 5)
+                                ):  # 最多尝试5个
+                                    try:
+                                        svg_element = svg_elements.nth(i)
+                                        print(f"🎯 尝试第 {i+1} 个SVG元素...")
+
+                                        with page.expect_file_chooser(
+                                            timeout=3000
+                                        ) as fc_info:
+                                            # 先尝试强制点击，再尝试普通点击
+                                            try:
+                                                svg_element.click(force=True)
+                                                print(
+                                                    f"📂 强制点击了第 {i+1} 个SVG元素"
+                                                )
+                                            except:
+                                                svg_element.click()
+                                                print(f"📂 点击了第 {i+1} 个SVG元素")
+
+                                        # 如果成功触发文件选择器
+                                        file_chooser = fc_info.value
+                                        file_chooser.set_files(cover_path)
+                                        print("✅ 成功通过SVG元素上传封面文件")
+                                        upload_success = True
+                                        break
+
+                                    except Exception:
+                                        # 这个SVG元素不是文件上传触发器，继续尝试下一个
+                                        continue
+
+                            except Exception as svg_error:
+                                print(f"⚠️ SVG通用方法失败: {svg_error}")
+
+                if upload_success:
+                    # 等待上传处理
+                    print("⏳ 等待封面上传处理...")
+                    page.wait_for_timeout(3000)
+
+                    # 查找并点击裁剪/确认按钮
+                    print("✂️ 查找裁剪或确认按钮...")
+                    crop_selectors = [
+                        'div[data-type="primary"].css-k4ekfx.e169k0uu3[style*="width: 180px"]',
+                        'button:has-text("确认")',
+                        'button:has-text("保存")',
+                        'button:has-text("裁剪")',
+                        'button:has-text("完成")',
+                        'div[data-type="primary"]:has-text("确认")',
+                        'div[data-type="primary"]:has-text("保存")',
+                    ]
+
+                    crop_success = False
+                    for crop_selector in crop_selectors:
+                        try:
+                            crop_button = page.locator(crop_selector)
+                            if (
+                                crop_button.count() > 0
+                                and crop_button.first.is_visible()
+                            ):
+                                crop_button.first.click()
+                                print(f"✅ 已点击确认按钮: {crop_selector}")
+                                crop_success = True
+                                break
+                        except Exception:
+                            continue
+
+                    if crop_success:
+                        # 等待裁剪处理完成
+                        print("⏰ 等待裁剪处理完成...")
+                        countdown_timer(8, "裁剪处理等待")
+                    else:
+                        print("⚠️ 未找到确认按钮，封面可能已自动保存")
+                        page.wait_for_timeout(3000)
+
+                    print("✅ 单集封面上传和处理完成")
+                else:
+                    print("❌ 无法找到封面上传触发元素")
+
+            except Exception as e:
+                print(f"⚠️ 单集封面上传失败: {e}")
+                import traceback
+
+                print(f"🔍 错误详情: {traceback.format_exc()}")
+
+        else:
+            print("⚠️ 未找到封面文件，跳过封面上传")
+
+        # 6. 最终发布或保存
+        print("📤 正在确认发布...")
+        # 小宇宙可能有发布/保存按钮，需要点击完成
+        try:
+            # 尝试查找发布或保存按钮
+            publish_buttons = [
+                "button:has-text('发布')",
+                "button:has-text('保存')",
+                "button:has-text('确认')",
+                "button:has-text('提交')",
+            ]
+
+            for button_selector in publish_buttons:
+                try:
+                    if page.locator(button_selector).count() > 0:
+                        page.locator(button_selector).click()
+                        print(f"✅ 已点击按钮: {button_selector}")
+                        break
+                except:
+                    continue
+
+            page.wait_for_timeout(3000)
+            print("✅ 播客上传流程完成")
+            return True
+
+        except Exception as e:
+            print(f"⚠️  最终确认步骤出错: {e}")
+            print("✅ 播客内容已填写完成，可能需要手动确认")
+            return True
+
+    except Exception as e:
+        print(f"❌ 上传播客时出错: {e}")
+        return False
+
+
+def update_excel_status(directories, book_info, publish_time):
+    """更新Excel中的发布状态"""
+    excel_file = directories["excel"]
+    uuid = book_info["uuid"]
+
+    print(f"📝 开始更新Excel状态: {uuid}")
+
+    try:
+        # 读取当前数据
+        df = pd.read_excel(excel_file)
+
+        # 查找对应的行
+        # 假设第一列是UUID
+        mask = df.iloc[:, 0] == uuid
+
+        if not mask.any():
+            print(f"❌ 在Excel中未找到UUID记录: {uuid}")
+            return False
+
+        # 更新状态（使用中文列名）
+        df.loc[mask, "是否发布"] = 1
+        df.loc[mask, "发布时间"] = publish_time.strftime("%Y-%m-%d %H:%M:%S")
+
+        # 保存更新后的数据
+        df.to_excel(excel_file, index=False)
+        print(f"✅ Excel状态更新成功")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ 更新Excel状态时出错: {e}")
+        return False
+
+
+class XiaoyuzhouPodcastUploader:
+    """小宇宙播客上传器"""
+
+    def __init__(
+        self, interval_hours=DEFAULT_INTERVAL_HOURS, max_tabs=3, wait_minutes=60
+    ):
+        """
+        初始化小宇宙播客上传器
+
+        Args:
+            interval_hours: 音频上传间隔小时数
+            max_tabs: 最大tab数量
+            wait_minutes: 达到tab限制时的等待时间（分钟）
+        """
+        self.interval_hours = interval_hours
+        self.max_tabs = max_tabs
+        self.wait_minutes = wait_minutes
+
+        # 获取目录配置
+        self.dirs = get_directories()
+        self.base_media_path = get_base_media_path()
+
+        # AdsPower和浏览器配置
+        self.browser_id = ADSPOWER_BROWSER_ID
+        self.url = XIAOYUZHOU_URL
+
+        # 浏览器实例
+        self.browser = None
+        self.context = None
+        self.current_tabs = []
+
+        print(f"🎙️ 小宇宙播客上传器已初始化")
+        print(f"📁 媒体根目录: {self.base_media_path}")
+        print(f"⏰ 上传间隔: {self.interval_hours} 小时")
+        print(f"📱 最大tab数量: {self.max_tabs}")
+        print(f"⏳ tab等待时间: {self.wait_minutes} 分钟")
+
+    def load_book_info(self, uuid: str) -> Optional[Dict]:
+        """
+        加载书籍信息
+
+        Args:
+            uuid: 书籍UUID
+
+        Returns:
+            Optional[Dict]: 书籍信息字典或None
+        """
+        info_file = os.path.join(self.dirs["info"], f"{uuid}.json")
+
+        if not is_valid_file(info_file, MIN_INFO_SIZE):
+            print(f"❌ 书籍信息文件无效: {info_file}")
+            return None
+
+        try:
+            with open(info_file, "r", encoding="utf-8") as f:
+                book_info = json.load(f)
+                book_info["uuid"] = uuid
+                return book_info
+        except Exception as e:
+            print(f"❌ 读取书籍信息失败 {uuid}: {e}")
+            return None
+
+    def get_youtube_title(self, uuid: str) -> str:
+        """
+        从youtube_titles目录读取YouTube标题
+
+        Args:
+            uuid: 书籍UUID
+
+        Returns:
+            str: YouTube标题，如果读取失败返回None
+        """
+        title_file = os.path.join(self.dirs["titles"], f"{uuid}.txt")
+
+        if not is_valid_file(title_file, 10):
+            print(f"❌ YouTube标题文件不存在或无效: {title_file}")
+            print(
+                f"💡 提示：请先运行 generate_youtube_titles.py --lang zh 生成标题文件"
+            )
+            return None
+
+        try:
+            with open(title_file, "r", encoding="utf-8") as f:
+                title = f.read().strip()
+                if not title:
+                    print(f"❌ YouTube标题文件为空: {title_file}")
+                    return None
+                return title
+        except Exception as e:
+            print(f"❌ 读取YouTube标题文件失败 {uuid}: {e}")
+            return None
+
+    def get_book_description(self, uuid: str) -> str:
+        """
+        获取书籍描述
+
+        Args:
+            uuid: 书籍UUID
+
+        Returns:
+            str: 书籍描述
+        """
+        desc_file = os.path.join(self.dirs["descriptions"], f"{uuid}.txt")
+
+        if not is_valid_file(desc_file, 50):
+            print(f"⚠️ 描述文件不存在或无效: {desc_file}")
+            return "书籍音频总结"
+
+        try:
+            with open(desc_file, "r", encoding="utf-8") as f:
+                description = f.read().strip()
+                return description if description else "书籍音频总结"
+        except Exception as e:
+            print(f"⚠️ 读取描述文件失败 {uuid}: {e}")
+            return "书籍音频总结"
+
+    def get_book_content(self, book_info):
+        """
+        获取书籍相关内容
+
+        Args:
+            book_info: 书籍信息字典
+
+        Returns:
+            dict: 包含所有内容的字典
+        """
+        uuid = book_info["uuid"]
+
+        # 音频文件路径
+        audio_path = os.path.join(self.dirs["audio"], f"{uuid}.mp3")
+
+        # 封面文件路径（优先png，其次jpg）
+        cover_path_png = os.path.join(self.dirs["covers"], f"{uuid}.png")
+        cover_path_jpg = os.path.join(self.dirs["covers"], f"{uuid}.jpg")
+
+        cover_path = None
+        if is_valid_file(cover_path_png, MIN_COVER_SIZE):
+            cover_path = cover_path_png
+        elif is_valid_file(cover_path_jpg, MIN_COVER_SIZE):
+            cover_path = cover_path_jpg
+
+        # 从youtube_titles目录读取标题
+        title = self.get_youtube_title(uuid)
+        description = self.get_book_description(uuid)
+
+        # 验证音频文件
+        audio_valid = is_valid_file(audio_path, MIN_AUDIO_SIZE)
+
+        return {
+            "uuid": uuid,
+            "title": title,
+            "description": description,
+            "audio_path": audio_path,
+            "cover_path": cover_path,
+            "valid": audio_valid and title is not None,
+            "book_info": book_info,
+        }
+
+    def get_adspower_info(self):
+        """获取AdsPower浏览器信息"""
+        open_url = f"http://local.adspower.net:50325/api/v1/browser/start?user_id={self.browser_id}"
+
+        self.http = urllib3.PoolManager()
+
+        print("🔌 正在连接AdsPower...")
+        r = self.http.request("GET", open_url)
+
+        if r.status != 200:
+            print(f"❌ API返回状态码 {r.status}")
+            return None, None
+
+        resp = json.loads(r.data.decode("utf-8"))
+
+        if resp["code"] != 0:
+            print(f"❌ 错误: {resp['msg']}")
+            return None, None
+
+        ws_endpoint = resp["data"]["ws"]["puppeteer"]
+        debug_port = resp["data"]["debug_port"]
+        remote_debugging_url = f"http://localhost:{debug_port}"
+
+        print(f"✅ 成功连接AdsPower")
+        return ws_endpoint, remote_debugging_url
+
+    def initialize_browser(self, max_retries=3):
+        """初始化浏览器连接"""
+        print("🔄 正在初始化浏览器...")
+
+        for attempt in range(max_retries):
+            print(f"📡 尝试连接浏览器 (第 {attempt + 1}/{max_retries} 次)...")
+
+            # 连接AdsPower
+            ws_endpoint, remote_debugging_url = self.get_adspower_info()
+            if not ws_endpoint:
+                if attempt < max_retries - 1:
+                    countdown_timer(5, "等待重试")
+                    continue
+                else:
+                    return None, None, None
+
+            playwright = None
+            try:
+                playwright = sync_playwright().start()
+                browser = playwright.chromium.connect_over_cdp(
+                    remote_debugging_url, timeout=15000
+                )
+
+                if not browser.contexts:
+                    context = browser.new_context()
+                    print("📝 创建了新的浏览器上下文")
+                else:
+                    context = browser.contexts[0]
+                    print("📝 使用现有的浏览器上下文")
+
+                # 保存上下文引用
+                self.context = context
+
+                # 关闭现有tab
+                existing_pages = context.pages
+                for page in existing_pages:
+                    try:
+                        page.close()
+                    except:
+                        pass
+
+                # 创建新tab
+                new_page = context.new_page()
+                self.current_tabs = [new_page]
+
+                return playwright, browser, new_page
+
+            except Exception as e:
+                print(f"❌ 浏览器连接失败 (第 {attempt + 1} 次): {e}")
+                if playwright:
+                    try:
+                        playwright.stop()
+                    except:
+                        pass
+
+                if attempt < max_retries - 1:
+                    countdown_timer(10, "等待重试")
+                    continue
+
+        return None, None, None
+
+    def create_new_tab_for_upload(self):
+        """创建新的tab用于上传"""
+        try:
+            page = self.context.new_page()
+            self.current_tabs.append(page)
+            print(f"📱 创建新tab，当前tab数量: {len(self.current_tabs)}")
+            return page
+        except Exception as e:
+            print(f"❌ 创建新tab失败: {e}")
+            return None
+
+    def check_and_wait_for_tab_limit(self):
+        """检查tab数量限制，必要时等待并清理"""
+        if len(self.current_tabs) >= self.max_tabs:
+            print(f"⚠️ 达到tab限制 ({self.max_tabs})，开始等待...")
+            countdown_timer(self.wait_minutes * 60, f"等待{self.wait_minutes}分钟")
+
+            # 清理现有tabs
+            print("🧹 清理现有tabs...")
+            for page in self.current_tabs:
+                try:
+                    page.close()
+                except:
+                    pass
+
+            self.current_tabs = []
+            print("✅ 清理完成，可以继续创建新tabs")
+
+    def cleanup_closed_tabs(self):
+        """清理已关闭的tabs"""
+        active_tabs = []
+        for page in self.current_tabs:
+            try:
+                # 尝试访问页面属性来检查是否仍然活跃
+                _ = page.url
+                active_tabs.append(page)
+            except:
+                # 页面已关闭或无法访问
+                pass
+
+        self.current_tabs = active_tabs
+
+    def calculate_next_publish_time(self):
+        """计算下一个发布时间"""
+        try:
+            # 读取Excel文件
+            excel_path = os.path.join(os.getcwd(), self.dirs["excel"])
+            if not os.path.exists(excel_path):
+                print(f"⚠️ Excel文件不存在: {excel_path}")
+                # 返回当前时间加间隔
+                return datetime.now() + timedelta(hours=self.interval_hours)
+
+            df = pd.read_excel(excel_path)
+
+            # 筛选已发布的记录
+            published_df = df[df["是否发布"] == 1]
+
+            if published_df.empty:
+                # 如果没有已发布的记录，从当前时间开始
+                next_time = datetime.now() + timedelta(hours=self.interval_hours)
+            else:
+                # 找到最新的发布时间
+                latest_publish_time = published_df["发布时间"].max()
+
+                if pd.isna(latest_publish_time):
+                    next_time = datetime.now() + timedelta(hours=self.interval_hours)
+                else:
+                    # 转换为datetime对象
+                    if isinstance(latest_publish_time, str):
+                        latest_time = pd.to_datetime(latest_publish_time)
+                    else:
+                        latest_time = latest_publish_time
+
+                    # 计算下一个发布时间
+                    next_time = latest_time + timedelta(hours=self.interval_hours)
+
+                    # 确保不早于当前时间
+                    if next_time <= datetime.now():
+                        next_time = datetime.now() + timedelta(
+                            hours=self.interval_hours
+                        )
+
+            # 检查是否超过13天限制
+            max_future_time = datetime.now() + timedelta(days=MAX_PUBLISH_DAYS)
+            if next_time > max_future_time:
+                print(f"⚠️ 计算的发布时间超过13天限制，调整为最大允许时间")
+                next_time = max_future_time
+
+            return next_time
+
+        except Exception as e:
+            print(f"❌ 计算发布时间失败: {e}")
+            return datetime.now() + timedelta(hours=self.interval_hours)
+
+    def get_pending_books(self):
+        """获取待上传的书籍列表"""
+        try:
+            excel_path = os.path.join(os.getcwd(), self.dirs["excel"])
+            if not os.path.exists(excel_path):
+                print(f"❌ Excel文件不存在: {excel_path}")
+                return []
+
+            # 读取Excel文件
+            df = pd.read_excel(excel_path)
+
+            # 检查必要的列
+            required_columns = ["UUID", "是否发布", "发布时间"]
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                print(f"❌ Excel文件缺少必要列: {missing_columns}")
+                return []
+
+            # 筛选未发布的书籍
+            pending_df = df[df["是否发布"] != 1]
+            pending_books = []
+
+            for _, row in pending_df.iterrows():
+                uuid = str(row["UUID"]).strip()
+
+                # 排除以点开头的文件（Mac系统文件）
+                if uuid.startswith("."):
+                    continue
+
+                # 加载书籍信息
+                book_info = self.load_book_info(uuid)
+                if book_info:
+                    pending_books.append(
+                        {"uuid": uuid, "book_info": book_info, "excel_row": row}
+                    )
+
+            print(f"📊 找到 {len(pending_books)} 个待上传的书籍")
+            return pending_books
+
+        except Exception as e:
+            print(f"❌ 读取待上传书籍列表失败: {e}")
+            return []
+
+    def upload_audio_to_xiaoyuzhou(
+        self, audio_content, page, publish_time=None, dry_run=False
+    ):
+        """
+        上传音频到小宇宙播客平台
+
+        Args:
+            audio_content: 音频内容字典
+            page: 页面对象
+            publish_time: 发布时间
+            dry_run: 是否为试运行
+
+        Returns:
+            bool: 上传是否成功
+        """
+        if dry_run:
+            print(f"[试运行] 将要上传音频:")
+            print(f"  文件: {audio_content['audio_path']}")
+            print(f"  标题: {audio_content['title']}")
+            print(f"  描述长度: {len(audio_content['description'])} 字符")
+            print(f"  封面: {audio_content['cover_path'] or '无'}")
+            print(f"  计划发布时间: {publish_time}")
+            return True
+
+        if not audio_content["valid"]:
+            print("❌ 音频内容无效，跳过上传")
+            return False
+
+        try:
+            # 导航到小宇宙播客页面
+            print(f"🌐 正在导航到小宇宙播客页面...")
+            page.goto(self.url)
+
+            # 等待页面加载
+            print("⏳ 等待页面加载...")
+            page.wait_for_load_state("domcontentloaded", timeout=15000)
+            time.sleep(2)
+
+            # 1. 输入标题
+            print("✏️ 正在输入标题...")
+            try:
+                page.wait_for_selector(
+                    SELECTORS["title_input"], state="visible", timeout=10000
+                )
+                title_input = page.locator(SELECTORS["title_input"])
+                title_input.click()
+                title_input.fill(audio_content["title"])
+                print(f"✅ 已输入标题: {audio_content['title']}")
+            except Exception as e:
+                print(f"❌ 输入标题失败: {e}")
+                return False
+
+            time.sleep(2)
+
+            # 2. 输入描述
+            print("✏️ 正在输入描述...")
+            try:
+                # 尝试多种方式定位描述输入框
+                desc_input = None
+
+                # 方法1：使用角色选择器，选择第二个textbox（第一个通常是标题）
+                try:
+                    page.wait_for_selector(
+                        'div[role="textbox"]', state="visible", timeout=10000
+                    )
+                    desc_inputs = page.locator('div[role="textbox"]')
+                    if desc_inputs.count() > 1:
+                        desc_input = desc_inputs.nth(1)  # 选择第二个textbox
+                        print("🎯 使用第二个textbox作为描述输入框")
+                    else:
+                        desc_input = desc_inputs.first
+                        print("🎯 使用第一个textbox作为描述输入框")
+                except:
+                    pass
+
+                # 方法2：如果上述方法失败，尝试使用更具体的选择器
+                if not desc_input:
+                    try:
+                        desc_input = page.locator(
+                            'div[contenteditable="true"]:not(input)'
+                        ).nth(1)
+                        print("🎯 使用contenteditable div作为描述输入框")
+                    except:
+                        pass
+
+                # 方法3：最后的备选方案，使用原始选择器的第一个元素
+                if not desc_input:
+                    desc_input = page.locator(
+                        'div[role="textbox"][contenteditable="true"]'
+                    ).first
+                    print("🎯 使用备选选择器作为描述输入框")
+
+                # 执行输入操作
+                desc_input.click()
+                desc_input.fill(audio_content["description"])
+                print("✅ 已输入描述")
+
+            except Exception as e:
+                print(f"❌ 输入描述失败: {e}")
+                print("🔍 尝试手动检查页面上的描述输入框")
+                return False
+
+            time.sleep(2)
+
+            # 3. 设置定时发布（优先设定日期）
+            if publish_time:
+                print("⏰ 正在设置定时发布...")
+                try:
+                    # 检查发布时间是否在13天限制内
+                    max_future_time = datetime.now() + timedelta(days=MAX_PUBLISH_DAYS)
+                    if publish_time > max_future_time:
+                        print(f"⚠️ 发布时间超过13天限制，调整为最大允许时间")
+                        publish_time = max_future_time
+
+                    # 1. 点击定时发布选项
+                    print("📅 点击定时发布选项...")
+                    schedule_button = page.locator("div.css-qas7iz.e169k0uu10").filter(
+                        has_text="定时发布"
+                    )
+                    if schedule_button.count() > 0:
+                        schedule_button.first.click()
+                        print("✅ 已点击定时发布选项")
+                        page.wait_for_timeout(1000)
+                    else:
+                        print("❌ 未找到定时发布按钮")
+                        return False
+
+                    # 2. 点击"选择时间"按钮
+                    print("⏰ 点击选择时间按钮...")
+                    choose_time_button = page.locator("span").filter(
+                        has_text="选择时间"
+                    )
+                    if choose_time_button.count() > 0:
+                        choose_time_button.first.click()
+                        print("✅ 已点击选择时间按钮")
+                        # 等待2秒让时间选择器完全加载
+                        print("⏳ 等待时间选择器加载...")
+                        page.wait_for_timeout(2000)
+                    else:
+                        print("❌ 未找到选择时间按钮")
+                        return False
+
+                        # 3. 进行时间选择
+                    print("📅 准备进行时间选择...")
+                    # 再等待2秒确保时间选择器完全可用
+                    print("⏳ 等待2秒进行时间选择...")
+                    page.wait_for_timeout(2000)
+
+                    # React DatePicker时间设置逻辑
+                    try:
+                        print("📅 等待React DatePicker加载...")
+                        # 等待react-datepicker出现
+                        page.wait_for_selector(
+                            ".react-datepicker", state="visible", timeout=10000
+                        )
+                        print("✅ React DatePicker已加载")
+
+                        # 计算目标日期和时间
+                        target_day = publish_time.day
+                        target_hour = publish_time.hour
+                        target_minute = publish_time.minute
+
+                        # 时间格式化为HH:MM或HH:30格式（小宇宙只支持30分钟间隔）
+                        if target_minute < 15:
+                            time_str = f"{target_hour:02d}:00"
+                        elif target_minute < 45:
+                            time_str = f"{target_hour:02d}:30"
+                        else:
+                            # 如果分钟数大于45，向上取整到下一小时
+                            next_hour = (target_hour + 1) % 24
+                            time_str = f"{next_hour:02d}:00"
+
+                        print(
+                            f"🎯 目标发布时间: {publish_time.strftime('%Y-%m-%d %H:%M')}"
+                        )
+                        print(
+                            f"🎯 调整后时间: {publish_time.strftime('%Y-%m-%d')} {time_str}"
+                        )
+
+                        # 1. 选择日期
+                        print(f"📅 选择日期: {target_day}号...")
+
+                        # 找到对应日期的元素（非disabled的）
+                        day_selector = f".react-datepicker__day--{target_day:03d}:not(.react-datepicker__day--disabled)"
+                        day_elements = page.locator(day_selector)
+
+                        if day_elements.count() > 0:
+                            day_elements.first.click()
+                            print(f"✅ 已选择日期: {target_day}号")
+                            page.wait_for_timeout(1000)
+                        else:
+                            # 如果目标日期不可用，找下一个可用日期
+                            print(f"⚠️ {target_day}号不可用，寻找下一个可用日期...")
+                            available_days = page.locator(
+                                ".react-datepicker__day:not(.react-datepicker__day--disabled):not(.react-datepicker__day--outside-month)"
+                            )
+                            if available_days.count() > 0:
+                                available_days.first.click()
+                                selected_day = available_days.first.inner_text()
+                                print(f"✅ 已选择下一个可用日期: {selected_day}号")
+                                page.wait_for_timeout(1000)
+                            else:
+                                print("❌ 没有找到可用的日期")
+                                return False
+
+                        # 2. 选择时间
+                        print(f"⏰ 选择时间: {time_str}...")
+
+                        # 找到对应时间的元素（非disabled的）
+                        time_selector = f'.react-datepicker__time-list-item:not(.react-datepicker__time-list-item--disabled):has-text("{time_str}")'
+                        time_elements = page.locator(time_selector)
+
+                        if time_elements.count() > 0:
+                            # 需要滚动到时间元素可见
+                            time_elements.first.scroll_into_view_if_needed()
+                            page.wait_for_timeout(500)
+                            time_elements.first.click()
+                            print(f"✅ 已选择时间: {time_str}")
+                            page.wait_for_timeout(1000)
+                        else:
+                            # 如果目标时间不可用，找下一个可用时间
+                            print(f"⚠️ {time_str}不可用，寻找下一个可用时间...")
+                            available_times = page.locator(
+                                ".react-datepicker__time-list-item:not(.react-datepicker__time-list-item--disabled)"
+                            )
+                            if available_times.count() > 0:
+                                # 找到第一个比目标时间晚的可用时间
+                                for i in range(available_times.count()):
+                                    time_element = available_times.nth(i)
+                                    time_text = time_element.locator("div").inner_text()
+                                    if time_text >= time_str:
+                                        time_element.scroll_into_view_if_needed()
+                                        page.wait_for_timeout(500)
+                                        time_element.click()
+                                        print(f"✅ 已选择下一个可用时间: {time_text}")
+                                        page.wait_for_timeout(1000)
+                                        break
+                                else:
+                                    # 如果没有找到更晚的时间，选择第一个可用时间
+                                    first_time = available_times.first
+                                    first_time.scroll_into_view_if_needed()
+                                    page.wait_for_timeout(500)
+                                    first_time.click()
+                                    selected_time = first_time.locator(
+                                        "div"
+                                    ).inner_text()
+                                    print(f"✅ 已选择第一个可用时间: {selected_time}")
+                                    page.wait_for_timeout(1000)
+                            else:
+                                print("❌ 没有找到可用的时间")
+                                return False
+
+                        # 3. 确认时间选择（可能需要点击确认按钮或者点击其他地方关闭选择器）
+                        print("✅ 时间选择完成，等待选择器关闭...")
+                        page.wait_for_timeout(2000)
+
+                        # 尝试点击页面其他地方关闭时间选择器
+                        try:
+                            # 点击页面标题区域来关闭时间选择器
+                            page.locator("body").click()
+                            page.wait_for_timeout(1000)
+                        except:
+                            pass
+
+                        print(f"✅ 定时发布设置完成")
+
+                    except Exception as datetime_error:
+                        print(f"❌ 设置日期时间失败: {datetime_error}")
+                        print("⚠️ 将使用立即发布")
+                        # 不返回False，继续后续步骤
+
+                except Exception as e:
+                    print(f"⚠️ 设置定时发布失败: {e}，将使用立即发布")
+
+            time.sleep(2)
+
+            # 4. 上传音频文件（在上传封面之前）
+            print(f"🎵 正在上传音频: {audio_content['audio_path']}")
+            try:
+                # 查找音频上传input
+                audio_input = page.locator(SELECTORS["audio_upload_input"])
+                if audio_input.count() > 0:
+                    # 优先使用CDP方法上传大文件
+                    cdp_upload_success = False
+                    try:
+                        cdp_session = page.context.new_cdp_session(page)
+                        dom_snapshot = cdp_session.send("DOM.getDocument")
+                        node_result = cdp_session.send(
+                            "DOM.querySelector",
+                            {
+                                "nodeId": dom_snapshot["root"]["nodeId"],
+                                "selector": SELECTORS["audio_upload_input"],
+                            },
+                        )
+
+                        if node_result.get("nodeId"):
+                            cdp_session.send(
+                                "DOM.setFileInputFiles",
+                                {
+                                    "nodeId": node_result["nodeId"],
+                                    "files": [audio_content["audio_path"]],
+                                },
+                            )
+                            cdp_session.detach()
+                            print("✅ 音频文件上传开始（CDP方法）")
+                            cdp_upload_success = True
+                        else:
+                            raise Exception("CDP方法失败")
+
+                    except Exception as cdp_error:
+                        print(f"⚠️ CDP上传失败: {cdp_error}")
+                        # 回退到标准方法
+                        try:
+                            audio_input.set_input_files(audio_content["audio_path"])
+                            print("✅ 音频文件上传开始（标准方法）")
+                        except Exception as standard_error:
+                            print(f"❌ 标准上传方法也失败: {standard_error}")
+                            return False
+
+                    # 简化的上传进度等待逻辑
+                    print("⏳ 等待音频上传完成...")
+                    try:
+                        # 等待一小段时间让上传开始
+                        page.wait_for_timeout(3000)
+
+                        # 检查页面上是否有"上传进度"相关的文本
+                        upload_elements = page.get_by_text("上传进度", exact=False)
+                        if upload_elements.count() > 0:
+                            print("📊 检测到上传进度元素，开始等待上传完成...")
+
+                            # 简单的轮询等待策略：每5秒检查一次是否还有上传进度
+                            max_wait_time = 120  # 最多等待2分钟
+                            wait_count = 0
+
+                            while (
+                                wait_count < max_wait_time
+                                and upload_elements.count() > 0
+                            ):
+                                page.wait_for_timeout(5000)  # 等待5秒
+                                wait_count += 5
+                                upload_elements = page.get_by_text(
+                                    "上传进度", exact=False
+                                )
+                                print(f"⏳ 仍在上传中... (已等待 {wait_count} 秒)")
+
+                            if upload_elements.count() == 0:
+                                print("✅ 上传进度完成")
+                            else:
+                                print("⚠️ 上传等待超时，继续后续步骤")
+                        else:
+                            print("📊 未检测到上传进度元素，可能上传很快完成")
+
+                        # 上传完成后额外等待
+                        print("⏳ 等待5秒进行后续处理...")
+                        page.wait_for_timeout(5000)
+                        print("✅ 音频文件上传处理完成")
+
+                    except Exception as upload_wait_error:
+                        print(f"⚠️ 等待上传进度时出现异常: {upload_wait_error}")
+                        print("⏳ 使用备用等待策略...")
+                        page.wait_for_timeout(20000)  # 备用等待20秒
+
+                else:
+                    print("❌ 未找到音频上传输入框")
+                    return False
+            except Exception as e:
+                print(f"❌ 上传音频失败: {e}")
+                return False
+
+            time.sleep(2)
+
+            # 5. 上传封面（最后步骤）
+            if audio_content.get("cover_path") and os.path.exists(
+                audio_content["cover_path"]
+            ):
+                cover_path = audio_content["cover_path"]
+                print(f"🎨 正在上传单集封面: {cover_path}")
+
+                try:
+                    # 尝试多种方式找到触发文件选择器的元素
+                    print("🔍 查找封面上传触发元素...")
+
+                    # 多种可能的选择器策略
+                    upload_selectors = [
+                        # 优先尝试点击path元素（加号图标）- 这个是覆盖层元素
+                        'path[d="M9 16h14M16 9v14"]',
+                        'path[stroke-width="2"]',
+                        # SVG容器元素（推荐方案：点击父容器）
+                        'svg:has(circle[cx="16"][cy="16"])',
+                        'svg:has(path[d="M9 16h14M16 9v14"])',
+                        # 包含加号图标的div容器
+                        'div:has(svg:has(circle[cx="16"][cy="16"]))',
+                        # SVG圆形元素（最后尝试，可能被拦截）
+                        'circle[cx="16"][cy="16"][r="16"]',
+                        'svg circle[cx="16"][cy="16"]',
+                        # 包含上传文本的元素
+                        'text:has-text("点击上传封面")',
+                        'div:has-text("点击上传封面")',
+                        'span:has-text("点击上传封面")',
+                        # SVG元素本身
+                        'svg[viewBox*="0 0 32 32"]',
+                        "svg:has(circle)",
+                        # 可能的按钮或区域
+                        '[role="button"]:has(svg)',
+                        'div[style*="cursor: pointer"]:has(svg)',
+                        # 通用的可点击区域
+                        ".upload-area",
+                        ".cover-upload",
+                    ]
+
+                    upload_success = False
+
+                    for selector in upload_selectors:
+                        try:
+                            print(f"🎯 尝试选择器: {selector}")
+                            upload_element = page.locator(selector)
+
+                            if upload_element.count() > 0:
+                                print(f"✅ 找到触发元素，准备监听文件选择器...")
+
+                                # 使用 expect_file_chooser 监听文件选择器弹出
+                                with page.expect_file_chooser(timeout=10000) as fc_info:
+                                    # 优先使用强制点击，忽略覆盖元素
+                                    try:
+                                        # 方法1：使用force点击忽略拦截
+                                        upload_element.first.click(force=True)
+                                        print("📂 已强制点击触发元素...")
+                                    except Exception as force_error:
+                                        print(f"⚠️ 强制点击失败: {force_error}")
+                                        # 方法2：普通点击
+                                        upload_element.first.click()
+                                        print("📂 已点击触发元素...")
+
+                                # 获取文件选择器并设置文件
+                                file_chooser = fc_info.value
+                                file_chooser.set_files(cover_path)
+                                print("✅ 成功通过文件选择器上传封面文件")
+
+                                upload_success = True
+                                break
+
+                        except Exception as selector_error:
+                            print(f"⚠️ 选择器 {selector} 失败: {selector_error}")
+                            continue
+
+                    if not upload_success:
+                        print("❌ 所有选择器都失败，尝试JavaScript强制点击方法...")
+
+                        # 最后的备选方案：使用JavaScript强制点击
+                        try:
+                            print("🔍 尝试JavaScript强制点击...")
+
+                            # 方法1：JavaScript查找并点击SVG容器
+                            js_click_script = """
+                            () => {
+                                // 查找包含加号图标的SVG元素
+                                const svgElements = document.querySelectorAll('svg');
+                                for (const svg of svgElements) {
+                                    const circle = svg.querySelector('circle[cx="16"][cy="16"]');
+                                    const path = svg.querySelector('path[d="M9 16h14M16 9v14"]');
+                                    if (circle && path) {
+                                        console.log('Found target SVG with circle and path');
+                                        svg.click();
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }
+                            """
+
+                            # 监听文件选择器并执行JavaScript点击
+                            with page.expect_file_chooser(timeout=10000) as fc_info:
+                                result = page.evaluate(js_click_script)
+                                if result:
+                                    print("✅ JavaScript点击成功")
+                                else:
+                                    print("❌ JavaScript点击失败")
+                                    raise Exception("JavaScript点击没有找到目标元素")
+
+                            # 获取文件选择器并设置文件
+                            file_chooser = fc_info.value
+                            file_chooser.set_files(cover_path)
+                            print("✅ 成功通过JavaScript方法上传封面文件")
+                            upload_success = True
+
+                        except Exception as js_error:
+                            print(f"⚠️ JavaScript方法失败: {js_error}")
+
+                            # 方法2：直接查找所有可能的父容器
+                            try:
+                                print("🔍 查找所有可能的父容器...")
+
+                                # 查找所有包含SVG的div元素
+                                container_selectors = [
+                                    "div:has(svg:has(circle))",
+                                    "div:has(svg:has(path))",
+                                    "button:has(svg)",
+                                    '[data-testid*="upload"]',
+                                    '[class*="upload"]',
+                                    '[class*="cover"]',
+                                ]
+
+                                for container_selector in container_selectors:
+                                    try:
+                                        containers = page.locator(container_selector)
+                                        if containers.count() > 0:
+                                            print(
+                                                f"🎯 尝试容器选择器: {container_selector}"
+                                            )
+
+                                            with page.expect_file_chooser(
+                                                timeout=5000
+                                            ) as fc_info:
+                                                containers.first.click(force=True)
+                                                print(f"✅ 容器点击成功")
+
+                                            file_chooser = fc_info.value
+                                            file_chooser.set_files(cover_path)
+                                            print("✅ 成功通过容器方法上传封面文件")
+                                            upload_success = True
+                                            break
+
+                                    except Exception:
+                                        continue
+
+                            except Exception as container_error:
+                                print(f"⚠️ 容器方法失败: {container_error}")
+
+                            if not upload_success:
+                                # 最终备选方案：查找所有可见的SVG元素并尝试点击
+                                try:
+                                    print("🔍 查找所有可见SVG元素...")
+                                    svg_elements = page.locator("svg:visible")
+                                    print(
+                                        f"📊 找到 {svg_elements.count()} 个可见SVG元素"
+                                    )
+
+                                    for i in range(
+                                        min(svg_elements.count(), 5)
+                                    ):  # 最多尝试5个
+                                        try:
+                                            svg_element = svg_elements.nth(i)
+                                            print(f"🎯 尝试第 {i+1} 个SVG元素...")
+
+                                            with page.expect_file_chooser(
+                                                timeout=3000
+                                            ) as fc_info:
+                                                # 先尝试强制点击，再尝试普通点击
+                                                try:
+                                                    svg_element.click(force=True)
+                                                    print(
+                                                        f"📂 强制点击了第 {i+1} 个SVG元素"
+                                                    )
+                                                except:
+                                                    svg_element.click()
+                                                    print(
+                                                        f"📂 点击了第 {i+1} 个SVG元素"
+                                                    )
+
+                                            # 如果成功触发文件选择器
+                                            file_chooser = fc_info.value
+                                            file_chooser.set_files(cover_path)
+                                            print("✅ 成功通过SVG元素上传封面文件")
+                                            upload_success = True
+                                            break
+
+                                        except Exception:
+                                            # 这个SVG元素不是文件上传触发器，继续尝试下一个
+                                            continue
+
+                                except Exception as svg_error:
+                                    print(f"⚠️ SVG通用方法失败: {svg_error}")
+
+                    if upload_success:
+                        # 等待上传处理
+                        print("⏳ 等待封面上传处理...")
+                        page.wait_for_timeout(3000)
+
+                        # 查找并点击裁剪/确认按钮
+                        print("✂️ 查找裁剪或确认按钮...")
+                        crop_selectors = [
+                            'div[data-type="primary"].css-k4ekfx.e169k0uu3[style*="width: 180px"]',
+                            'button:has-text("确认")',
+                            'button:has-text("保存")',
+                            'button:has-text("裁剪")',
+                            'button:has-text("完成")',
+                            'div[data-type="primary"]:has-text("确认")',
+                            'div[data-type="primary"]:has-text("保存")',
+                        ]
+
+                        crop_success = False
+                        for crop_selector in crop_selectors:
+                            try:
+                                crop_button = page.locator(crop_selector)
+                                if (
+                                    crop_button.count() > 0
+                                    and crop_button.first.is_visible()
+                                ):
+                                    crop_button.first.click()
+                                    print(f"✅ 已点击确认按钮: {crop_selector}")
+                                    crop_success = True
+                                    break
+                            except Exception:
+                                continue
+
+                        if crop_success:
+                            # 等待裁剪处理完成
+                            print("⏰ 等待裁剪处理完成...")
+                            countdown_timer(8, "裁剪处理等待")
+                        else:
+                            print("⚠️ 未找到确认按钮，封面可能已自动保存")
+                            page.wait_for_timeout(3000)
+
+                        print("✅ 单集封面上传和处理完成")
+                    else:
+                        print("❌ 无法找到封面上传触发元素")
+
+                except Exception as e:
+                    print(f"⚠️ 单集封面上传失败: {e}")
+                    import traceback
+
+                    print(f"🔍 错误详情: {traceback.format_exc()}")
+
+            else:
+                print("⚠️ 未找到封面文件，跳过封面上传")
+
+            # 6. 确认发布
+            print("📤 正在确认发布...")
+            try:
+                # 查找发布按钮（可能是"发布"、"提交"等文本）
+                publish_selectors = [
+                    "button:has-text('发布')",
+                    "button:has-text('提交')",
+                    "button:has-text('确认')",
+                    "button[type='submit']",
+                    "button.primary",  # 主要按钮样式
+                ]
+
+                publish_success = False
+                for selector in publish_selectors:
+                    try:
+                        publish_button = page.locator(selector)
+                        if publish_button.count() > 0:
+                            publish_button.first.click()
+                            print(f"✅ 发布确认完成 (使用选择器: {selector})")
+                            publish_success = True
+                            break
+                    except:
+                        continue
+
+                if not publish_success:
+                    print("⚠️ 未找到发布按钮，可能需要手动确认")
+
+                # 等待发布完成
+                time.sleep(5)
+
+                # 检查是否发布成功（这里可以根据实际页面反馈来判断）
+                current_url = page.url
+                if "create/episode" not in current_url:
+                    print("✅ 音频发布成功")
+                    return True
+                else:
+                    print("✅ 音频内容已填写完成")
+                    return True
+
+            except Exception as e:
+                print(f"❌ 确认发布失败: {e}")
+                return False
+
+        except Exception as e:
+            print(f"❌ 上传过程中发生错误: {e}")
+            return False
+
+    def update_excel_status(self, book_info, publish_time):
+        """更新Excel中的发布状态"""
+        try:
+            excel_path = os.path.join(os.getcwd(), self.dirs["excel"])
+            df = pd.read_excel(excel_path)
+
+            # 查找对应的行
+            uuid = book_info["uuid"]
+            mask = df["UUID"] == uuid
+
+            if mask.any():
+                # 更新状态
+                df.loc[mask, "是否发布"] = 1
+                df.loc[mask, "发布时间"] = publish_time.strftime("%Y-%m-%d %H:%M:%S")
+
+                # 保存文件
+                df.to_excel(excel_path, index=False)
+                print(f"✅ 已更新Excel状态: {uuid}")
+            else:
+                print(f"⚠️ 在Excel中未找到UUID: {uuid}")
+
+        except Exception as e:
+            print(f"❌ 更新Excel状态失败: {e}")
+
+    def run(self, max_count=None, dry_run=False):
+        """运行小宇宙播客上传流程"""
+        try:
+            print("🎙️ 开始小宇宙播客上传流程")
+
+            # 获取待上传书籍列表
+            pending_books = self.get_pending_books()
+
+            if not pending_books:
+                print("📝 没有找到待上传的书籍")
+                return
+
+            # 限制数量
+            if max_count:
+                pending_books = pending_books[:max_count]
+                print(f"📊 限制上传数量为: {max_count}")
+
+            print(f"📋 准备上传 {len(pending_books)} 个书籍")
+
+            if not dry_run:
+                # 初始化浏览器
+                playwright, browser, initial_page = self.initialize_browser()
+                if not initial_page:
+                    print("❌ 浏览器初始化失败，退出程序")
+                    return
+
+            # 处理每个书籍
+            success_count = 0
+
+            for i, book_data in enumerate(pending_books, 1):
+                print(f"\n{'='*60}")
+                print(f"📚 处理书籍 {i}/{len(pending_books)}: {book_data['uuid']}")
+                print(f"{'-'*50}")
+
+                # 获取书籍内容
+                book_content = self.get_book_content(book_data["book_info"])
+
+                if not book_content["valid"] and not dry_run:
+                    print(f"⚠️ 书籍内容无效，跳过: {book_data['uuid']}")
+                    continue
+
+                # 计算发布时间
+                publish_time = self.calculate_next_publish_time()
+
+                if not dry_run:
+                    # 检查tab限制
+                    self.check_and_wait_for_tab_limit()
+
+                    # 清理已关闭的tabs
+                    self.cleanup_closed_tabs()
+
+                    # 创建新tab
+                    page = self.create_new_tab_for_upload()
+                    if not page:
+                        print(f"❌ 创建tab失败，跳过: {book_data['uuid']}")
+                        continue
+
+                # 上传音频
+                if dry_run:
+                    success = self.upload_audio_to_xiaoyuzhou(
+                        book_content, None, publish_time, dry_run=True
+                    )
+                else:
+                    success = self.upload_audio_to_xiaoyuzhou(
+                        book_content, page, publish_time, dry_run=False
+                    )
+
+                if success:
+                    success_count += 1
+
+                    if not dry_run:
+                        # 更新Excel状态
+                        self.update_excel_status(book_data["book_info"], publish_time)
+
+                        print(f"✅ 书籍上传成功: {book_data['uuid']}")
+                        print(
+                            f"⏰ 发布时间: {publish_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                        )
+                    else:
+                        print(f"✅ 试运行完成: {book_data['uuid']}")
+                else:
+                    print(f"❌ 书籍上传失败: {book_data['uuid']}")
+
+            print(f"\n🎉 小宇宙播客上传流程完成")
+            print(f"📊 成功上传: {success_count}/{len(pending_books)}")
+
+        except KeyboardInterrupt:
+            print("\n\n🛑 用户中断操作")
+            print("📝 提示：浏览器连接已断开，AdsPower浏览器实例仍保持打开状态")
+        except Exception as e:
+            print(f"\n❌ 运行过程中发生错误: {e}")
+            print("\n🔧 故障排除建议:")
+            print("   1. 检查AdsPower是否正常运行")
+            print("   2. 确认浏览器ID是否正确 (k10i5y1s)")
+            print("   3. 检查网络连接")
+            print("   4. 确认Excel文件格式正确，列名为：UUID、是否发布、发布时间")
+            print("   5. 检查音频文件路径是否正确")
+            print(
+                "   6. 先运行：python generate_youtube_titles.py --lang zh 生成标题文件"
+            )
+            print("   7. 确认生成的标题、描述文件存在")
+            print("   8. 检查封面文件是否存在（png或jpg格式）")
+            print(
+                "   9. 运行试运行模式检查：python upload_books_to_xiaoyuzhou.py --dry-run"
+            )
+            print(
+                "   10. 查看详细示例：python upload_books_to_xiaoyuzhou.py --help-examples"
+            )
+            sys.exit(1)
+
+
+def check_dependencies():
+    """检查依赖"""
+    missing_deps = []
+
+    try:
+        import pandas
+    except ImportError:
+        missing_deps.append("pandas")
+
+    try:
+        import urllib3
+    except ImportError:
+        missing_deps.append("urllib3")
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        missing_deps.append("playwright")
+
+    if missing_deps:
+        print("❌ 缺少依赖模块:")
+        for dep in missing_deps:
+            print(f"   - {dep}")
+        print("\n📦 请安装依赖:")
+        print("pip install pandas urllib3 playwright")
+        print("playwright install chromium")
+        return False
+
+    return True
+
+
+def show_usage_examples():
+    """显示使用示例"""
+    print("\n💡 小宇宙播客上传脚本使用示例:")
+    print("=" * 60)
+    print()
+    print("# 基础使用")
+    print("python upload_books_to_xiaoyuzhou.py                   # 默认12小时间隔")
+    print()
+    print("# 自定义间隔时间")
+    print("python upload_books_to_xiaoyuzhou.py --interval 8      # 8小时间隔")
+    print()
+    print("# 限制上传数量")
+    print("python upload_books_to_xiaoyuzhou.py --max-count 5     # 限制5个音频")
+    print()
+    print("# Tab管理设置")
+    print(
+        "python upload_books_to_xiaoyuzhou.py --max-tabs 3 --wait-minutes 60    # 最多3个tab，等待60分钟"
+    )
+    print()
+    print("# 试运行模式")
+    print("python upload_books_to_xiaoyuzhou.py --dry-run         # 查看待上传的书籍")
+    print()
+    print("# 组合使用")
+    print(
+        "python upload_books_to_xiaoyuzhou.py --interval 6 --max-count 3 --max-tabs 2 --wait-minutes 45"
+    )
+    print("# 6小时间隔，限制3个音频，最多2个tab，等待45分钟")
+
+
+def main():
+    """主函数"""
+    parser = argparse.ArgumentParser(
+        description="小宇宙播客上传脚本 - 上传merge_book_audio.py产生的音频文件",
+        formatter_class=argparse.RawTextHelpFormatter,
+        epilog="""
+功能说明:
+  1. 读取中文书籍Excel文件中的播客列表
+  2. 跳过已上传的播客（是否发布=1）
+  3. 获取播客MP3文件、封面、标题、描述
+  4. 按设定的时间间隔自动上传到小宇宙播客平台
+  5. 支持定时发布（最多13天后）
+  6. 更新Excel文件中的发布状态
+
+Excel文件格式要求:
+  - 文件路径: excel/book-zh-xiaoyuzhou.xlsx
+  - 列名: UUID | 是否发布 | 发布时间
+  - '是否发布' 列: 0=未发布, 1=已发布
+  - '发布时间' 列: 日期时间字符串 (YYYY-MM-DD HH:MM:SS)
+
+使用示例:
+  python upload_books_to_xiaoyuzhou.py --dry-run           # 试运行
+  python upload_books_to_xiaoyuzhou.py                     # 默认12小时间隔
+  python upload_books_to_xiaoyuzhou.py --interval 8        # 8小时间隔
+  python upload_books_to_xiaoyuzhou.py --max-count 5       # 限制5个音频
+
+配置信息:
+  小宇宙URL: https://podcaster.xiaoyuzhoufm.com/podcasts/6865f2aa95ec18c5e6706091/create/episode
+  浏览器ID: k10i5y1s
+  发布时间格式: YYYY.MM.DD HH:MM（24小时制）
+  发布时间限制: 最多13天后
+        """,
+    )
+
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=DEFAULT_INTERVAL_HOURS,
+        help=f"音频上传间隔小时数 (默认: {DEFAULT_INTERVAL_HOURS})",
+    )
+    parser.add_argument("--max-count", type=int, help="最大上传数量 (默认: 全部)")
+    parser.add_argument("--dry-run", action="store_true", help="试运行模式，不实际上传")
+    parser.add_argument(
+        "--max-tabs",
+        type=int,
+        default=3,
+        help="最大tab数量，达到此数量时将等待 (默认: 3)",
+    )
+    parser.add_argument(
+        "--wait-minutes",
+        type=int,
+        default=60,
+        help="当tab达到限制时的等待时间（分钟） (默认: 60)",
+    )
+    parser.add_argument(
+        "--help-examples", action="store_true", help="显示详细的使用示例"
+    )
+
+    args = parser.parse_args()
+
+    # 如果请求显示示例，则显示并退出
+    if args.help_examples:
+        show_usage_examples()
+        return
+
+    print("🎙️ 小宇宙播客上传系统")
+    print("=" * 60)
+    print(f"🖥️  操作系统: {platform.system()}")
+    print(f"🏗️  架构类型: {platform.machine()}")
+    print(f"📅 当前时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # 检查依赖
+    if not check_dependencies():
+        return
+
+    # 检查系统
+    if not check_supported_system():
+        print("⚠️  此脚本主要为macOS和Ubuntu系统设计，其他系统可能需要调整路径")
+
+    # 显示配置信息
+    print(f"\n🔧 配置信息:")
+    print(f"   平台: 小宇宙播客")
+    print(f"   上传URL: {XIAOYUZHOU_URL}")
+    print(f"   浏览器ID: {ADSPOWER_BROWSER_ID}")
+    print(f"   Excel文件: {EXCEL_FILE}")
+    print(f"   音频间隔: {args.interval} 小时")
+    print(f"   最大数量: {args.max_count or '全部'}")
+    print(f"   最大tab数量: {args.max_tabs}")
+    print(f"   tab等待时间: {args.wait_minutes} 分钟")
+    print(f"   运行模式: {'试运行' if args.dry_run else '实际上传'}")
+    print(f"   媒体根目录: {get_base_media_path()}")
+
+    # 创建上传器实例
+    uploader = XiaoyuzhouPodcastUploader(
+        interval_hours=args.interval,
+        max_tabs=args.max_tabs,
+        wait_minutes=args.wait_minutes,
+    )
+
+    # 运行上传系统
+    try:
+        uploader.run(max_count=args.max_count, dry_run=args.dry_run)
+        print("\n🎉 程序正常结束")
+
+    except KeyboardInterrupt:
+        print("\n\n🛑 用户中断操作")
+        print("📝 提示：浏览器连接已断开，AdsPower浏览器实例仍保持打开状态")
+        sys.exit(0)
+
+    except Exception as e:
+        print(f"\n❌ 系统错误: {e}")
+        print("\n🔧 故障排除建议:")
+        print("   1. 检查AdsPower是否正常运行")
+        print("   2. 确认浏览器ID是否正确 (k10i5y1s)")
+        print("   3. 检查网络连接")
+        print("   4. 确认Excel文件格式正确，列名为：UUID、是否发布、发布时间")
+        print("   5. 检查音频文件路径是否正确")
+        print("   6. 先运行：python generate_youtube_titles.py --lang zh 生成标题文件")
+        print("   7. 确认生成的标题、描述文件存在")
+        print("   8. 检查封面文件是否存在（png或jpg格式）")
+        print(
+            "   9. 运行试运行模式检查：python upload_books_to_xiaoyuzhou.py --dry-run"
+        )
+        print(
+            "   10. 查看详细示例：python upload_books_to_xiaoyuzhou.py --help-examples"
+        )
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

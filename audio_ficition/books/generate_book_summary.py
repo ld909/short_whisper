@@ -854,7 +854,7 @@ Ensure the total word count reaches at least 5000 words.
             ".file-chunk-container span.name",
         ]
 
-        max_wait_time = 100  # 最多等待100秒，避免等待时间过长
+        max_wait_time = 240  # 最多等待240秒（4分钟），确保有足够时间处理大文件
         check_interval = 3  # 每3秒检查一次
         elapsed_time = 0
 

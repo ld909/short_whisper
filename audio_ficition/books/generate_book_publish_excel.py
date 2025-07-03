@@ -7,6 +7,7 @@
 
 📚 功能说明:
 - 支持中文和英文书籍处理（通过 --language 参数选择）
+- 支持多个发布平台（通过 --platform 参数选择）
 - 扫描对应语言的合并后书籍音频文件目录
 - 从文件名中提取UUID
 - 生成包含UUID、发布状态、发布时间的Excel表格
@@ -17,14 +18,24 @@
 - 英文 (en): /mnt/dhl/audio/books/en/mp3/*.mp3 → excel/book-en.xlsx
 - 中文 (zh): /mnt/dhl/audio/books/zh/mp3/*.mp3 → excel/book-zh.xlsx
 
+📱 平台支持:
+- YouTube (youtube): 默认平台
+  - 英文: excel/book-en.xlsx
+  - 中文: excel/book-zh.xlsx
+- 小宇宙播客 (xiaoyuzhou): 中文播客平台
+  - 中文: excel/book-zh-xiaoyuzhou.xlsx
+
 📥 输入信息:
 - Ubuntu: /mnt/dhl/audio/books/{语言}/mp3/*.mp3 (merge_book_audio.py的输出)
 - macOS Intel: /Volumes/dhl/audio/books/{语言}/mp3/*.mp3 (merge_book_audio.py的输出)
 - macOS Apple Silicon: /Users/donghaoliu/Documents/audio/books/{语言}/mp3/*.mp3 (merge_book_audio.py的输出)
 
 📤 输出信息:
-- 英文Excel文件: excel/book-en.xlsx
-- 中文Excel文件: excel/book-zh.xlsx
+- YouTube平台:
+  - 英文Excel文件: excel/book-en.xlsx
+  - 中文Excel文件: excel/book-zh.xlsx
+- 小宇宙播客平台:
+  - 中文Excel文件: excel/book-zh-xiaoyuzhou.xlsx
 - 列结构: UUID | 是否发布 | 发布时间
 
 🔄 处理规则:
@@ -32,21 +43,24 @@
 2. 自动排除以点开头的Mac系统文件
 3. 支持断点续传，不修改已存在的UUID记录
 4. 新UUID默认设置：是否发布=0，发布时间=空
-5. 根据语言参数自动选择对应的音频目录和Excel文件名
+5. 根据语言参数和平台参数自动选择对应的音频目录和Excel文件名
 6. 自动检测系统类型并使用对应的路径配置
 
 💡 使用示例:
-# 生成/更新英语书籍发布Excel表格
+# 生成/更新英语书籍发布Excel表格（YouTube）
 python generate_book_publish_excel.py
 
-# 生成中文书籍发布Excel表格
+# 生成中文书籍发布Excel表格（YouTube）
 python generate_book_publish_excel.py --language zh
 
+# 生成中文小宇宙播客发布Excel表格
+python generate_book_publish_excel.py --language zh --platform xiaoyuzhou
+
 # 预览模式
-python generate_book_publish_excel.py --language zh --preview
+python generate_book_publish_excel.py --language zh --platform xiaoyuzhou --preview
 
 # 强制重新生成
-python generate_book_publish_excel.py --language zh --force-regenerate
+python generate_book_publish_excel.py --language zh --platform xiaoyuzhou --force-regenerate
 """
 
 import os
@@ -520,10 +534,25 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 使用示例:
-  python generate_book_publish_excel.py                    # 生成英语书籍Excel表格
-  python generate_book_publish_excel.py --language zh      # 生成中文书籍Excel表格
-  python generate_book_publish_excel.py --preview          # 预览模式
-  python generate_book_publish_excel.py --force-regenerate # 强制重新生成
+  # YouTube平台（默认）
+  python generate_book_publish_excel.py                           # 生成英语书籍Excel表格
+  python generate_book_publish_excel.py --language zh             # 生成中文书籍Excel表格  
+  
+  # 小宇宙播客平台
+  python generate_book_publish_excel.py --language zh --platform xiaoyuzhou  # 生成中文小宇宙播客Excel表格
+  
+  # 其他模式
+  python generate_book_publish_excel.py --language zh --platform xiaoyuzhou --preview   # 预览模式
+  python generate_book_publish_excel.py --language zh --platform xiaoyuzhou --force-regenerate  # 强制重新生成
+  
+平台说明:
+  • YouTube (youtube): 支持中英文，生成book-en.xlsx/book-zh.xlsx
+  • 小宇宙播客 (xiaoyuzhou): 仅支持中文，生成book-zh-xiaoyuzhou.xlsx
+  
+文件对应关系:
+  • book-en.xlsx → upload_books_to_youtube.py (英文)
+  • book-zh.xlsx → upload_books_to_youtube.py (中文)  
+  • book-zh-xiaoyuzhou.xlsx → upload_books_to_xiaoyuzhou.py (中文小宇宙)
         """,
     )
     # 获取默认音频目录配置
@@ -551,6 +580,13 @@ def main():
         help="语言代码，用于生成文件名 (默认: en，将生成book-en.xlsx)",
     )
     parser.add_argument(
+        "--platform",
+        "-p",
+        default="youtube",
+        choices=["youtube", "xiaoyuzhou"],
+        help="平台代码，用于生成文件名 (默认: youtube，将生成book-en.xlsx和book-zh.xlsx；xiaoyuzhou仅支持中文)",
+    )
+    parser.add_argument(
         "--preview",
         action="store_true",
         help="预览模式，只显示会添加哪些新记录，不实际处理",
@@ -563,6 +599,14 @@ def main():
 
     args = parser.parse_args()
 
+    # 验证平台和语言的组合
+    if args.platform == "xiaoyuzhou" and args.language != "zh":
+        print(f"❌ 小宇宙播客平台仅支持中文 (zh)，当前语言代码: {args.language}")
+        print(
+            f"💡 请使用: python generate_book_publish_excel.py --language zh --platform xiaoyuzhou"
+        )
+        exit(1)
+
     # 如果用户没有指定自定义音频目录，根据语言代码选择默认目录
     if (
         args.audio_dir == default_audio_dirs["en"]
@@ -572,18 +616,35 @@ def main():
     else:
         audio_dir = args.audio_dir
 
-    # 如果用户没有指定自定义文件名，根据语言代码生成文件名
-    if args.excel_filename == DEFAULT_EXCEL_FILENAME and args.language != "en":
-        excel_filename = f"book-{args.language}.xlsx"
+    # 如果用户没有指定自定义文件名，根据语言代码和平台生成文件名
+    if args.excel_filename == DEFAULT_EXCEL_FILENAME:
+        if args.platform == "xiaoyuzhou":
+            excel_filename = f"book-{args.language}-xiaoyuzhou.xlsx"
+        elif args.language != "en":
+            excel_filename = f"book-{args.language}.xlsx"
+        else:
+            excel_filename = DEFAULT_EXCEL_FILENAME
     else:
         excel_filename = args.excel_filename
 
     print(f"\n📊 书籍发布Excel生成器")
     print(f"🌐 语言代码: {args.language}")
+    print(f"📱 发布平台: {args.platform}")
     print(f"📁 音频目录: {audio_dir}")
     print(f"📁 Excel目录: {args.excel_dir}")
     print(f"📄 Excel文件: {excel_filename}")
     print(f"🚫 自动排除Mac系统文件 (.DS_Store等)")
+
+    if args.platform == "xiaoyuzhou":
+        print(f"🎙️ 小宇宙播客Excel配置:")
+        print(f"   - 目标脚本: upload_books_to_xiaoyuzhou.py")
+        print(f"   - 平台地址: https://podcaster.xiaoyuzhoufm.com/")
+        print(f"   - 列结构: UUID | 是否发布 | 发布时间")
+    else:
+        print(f"📺 YouTube配置:")
+        print(f"   - 目标脚本: upload_books_to_youtube.py")
+        print(f"   - 平台地址: https://studio.youtube.com/")
+        print(f"   - 列结构: UUID | 是否发布 | 发布时间")
 
     if args.force_regenerate:
         print(f"🔄 强制重新生成模式")

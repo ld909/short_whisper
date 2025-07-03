@@ -1,0 +1,47 @@
+{
+  "7e377166-7ac2-4fc9-ac45-ddf19bb22c56": {
+    "retry_count": 1,
+    "last_error": "未找到下载按钮",
+    "last_attempt": "2025-07-03 10:15:28"
+  },
+  "a440e3c4-be3f-48d0-911a-8e5d0f6ae06b": {
+    "retry_count": 1,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:15:39"
+  },
+  "15a0c194-6b3a-4f66-945f-4077fc0c31c1": {
+    "retry_count": 1,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:15:51"
+  },
+  "7f251d63-b483-4352-bfbc-90962e63fb4f": {
+    "retry_count": 1,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:16:02"
+  },
+  "5906f718-2d65-4c96-ab15-ef94b0f72359": {
+    "retry_count": 1,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:16:13"
+  },
+  "eb84575b-3214-4f16-8c51-f90d9cc3af14": {
+    "retry_count": 1,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:16:24"
+  },
+  "3298c038-890a-4137-8123-4d122431c1f6": {
+    "retry_count": 1,
+    "last_error": "未找到下载按钮",
+    "last_attempt": "2025-07-03 10:16:31"
+  },
+  "b37077a0-fcbd-44aa-9036-c4a2ba813be4": {
+    "retry_count": 1,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:16:43"
+  },
+  "617a4ce8-a18a-4f46-a0a6-8defe53a3eef": {
+    "retry_count": 1,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:16:55"
+  }
+}

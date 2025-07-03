@@ -1,0 +1,72 @@
+{
+  "7e377166-7ac2-4fc9-ac45-ddf19bb22c56": {
+    "retry_count": 2,
+    "last_error": "未找到下载按钮",
+    "last_attempt": "2025-07-03 10:33:51"
+  },
+  "a440e3c4-be3f-48d0-911a-8e5d0f6ae06b": {
+    "retry_count": 2,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:34:02"
+  },
+  "15a0c194-6b3a-4f66-945f-4077fc0c31c1": {
+    "retry_count": 2,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:34:14"
+  },
+  "7f251d63-b483-4352-bfbc-90962e63fb4f": {
+    "retry_count": 2,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:34:24"
+  },
+  "5906f718-2d65-4c96-ab15-ef94b0f72359": {
+    "retry_count": 2,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:34:35"
+  },
+  "eb84575b-3214-4f16-8c51-f90d9cc3af14": {
+    "retry_count": 2,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:34:46"
+  },
+  "3298c038-890a-4137-8123-4d122431c1f6": {
+    "retry_count": 2,
+    "last_error": "未找到下载按钮",
+    "last_attempt": "2025-07-03 10:34:55"
+  },
+  "b37077a0-fcbd-44aa-9036-c4a2ba813be4": {
+    "retry_count": 2,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:35:05"
+  },
+  "617a4ce8-a18a-4f46-a0a6-8defe53a3eef": {
+    "retry_count": 2,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:35:15"
+  },
+  "05402926-9dc7-4d9a-b8fd-2faf00aae501": {
+    "retry_count": 2,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:35:25"
+  },
+  "b43fb180-947a-49e1-b6ac-661df067bc6a": {
+    "retry_count": 3,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-03 10:45:11"
+  },
+  "db6b4a9f-3359-47dd-8b82-3042b5a89e70": {
+    "retry_count": 2,
+    "last_error": "Timeout 60000ms exceeded while waiting for event \"download\"\n=========================== logs ===========================\nwaiting for event \"download\"\n============================================================",
+    "last_attempt": "2025-07-03 10:47:19"
+  },
+  "f85f0d50-add5-44b3-8732-fdfbc39624ad": {
+    "retry_count": 1,
+    "last_error": "未找到下载按钮",
+    "last_attempt": "2025-07-03 10:40:21"
+  },
+  "f073021d-c0c2-4c20-9af2-ba696d444938": {
+    "retry_count": 1,
+    "last_error": "未找到下载按钮",
+    "last_attempt": "2025-07-03 10:40:51"
+  }
+}
