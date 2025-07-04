@@ -24,6 +24,12 @@
   - 中文: excel/book-zh.xlsx
 - 小宇宙播客 (xiaoyuzhou): 中文播客平台
   - 中文: excel/book-zh-xiaoyuzhou.xlsx
+- B站 (bilibili): 视频平台
+  - 英文: excel/book-en-bilibili.xlsx
+  - 中文: excel/book-zh-bilibili.xlsx
+- 喜马拉雅 (ximalaya): 音频平台
+  - 英文: excel/book-en-ximalaya.xlsx
+  - 中文: excel/book-zh-ximalaya.xlsx
 
 📥 输入信息:
 - Ubuntu: /mnt/dhl/audio/books/{语言}/mp3/*.mp3 (merge_book_audio.py的输出)
@@ -36,6 +42,12 @@
   - 中文Excel文件: excel/book-zh.xlsx
 - 小宇宙播客平台:
   - 中文Excel文件: excel/book-zh-xiaoyuzhou.xlsx
+- B站平台:
+  - 英文Excel文件: excel/book-en-bilibili.xlsx
+  - 中文Excel文件: excel/book-zh-bilibili.xlsx
+- 喜马拉雅平台:
+  - 英文Excel文件: excel/book-en-ximalaya.xlsx
+  - 中文Excel文件: excel/book-zh-ximalaya.xlsx
 - 列结构: UUID | 是否发布 | 发布时间
 
 🔄 处理规则:
@@ -56,11 +68,19 @@ python generate_book_publish_excel.py --language zh
 # 生成中文小宇宙播客发布Excel表格
 python generate_book_publish_excel.py --language zh --platform xiaoyuzhou
 
+# 生成B站发布Excel表格
+python generate_book_publish_excel.py --language zh --platform bilibili
+python generate_book_publish_excel.py --language en --platform bilibili
+
+# 生成喜马拉雅发布Excel表格
+python generate_book_publish_excel.py --language zh --platform ximalaya
+python generate_book_publish_excel.py --language en --platform ximalaya
+
 # 预览模式
-python generate_book_publish_excel.py --language zh --platform xiaoyuzhou --preview
+python generate_book_publish_excel.py --language zh --platform ximalaya --preview
 
 # 强制重新生成
-python generate_book_publish_excel.py --language zh --platform xiaoyuzhou --force-regenerate
+python generate_book_publish_excel.py --language zh --platform ximalaya --force-regenerate
 """
 
 import os
@@ -541,18 +561,32 @@ def main():
   # 小宇宙播客平台
   python generate_book_publish_excel.py --language zh --platform xiaoyuzhou  # 生成中文小宇宙播客Excel表格
   
+  # B站平台
+  python generate_book_publish_excel.py --language zh --platform bilibili    # 生成中文B站Excel表格
+  python generate_book_publish_excel.py --language en --platform bilibili    # 生成英文B站Excel表格
+  
+  # 喜马拉雅平台
+  python generate_book_publish_excel.py --language zh --platform ximalaya    # 生成中文喜马拉雅Excel表格
+  python generate_book_publish_excel.py --language en --platform ximalaya    # 生成英文喜马拉雅Excel表格
+  
   # 其他模式
-  python generate_book_publish_excel.py --language zh --platform xiaoyuzhou --preview   # 预览模式
-  python generate_book_publish_excel.py --language zh --platform xiaoyuzhou --force-regenerate  # 强制重新生成
+  python generate_book_publish_excel.py --language zh --platform ximalaya --preview   # 预览模式
+  python generate_book_publish_excel.py --language zh --platform ximalaya --force-regenerate  # 强制重新生成
   
 平台说明:
   • YouTube (youtube): 支持中英文，生成book-en.xlsx/book-zh.xlsx
   • 小宇宙播客 (xiaoyuzhou): 仅支持中文，生成book-zh-xiaoyuzhou.xlsx
+  • B站 (bilibili): 支持中英文，生成book-en-bilibili.xlsx/book-zh-bilibili.xlsx
+  • 喜马拉雅 (ximalaya): 支持中英文，生成book-en-ximalaya.xlsx/book-zh-ximalaya.xlsx
   
 文件对应关系:
   • book-en.xlsx → upload_books_to_youtube.py (英文)
   • book-zh.xlsx → upload_books_to_youtube.py (中文)  
   • book-zh-xiaoyuzhou.xlsx → upload_books_to_xiaoyuzhou.py (中文小宇宙)
+  • book-en-bilibili.xlsx → upload_books_to_bilibili.py (英文B站)
+  • book-zh-bilibili.xlsx → upload_books_to_bilibili.py (中文B站)
+  • book-en-ximalaya.xlsx → upload_books_to_ximalaya.py (英文喜马拉雅)
+  • book-zh-ximalaya.xlsx → upload_books_to_ximalaya.py (中文喜马拉雅)
         """,
     )
     # 获取默认音频目录配置
@@ -583,8 +617,8 @@ def main():
         "--platform",
         "-p",
         default="youtube",
-        choices=["youtube", "xiaoyuzhou"],
-        help="平台代码，用于生成文件名 (默认: youtube，将生成book-en.xlsx和book-zh.xlsx；xiaoyuzhou仅支持中文)",
+        choices=["youtube", "xiaoyuzhou", "bilibili", "ximalaya"],
+        help="平台代码，用于生成文件名 (默认: youtube，将生成book-en.xlsx和book-zh.xlsx；xiaoyuzhou仅支持中文；bilibili支持中英文；ximalaya支持中英文)",
     )
     parser.add_argument(
         "--preview",
@@ -620,6 +654,10 @@ def main():
     if args.excel_filename == DEFAULT_EXCEL_FILENAME:
         if args.platform == "xiaoyuzhou":
             excel_filename = f"book-{args.language}-xiaoyuzhou.xlsx"
+        elif args.platform == "bilibili":
+            excel_filename = f"book-{args.language}-bilibili.xlsx"
+        elif args.platform == "ximalaya":
+            excel_filename = f"book-{args.language}-ximalaya.xlsx"
         elif args.language != "en":
             excel_filename = f"book-{args.language}.xlsx"
         else:
@@ -639,6 +677,16 @@ def main():
         print(f"🎙️ 小宇宙播客Excel配置:")
         print(f"   - 目标脚本: upload_books_to_xiaoyuzhou.py")
         print(f"   - 平台地址: https://podcaster.xiaoyuzhoufm.com/")
+        print(f"   - 列结构: UUID | 是否发布 | 发布时间")
+    elif args.platform == "bilibili":
+        print(f"📺 B站Excel配置:")
+        print(f"   - 目标脚本: upload_books_to_bilibili.py")
+        print(f"   - 平台地址: https://member.bilibili.com/york/video-mgmt")
+        print(f"   - 列结构: UUID | 是否发布 | 发布时间")
+    elif args.platform == "ximalaya":
+        print(f"🎧 喜马拉雅Excel配置:")
+        print(f"   - 目标脚本: upload_books_to_ximalaya.py")
+        print(f"   - 平台地址: https://www.ximalaya.com/gatekeeper/dashboard/audio")
         print(f"   - 列结构: UUID | 是否发布 | 发布时间")
     else:
         print(f"📺 YouTube配置:")
