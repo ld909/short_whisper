@@ -69,7 +69,7 @@ python generate_book_clips.py --language zh --fixed-font-size --font-size 48 --d
 - 右边上下分配需要根据标题长度动态调整
 - 自动跳过点开头的系统文件
 - 支持中英文两种语言的书籍处理
-- 只支持在Linux/Ubuntu系统上运行
+- 支持 macOS (Intel/Apple Silicon) 和 Linux/Ubuntu 系统
 - 长标题会智能使用省略号，确保不溢出屏幕
 """
 
@@ -100,38 +100,75 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def check_supported_system():
+    """
+    检查是否为支持的系统
+
+    Returns:
+        tuple: (是否支持, 系统类型描述)
+    """
+    system = platform.system()
+
+    if system == "Darwin":  # macOS
+        machine = platform.machine()
+        if machine == "x86_64":
+            return True, "macOS (Intel)"
+        else:
+            return True, "macOS (Apple Silicon)"
+    elif system == "Linux":
+        try:
+            # 检查是否为Ubuntu
+            with open("/etc/os-release", "r") as f:
+                content = f.read()
+                if "Ubuntu" in content or "ubuntu" in content:
+                    return True, "Ubuntu"
+                else:
+                    return True, "Linux"
+        except:
+            return True, "Linux"
+    else:
+        # 其他系统也支持，但可能需要手动配置路径
+        return True, system
+
+
+# 保持向后兼容性
 def check_ubuntu_system():
     """
-    检查是否为Ubuntu系统
-    
+    检查是否为Ubuntu系统（保持向后兼容性）
+
     Returns:
-        bool: 是否为Ubuntu系统
+        bool: 是否为支持的系统
     """
-    try:
-        # 检查系统类型
-        if platform.system() != "Linux":
-            return False
-        
-        # 检查是否为Ubuntu
-        with open('/etc/os-release', 'r') as f:
-            content = f.read()
-            if 'Ubuntu' in content or 'ubuntu' in content:
-                return True
-        
-        return False
-    except:
-        return False
+    supported, _ = check_supported_system()
+    return supported
 
 
 def get_base_media_path():
     """根据操作系统返回适当的媒体路径"""
-    # 参考 merge_book_audio.py 的路径配置
     system = platform.system()
-    if system == "Linux":
-        return "/mnt/dhl/audio"
-    else:  # 其他系统暂不支持
-        logger.error(f"❌ 不支持的操作系统: {system}")
-        return None
+
+    if system == "Darwin":  # macOS
+        # 检测芯片架构
+        machine = platform.machine()
+        if machine == "x86_64":
+            # Intel Mac
+            return "/Volumes/dhl/audio"
+        else:
+            # Apple Silicon (arm64)
+            return "/Users/donghaoliu/Documents/audio"
+    elif system == "Linux":
+        # Ubuntu/Linux
+        return "/media/dhl/audio"
+    else:
+        # 其他系统给出提示，让用户手动配置
+        logger.warning(f"⚠️ 未明确支持的操作系统: {system}")
+        logger.warning("💡 请手动设置AUDIO_BASE_DIR环境变量或修改代码中的路径配置")
+        # 检查是否设置了环境变量
+        env_path = os.environ.get("AUDIO_BASE_DIR")
+        if env_path:
+            logger.info(f"✅ 使用环境变量路径: {env_path}")
+            return env_path
+        return None  # 返回None让调用者处理
 
 
 def get_script_dir():
@@ -142,20 +179,20 @@ def get_script_dir():
 def get_input_directories(language="en"):
     """
     获取输入目录路径
-    
+
     Args:
         language: 语言代码 (en/zh)
-        
+
     Returns:
         dict: 包含各种输入目录路径的字典
     """
     base_media_path = get_base_media_path()
     if not base_media_path:
         return {}
-    
+
     # 根据语言设置基础路径
     base_path = os.path.join(base_media_path, "books", language)
-    
+
     return {
         "thumbnails_large": os.path.join(base_path, "thumbnails_large"),
         "info": os.path.join(base_path, "info"),
@@ -167,17 +204,17 @@ def get_input_directories(language="en"):
 def get_output_directory(language="en"):
     """
     获取输出目录路径
-    
+
     Args:
         language: 语言代码 (en/zh)
-        
+
     Returns:
         str: 输出目录路径
     """
     base_media_path = get_base_media_path()
     if not base_media_path:
         return ""
-    
+
     return os.path.join(base_media_path, "books", language, "1080_clips")
 
 
@@ -193,7 +230,13 @@ def check_dependencies():
     if missing:
         print(f"❌ 缺少依赖: {', '.join(missing)}")
         print("请安装 FFmpeg:")
-        print("Ubuntu: sudo apt install ffmpeg")
+        system = platform.system()
+        if system == "Darwin":
+            print("macOS: brew install ffmpeg")
+        elif system == "Linux":
+            print("Ubuntu/Linux: sudo apt install ffmpeg")
+        else:
+            print("请根据您的操作系统安装 FFmpeg")
         return False
 
     return True
@@ -290,10 +333,10 @@ def get_book_info(uuid: str, language="en") -> Optional[Dict]:
 def get_available_fonts(language="en") -> List[str]:
     """
     获取可用的字体文件列表
-    
+
     Args:
         language: 语言代码 (en/zh)
-        
+
     Returns:
         list: 字体文件路径列表
     """
@@ -387,7 +430,7 @@ def select_font_by_path_or_weight(
         preferred_weights = ["regular", "medium", "semi-bold", "bold"]
     else:  # 中文字体优先选择
         preferred_weights = ["regular", "标准", "medium", "中等", "semi-bold", "半粗"]
-    
+
     for weight in preferred_weights:
         for font_file in font_files:
             if weight in os.path.basename(font_file).lower():
@@ -425,10 +468,10 @@ def get_background_video(language="en") -> Optional[str]:
 def get_merriweather_font_path(language="en") -> Optional[str]:
     """
     获取适合的字体路径（英文使用Merriweather，中文使用合适的中文字体）
-    
+
     Args:
         language: 语言代码 (en/zh)
-        
+
     Returns:
         str: 字体文件路径，如果没找到返回None
     """
@@ -447,7 +490,7 @@ def get_merriweather_font_path(language="en") -> Optional[str]:
         # 英文：查找M开头的字体文件，优先选择Merriweather
         m_fonts = [f for f in font_files if os.path.basename(f).lower().startswith("m")]
         merriweather_fonts = [f for f in m_fonts if "merriweather" in f.lower()]
-        
+
         if merriweather_fonts:
             selected_font = merriweather_fonts[0]
             logger.info(f"🔤 找到Merriweather字体: {os.path.basename(selected_font)}")
@@ -507,8 +550,9 @@ def process_title_for_overflow(
 
         # 分词换行计算
         import re
-        has_chinese = bool(re.search(r'[\u4e00-\u9fff]', text))
-        
+
+        has_chinese = bool(re.search(r"[\u4e00-\u9fff]", text))
+
         lines = []
         max_line_width = 0
 
@@ -608,73 +652,80 @@ def process_title_for_overflow(
         if debug:
             print(f"✅ 标题无需处理，直接使用")
         return processed_title, current_font_size, False
-    
+
     # 如果启用固定字体大小模式，保持字体大小但检查溢出，必要时使用省略号
     if fixed_font_size:
         if debug:
             print(f"🔒 固定字体大小模式：保持{font_size}px字体，检查溢出并智能处理")
-        
+
         # 检查原始标题是否溢出
         if not overflow:
             if debug:
                 print(f"✅ 原始标题无溢出，直接使用")
             return title, font_size, False
-        
+
         # 溢出了，需要使用省略号处理
         if debug:
             print(f"⚠️ 原始标题溢出，开始省略号处理")
-        
+
         # 检查是否包含中文字符
         import re
-        has_chinese = bool(re.search(r'[\u4e00-\u9fff]', title))
+
+        has_chinese = bool(re.search(r"[\u4e00-\u9fff]", title))
         ellipsis = "..." if not has_chinese else "..."  # 中英文都用...
-        
+
         # 智能缩短标题直到不溢出
         processed_title = title
         min_length = 3  # 最少保留字符数
-        
+
         # 先估算需要的大概长度（粗略估算）
         original_length = len(title)
         target_lines = max_height // (font_size + 5)  # 估算最大行数
         chars_per_line = (max_width - 40) // (font_size * 0.6)  # 粗略估算每行字符数
         estimated_max_chars = int(target_lines * chars_per_line * 0.8)  # 保守估计
-        
+
         if debug:
-            print(f"   估算参数: 原长度={original_length}, 目标行数≤{target_lines}, 每行约{chars_per_line:.1f}字符")
+            print(
+                f"   估算参数: 原长度={original_length}, 目标行数≤{target_lines}, 每行约{chars_per_line:.1f}字符"
+            )
             print(f"   估算最大字符数: {estimated_max_chars}")
-        
+
         # 如果估算长度远小于原长度，直接跳到估算长度附近开始测试
         if estimated_max_chars > 0 and estimated_max_chars < original_length * 0.7:
-            processed_title = title[:max(estimated_max_chars, min_length)]
+            processed_title = title[: max(estimated_max_chars, min_length)]
             if debug:
                 print(f"   快速定位到估算长度: '{processed_title}'")
-        
+
         # 逐步精确调整
         while len(processed_title) > min_length:
             # 尝试添加省略号
             test_title = processed_title + ellipsis
-            
+
             # 检查是否还溢出
             test_overflow, test_width, test_height, test_lines = will_text_overflow(
                 test_title, font_size
             )
-            
+
             if debug:
-                print(f"   测试标题长度{len(test_title)}: 溢出={'是' if test_overflow else '否'}, 高度={test_height}px/{max_height}px, 行数={test_lines}")
-            
+                print(
+                    f"   测试标题长度{len(test_title)}: 溢出={'是' if test_overflow else '否'}, 高度={test_height}px/{max_height}px, 行数={test_lines}"
+                )
+
             if not test_overflow:
                 # 找到合适的长度
                 if debug:
                     print(f"✅ 省略号处理成功: '{test_title}'")
                 return test_title, font_size, True
-            
+
             # 继续缩短，智能选择缩短长度
             if has_chinese:
                 # 中文：尝试按标点符号边界或字符截断
                 shorter_length = len(processed_title) - 1
                 # 寻找合适的截断点（标点符号后）
-                punctuation_chars = '，。！？；：、）】』」'
-                for i in range(len(processed_title) - 1, max(len(processed_title) - 5, 0), -1):
+                punctuation_chars = "，。！？；：、）】』」"
+                for i in range(
+                    len(processed_title) - 1, max(len(processed_title) - 5, 0), -1
+                ):
                     if processed_title[i] in punctuation_chars:
                         shorter_length = i + 1
                         break
@@ -683,10 +734,10 @@ def process_title_for_overflow(
                 # 英文：尝试按单词边界截断
                 words = processed_title.split()
                 if len(words) > 1:
-                    processed_title = ' '.join(words[:-1])  # 删除最后一个单词
+                    processed_title = " ".join(words[:-1])  # 删除最后一个单词
                 else:
                     processed_title = processed_title[:-1]  # 按字符删除
-        
+
         # 如果缩短到很短还是溢出，使用最短安全版本
         safe_title = title[:min_length] + ellipsis
         if debug:
@@ -755,39 +806,44 @@ def process_title_for_overflow(
             processed = True
             if debug:
                 print(f"⚠️ 已达最小字体大小({min_font_size}px)")
-            
+
             # 检查最小字体大小是否还溢出
             final_overflow, _, _, _ = will_text_overflow(processed_title, min_font_size)
             if final_overflow:
                 if debug:
                     print(f"⚠️ 最小字体仍溢出，启用省略号处理")
-                
+
                 # 使用省略号处理逻辑
                 import re
-                has_chinese = bool(re.search(r'[\u4e00-\u9fff]', processed_title))
+
+                has_chinese = bool(re.search(r"[\u4e00-\u9fff]", processed_title))
                 ellipsis = "..."
-                
+
                 # 逐步缩短直到不溢出
                 test_title = processed_title
                 min_length = 3
-                
+
                 while len(test_title) > min_length:
                     test_with_ellipsis = test_title + ellipsis
-                    test_overflow, _, _, _ = will_text_overflow(test_with_ellipsis, min_font_size)
-                    
+                    test_overflow, _, _, _ = will_text_overflow(
+                        test_with_ellipsis, min_font_size
+                    )
+
                     if not test_overflow:
                         processed_title = test_with_ellipsis
                         processed = True
                         if debug:
                             print(f"✅ 省略号处理成功: '{processed_title}'")
                         break
-                    
+
                     # 智能缩短
                     if has_chinese:
                         # 中文按标点或字符截断
                         shorter_length = len(test_title) - 1
-                        punctuation_chars = '，。！？；：、）】』」'
-                        for i in range(len(test_title) - 1, max(len(test_title) - 5, 0), -1):
+                        punctuation_chars = "，。！？；：、）】』」"
+                        for i in range(
+                            len(test_title) - 1, max(len(test_title) - 5, 0), -1
+                        ):
                             if test_title[i] in punctuation_chars:
                                 shorter_length = i + 1
                                 break
@@ -796,16 +852,16 @@ def process_title_for_overflow(
                         # 英文按单词边界截断
                         words = test_title.split()
                         if len(words) > 1:
-                            test_title = ' '.join(words[:-1])
+                            test_title = " ".join(words[:-1])
                         else:
                             test_title = test_title[:-1]
-                
+
                 # 如果循环结束还没找到合适长度，使用最短版本
                 if len(test_title) <= min_length:
                     processed_title = processed_title[:min_length] + ellipsis
                     if debug:
                         print(f"⚠️ 使用最短安全版本: '{processed_title}'")
-            
+
             break
 
     if debug:
@@ -1008,22 +1064,25 @@ def create_left_composite_image(
                 y = title_y_start + title_top_margin
             else:
                 y = title_y_start + (title_area_height - text_height) // 2
-            
+
             if debug:
-                print(f"🔤 单行显示: 标题位置 x={x}, y={y} (上边距={title_top_margin}px)")
-            
+                print(
+                    f"🔤 单行显示: 标题位置 x={x}, y={y} (上边距={title_top_margin}px)"
+                )
+
             draw.text((x, y), processed_title, font=font, fill="white")
         else:
             # 需要换行，已经通过智能处理优化过的标题
             # 用处理后的标题和字体大小进行换行
-            
+
             # 检查是否包含中文字符
             import re
-            has_chinese = bool(re.search(r'[\u4e00-\u9fff]', processed_title))
-            
+
+            has_chinese = bool(re.search(r"[\u4e00-\u9fff]", processed_title))
+
             lines = []
             max_line_width = 0
-            
+
             if has_chinese:
                 # 中文换行：逐字符处理
                 current_line = ""
@@ -1031,7 +1090,7 @@ def create_left_composite_image(
                     test_line = current_line + char
                     bbox = draw.textbbox((0, 0), test_line, font=font)
                     test_width = bbox[2] - bbox[0]
-                    
+
                     if test_width <= title_area_width - 40:
                         current_line = test_line
                         max_line_width = max(max_line_width, test_width)
@@ -1049,7 +1108,7 @@ def create_left_composite_image(
                             bbox = draw.textbbox((0, 0), char, font=font)
                             char_width = bbox[2] - bbox[0]
                             max_line_width = max(max_line_width, char_width)
-                
+
                 if current_line:
                     lines.append(current_line)
                     bbox = draw.textbbox((0, 0), current_line, font=font)
@@ -1059,7 +1118,7 @@ def create_left_composite_image(
                 # 英文换行：按单词处理
                 words = processed_title.split()
                 current_line = ""
-                
+
                 for word in words:
                     test_line = current_line + " " + word if current_line else word
                     bbox = draw.textbbox((0, 0), test_line, font=font)
@@ -1092,7 +1151,7 @@ def create_left_composite_image(
             # 绘制多行文本
             line_height = text_height + 5  # 行间距
             total_text_height = len(lines) * line_height
-            
+
             # 应用上边距：如果设置了上边距，从上边距开始，否则垂直居中
             if title_top_margin > 0:
                 start_y = title_y_start + title_top_margin
@@ -1111,7 +1170,9 @@ def create_left_composite_image(
                 print(
                     f"   最宽行宽度={max_line_width}px, 区域宽度={title_area_width}px"
                 )
-                print(f"   多行起始位置: start_y={start_y} (上边距={title_top_margin}px)")
+                print(
+                    f"   多行起始位置: start_y={start_y} (上边距={title_top_margin}px)"
+                )
                 print(f"   总文本高度: {total_text_height}px")
 
         # 保存合成图片
@@ -1133,6 +1194,7 @@ def create_left_composite_image(
 
 def get_optimal_encoder_settings():
     """获取最优的编码器设置"""
+
     system = platform.system()
 
     # 检测可用的硬件编码器
@@ -1308,7 +1370,7 @@ def create_book_clip(
 
                 # 根据语言选择合适的文字
                 summary_text = "书籍摘要" if language == "zh" else "Book summary"
-                
+
                 # 先添加纯文字（不含emoji）
                 filter_complex += (
                     f"[video_composed]drawtext=text='{summary_text}':"
@@ -1691,13 +1753,14 @@ def process_all_books(
 
 def main():
     """主函数"""
-    # 首先检查是否为Ubuntu系统
-    if not check_ubuntu_system():
-        print("❌ 此脚本只能在Ubuntu系统上运行！")
-        print("🖥️  当前系统: " + platform.system())
-        sys.exit(1)
-    
-    print("✅ Ubuntu系统检测通过")
+    # 检查系统支持情况
+    supported, system_desc = check_supported_system()
+    if supported:
+        print(f"✅ 系统检测: {system_desc}")
+    else:
+        print(f"⚠️ 系统检测: {system_desc} (可能需要手动配置路径)")
+
+    print(f"🖥️  操作系统: {platform.system()}")
 
     # 创建命令行参数解析器
     parser = argparse.ArgumentParser(
@@ -1739,7 +1802,7 @@ Book summary文字设置:
   python generate_book_clips.py --language zh --fixed-font-size --font-size 56 --title-top-margin 20 --debug  # 中文书籍固定56px字体，长标题自动换行，上边距20px
 
 注意:
-- 只支持在Linux/Ubuntu系统上运行
+- 支持 macOS (Intel/Apple Silicon) 和 Linux/Ubuntu 系统
 - 需要安装 FFmpeg
 - 需要超分后的封面图片 (来自 upscale_book_thumbnails.py)
 - 需要背景视频文件 (assets/plate_upscaled.mp4)
@@ -1896,7 +1959,21 @@ Book summary文字设置:
 
     # 检查基础路径是否正确配置
     if not directories:
-        print("❌ 无法获取目录配置，请检查系统设置")
+        print("❌ 无法获取目录配置，可能的原因:")
+        base_path = get_base_media_path()
+        if not base_path:
+            print("   - 无法确定基础媒体路径")
+            system = platform.system()
+            if system == "Darwin":
+                print("   💡 macOS用户请确保以下路径之一存在:")
+                print("      Intel Mac: /Volumes/dhl/audio")
+                print("      Apple Silicon: /Users/donghaoliu/Documents/audio")
+            elif system == "Linux":
+                print("   💡 Linux用户请确保路径存在: /media/dhl/audio")
+            else:
+                print(f"   💡 {system}用户解决方案:")
+                print("      1. 设置环境变量: export AUDIO_BASE_DIR=/your/audio/path")
+                print("      2. 或修改代码中的get_base_media_path()函数")
         sys.exit(1)
 
     # 检查目录是否存在
@@ -1927,7 +2004,9 @@ Book summary文字设置:
 
     print(f"🔤 强制单行显示: {'是' if args.force_single_line else '否'}")
     print(f"🔒 固定字体大小: {'是' if args.fixed_font_size else '否'}")
-    print(f"📏 标题上边距: {args.title_top_margin}px {'(垂直居中)' if args.title_top_margin == 0 else '(距离顶部)'}")
+    print(
+        f"📏 标题上边距: {args.title_top_margin}px {'(垂直居中)' if args.title_top_margin == 0 else '(距离顶部)'}"
+    )
     print(f"📝 显示Book summary: {'否' if args.no_book_summary else '是'}")
     if not args.no_book_summary:
         print(f"📝 Book summary字体大小: {args.summary_font_size}px")

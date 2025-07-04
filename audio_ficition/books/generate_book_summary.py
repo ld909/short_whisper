@@ -716,6 +716,15 @@ Ensure the total word count reaches at least 5000 words.
             ".file-chunk-container span.name",
         ]
 
+        # Failed状态选择器
+        failed_selectors = [
+            'span.status.ng-star-inserted:has-text("Failed")',
+            'span.status:has-text("Failed")',
+            'span:has-text("Failed")',
+            '.status:has-text("Failed")',
+            '[class*="status"]:has-text("Failed")',
+        ]
+
         max_wait_time = (
             self.token_wait_time
         )  # 等待token计算的时间（可通过命令行参数设定）
@@ -723,6 +732,34 @@ Ensure the total word count reaches at least 5000 words.
         elapsed_time = 0
 
         while elapsed_time < max_wait_time:
+            # 🔥 优先检查Failed状态
+            failed_detected = False
+            for selector in failed_selectors:
+                try:
+                    failed_elements = self.page.locator(selector)
+                    if failed_elements.count() > 0:
+                        for i in range(failed_elements.count()):
+                            element_text = failed_elements.nth(i).inner_text().strip()
+                            if "failed" in element_text.lower():
+                                failed_detected = True
+                                print(f"❌ 检测到Failed状态: {element_text}")
+                                break
+                    if failed_detected:
+                        break
+                except Exception as e:
+                    if self.debug:
+                        print(f"检查Failed选择器失败 {selector}: {e}")
+                    continue
+
+            if failed_detected:
+                print("❌ PDF处理失败，立即停止等待进行重试")
+
+                # 更新失败记录
+                if uuid_val:
+                    self.update_token_failure(uuid_val, book_title)
+
+                return False
+
             # 检查token计数
             token_found = False
             token_text = ""
