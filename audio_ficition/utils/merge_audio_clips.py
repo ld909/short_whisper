@@ -37,7 +37,7 @@
 使用示例
 -------
 ```bash
-# 处理所有主题
+# 处理所有主题（传统模式）
 python merge_audio_clips.py
 
 # 处理指定主题
@@ -48,7 +48,34 @@ python merge_audio_clips.py --theme thriller --preview
 
 # 强制重新生成
 python merge_audio_clips.py --theme horror --force-regenerate
+
+# 启用一致性检查（推荐：指定主题）
+python merge_audio_clips.py --check-consistency --theme fantasy
+
+# 一致性检查 + 预览模式
+python merge_audio_clips.py --check-consistency --theme thriller --preview
+
+# 一致性检查 + 强制重新生成
+python merge_audio_clips.py --check-consistency --theme scifi --force-regenerate
+
+# 传统模式：书籍音频一致性检查（已废弃）
+python merge_audio_clips.py --check-consistency --lang en --theme all
+
+# 指定自定义chunk目录进行一致性检查
+python merge_audio_clips.py --check-consistency --theme horror --chunk-dir /custom/path/to/chunks
 ```
+
+一致性检查功能说明
+---------------
+- `--check-consistency`: 启用chunk文本文件和mp3音频文件数量一致性检查
+- `--theme`: 指定主题类型（scifi/thriller/horror/fantasy/romance），自动使用对应主题路径
+- `--lang`: 语言类型（en/zh），用于传统书籍音频路径（已废弃，建议使用主题路径）
+- `--chunk-dir`: 可选，指定自定义chunk文件目录（默认根据主题自动选择）
+- 只有当chunk数量与mp3数量完全匹配时才会进行音频合并
+- 推荐使用主题路径结构：
+  - Chunk目录：`/home/dhl/Documents/audio/chunks/{theme}/{story_index}/`
+  - MP3目录：`/home/dhl/Documents/audio/mp3_clips/{theme}/{story_index}/`
+- 适用于故事音频处理流水线，确保数据完整性
 
 """
 
@@ -88,6 +115,33 @@ def get_output_dir(theme):
         exit(1)
 
 
+# 新增：获取主题相关路径配置
+def get_theme_chunk_dir(theme):
+    """获取主题chunk文本文件目录路径"""
+    return f"/home/dhl/Documents/audio/chunks/{theme}"
+
+
+def get_theme_mp3_dir(theme):
+    """获取主题mp3音频文件目录路径"""
+    return f"/home/dhl/Documents/audio/mp3_clips/{theme}"
+
+
+# 兼容性函数：为书籍音频保留原有接口（已废弃，使用主题路径）
+def get_book_chunk_dir(lang="en"):
+    """获取书籍chunk文本文件目录路径（已废弃，请使用get_theme_chunk_dir）"""
+    print("⚠️  警告：get_book_chunk_dir已废弃，请使用主题相关的路径配置")
+    return f"/home/dhl/Documents/book/{lang}"
+
+
+def get_book_mp3_dir(lang="en"):
+    """获取书籍mp3音频文件目录路径（已废弃，请使用get_theme_mp3_dir）"""
+    print("⚠️  警告：get_book_mp3_dir已废弃，请使用主题相关的路径配置")
+    if lang == "zh":
+        return "/home/dhl/Documents/audio/mp3_clips/book/book_zh"
+    else:  # lang == "en"
+        return "/home/dhl/Documents/audio/mp3_clips/book/book_en"
+
+
 # 合并后的文件名
 OUTPUT_FILENAME = "story.mp3"
 # ===================================
@@ -114,6 +168,145 @@ def check_ubuntu_system():
         return False
     except:
         return False
+
+
+def get_chunk_files_count(chunk_dir, uuid):
+    """
+    获取指定UUID的chunk文本文件数量
+    
+    Args:
+        chunk_dir (str): chunk文本文件基础目录
+        uuid (str): 书籍或故事UUID
+        
+    Returns:
+        int: chunk文件数量
+        list: chunk文件路径列表
+    """
+    uuid_chunk_dir = os.path.join(chunk_dir, uuid)
+    
+    if not os.path.exists(uuid_chunk_dir):
+        print(f"❌ [UUID:{uuid[:8]}...] chunk目录不存在: {uuid_chunk_dir}")
+        return 0, []
+        
+    # 获取所有txt文件
+    txt_pattern = os.path.join(uuid_chunk_dir, "*.txt")
+    all_txt_files = glob.glob(txt_pattern)
+    
+    # 过滤掉以点开头的Mac系统文件
+    chunk_files = []
+    for txt_file in all_txt_files:
+        filename = os.path.basename(txt_file)
+        if not filename.startswith(".") and not filename.startswith("._"):
+            chunk_files.append(txt_file)
+    
+    # 按chunk索引排序
+    def extract_chunk_number(filepath):
+        basename = os.path.basename(filepath)
+        try:
+            return int(basename.split(".")[0])
+        except:
+            return 0
+    
+    chunk_files.sort(key=extract_chunk_number)
+    
+    print(f"📄 [UUID:{uuid[:8]}...] 找到 {len(chunk_files)} 个chunk文本文件")
+    return len(chunk_files), chunk_files
+
+
+def get_mp3_files_count(mp3_dir, uuid):
+    """
+    获取指定UUID的mp3音频文件数量
+    
+    Args:
+        mp3_dir (str): mp3音频文件基础目录
+        uuid (str): 书籍或故事UUID
+        
+    Returns:
+        int: mp3文件数量
+        list: mp3文件路径列表
+    """
+    uuid_mp3_dir = os.path.join(mp3_dir, uuid)
+    
+    if not os.path.exists(uuid_mp3_dir):
+        print(f"❌ [UUID:{uuid[:8]}...] mp3目录不存在: {uuid_mp3_dir}")
+        return 0, []
+        
+    # 获取所有mp3文件
+    mp3_pattern = os.path.join(uuid_mp3_dir, "*.mp3")
+    all_mp3_files = glob.glob(mp3_pattern)
+    
+    # 过滤掉以点开头的Mac系统文件，并验证文件有效性
+    mp3_files = []
+    for mp3_file in all_mp3_files:
+        filename = os.path.basename(mp3_file)
+        if not filename.startswith(".") and not filename.startswith("._"):
+            # 检查文件是否有效
+            if is_valid_audio_file(mp3_file):
+                mp3_files.append(mp3_file)
+            else:
+                print(f"⚠️  [UUID:{uuid[:8]}...] 跳过无效mp3文件: {mp3_file}")
+    
+    # 按chunk索引排序
+    def extract_chunk_number(filepath):
+        basename = os.path.basename(filepath)
+        try:
+            return int(basename.split(".")[0])
+        except:
+            return 0
+    
+    mp3_files.sort(key=extract_chunk_number)
+    
+    print(f"🎵 [UUID:{uuid[:8]}...] 找到 {len(mp3_files)} 个有效mp3音频文件")
+    return len(mp3_files), mp3_files
+
+
+def check_chunk_mp3_consistency(chunk_dir, mp3_dir, uuid):
+    """
+    检查指定UUID的chunk文件数量和mp3文件数量是否一致
+    
+    Args:
+        chunk_dir (str): chunk文本文件基础目录
+        mp3_dir (str): mp3音频文件基础目录
+        uuid (str): 书籍或故事UUID
+        
+    Returns:
+        bool: 数量是否一致
+        dict: 详细信息
+    """
+    print(f"\n🔍 [UUID:{uuid[:8]}...] 检查chunk和mp3文件数量一致性...")
+    
+    # 获取chunk文件数量
+    chunk_count, chunk_files = get_chunk_files_count(chunk_dir, uuid)
+    
+    # 获取mp3文件数量
+    mp3_count, mp3_files = get_mp3_files_count(mp3_dir, uuid)
+    
+    # 检查数量是否一致
+    is_consistent = chunk_count == mp3_count and chunk_count > 0
+    
+    result = {
+        "uuid": uuid,
+        "chunk_count": chunk_count,
+        "mp3_count": mp3_count,
+        "is_consistent": is_consistent,
+        "chunk_files": chunk_files,
+        "mp3_files": mp3_files
+    }
+    
+    if is_consistent:
+        print(f"✅ [UUID:{uuid[:8]}...] 数量检查通过: chunk={chunk_count}, mp3={mp3_count}")
+    else:
+        print(f"❌ [UUID:{uuid[:8]}...] 数量检查失败: chunk={chunk_count}, mp3={mp3_count}")
+        
+        if chunk_count == 0:
+            print(f"   💡 [UUID:{uuid[:8]}...] 没有找到chunk文本文件")
+        if mp3_count == 0:
+            print(f"   💡 [UUID:{uuid[:8]}...] 没有找到mp3音频文件")
+        if chunk_count > 0 and mp3_count > 0 and chunk_count != mp3_count:
+            print(f"   💡 [UUID:{uuid[:8]}...] chunk文件数量 ({chunk_count}) 与 mp3文件数量 ({mp3_count}) 不匹配")
+            print(f"   💡 [UUID:{uuid[:8]}...] 请检查 synthesize_book_audio.py 是否完整执行")
+    
+    return is_consistent, result
 
 
 def get_story_directories(input_dir):
@@ -396,7 +589,7 @@ def get_progress_stats(story_dirs, existing_stories):
     }
 
 
-def process_story(story_index, story_dir, output_base_dir, force_regenerate=False):
+def process_story(story_index, story_dir, output_base_dir, force_regenerate=False, check_consistency=False, chunk_dir=None, lang="en", theme=None):
     """
     处理单个故事，合并其所有音频片段
 
@@ -405,6 +598,10 @@ def process_story(story_index, story_dir, output_base_dir, force_regenerate=Fals
         story_dir (str): 故事目录路径
         output_base_dir (str): 输出基础目录
         force_regenerate (bool): 是否强制重新生成
+        check_consistency (bool): 是否检查chunk和mp3数量一致性
+        chunk_dir (str): chunk文本文件目录（当check_consistency=True时需要）
+        lang (str): 语言类型，用于书籍音频处理（en/zh）（已废弃）
+        theme (str): 主题名称，用于确定正确的路径
 
     Returns:
         bool: 处理是否成功
@@ -424,29 +621,74 @@ def process_story(story_index, story_dir, output_base_dir, force_regenerate=Fals
         print(f"⏭️  文件已存在且有效，跳过: {output_file} ({file_size:,} 字节)")
         return True
 
-    # 获取所有音频片段
-    audio_clips = get_audio_clips(story_dir)
-
-    if not audio_clips:
-        print(f"❌ 故事 {story_index} 没有找到音频片段")
-        return False
-
-    print(f"📊 找到 {len(audio_clips)} 个音频片段")
-
-    # 检查所有片段是否有效
-    valid_clips = []
-    for clip in audio_clips:
-        if is_valid_audio_file(clip):
-            valid_clips.append(clip)
+    # 如果启用一致性检查，则检查chunk和mp3数量是否一致
+    if check_consistency and chunk_dir:
+        print(f"🔍 启用一致性检查模式...")
+        
+        # 故事索引就是UUID/故事ID
+        uuid = story_index
+        
+        # 检查数量一致性
+        # 使用主题相关的正确路径
+        if theme:
+            # 使用主题路径（推荐方式）
+            chunk_base_dir = get_theme_chunk_dir(theme)
+            mp3_base_dir = get_theme_mp3_dir(theme)
         else:
-            print(f"⚠️  跳过无效音频片段: {clip}")
+            # 向后兼容：使用传入的chunk_dir和lang参数
+            chunk_base_dir = chunk_dir
+            mp3_base_dir = get_book_mp3_dir(lang)
+            
+        is_consistent, check_result = check_chunk_mp3_consistency(chunk_base_dir, mp3_base_dir, uuid)
+        
+        if not is_consistent:
+            print(f"❌ 故事 {story_index} 一致性检查失败，跳过合并")
+            print(f"   Chunk文件数量: {check_result['chunk_count']}")
+            print(f"   MP3文件数量: {check_result['mp3_count']}")
+            if check_result['chunk_count'] == 0:
+                if theme:
+                    print(f"   💡 建议: 检查 {chunk_base_dir}/{story_index}/ 目录是否存在chunk文件")
+                else:
+                    print(f"   💡 建议: 先运行 chunk_book_summaries.py 生成chunk文件")
+            if check_result['mp3_count'] == 0:
+                if theme:
+                    print(f"   💡 建议: 检查 {mp3_base_dir}/{story_index}/ 目录是否存在mp3文件")
+                else:
+                    print(f"   💡 建议: 先运行 synthesize_book_audio.py --lang {lang} 生成音频文件")
+            elif check_result['chunk_count'] != check_result['mp3_count']:
+                if theme:
+                    print(f"   💡 建议: 重新运行音频合成，确保所有chunk都已合成音频")
+                else:
+                    print(f"   💡 建议: 重新运行 synthesize_book_audio.py --lang {lang} 确保所有chunk都已合成音频")
+            return False
+        else:
+            print(f"✅ 故事 {story_index} 一致性检查通过，继续合并...")
+            # 使用检查结果中的有效mp3文件列表
+            valid_clips = check_result['mp3_files']
+    else:
+        # 原有逻辑：获取所有音频片段
+        audio_clips = get_audio_clips(story_dir)
 
-    if not valid_clips:
-        print(f"❌ 故事 {story_index} 没有有效的音频片段")
-        return False
+        if not audio_clips:
+            print(f"❌ 故事 {story_index} 没有找到音频片段")
+            return False
 
-    if len(valid_clips) != len(audio_clips):
-        print(f"⚠️  有 {len(audio_clips) - len(valid_clips)} 个无效片段被跳过")
+        print(f"📊 找到 {len(audio_clips)} 个音频片段")
+
+        # 检查所有片段是否有效
+        valid_clips = []
+        for clip in audio_clips:
+            if is_valid_audio_file(clip):
+                valid_clips.append(clip)
+            else:
+                print(f"⚠️  跳过无效音频片段: {clip}")
+
+        if not valid_clips:
+            print(f"❌ 故事 {story_index} 没有有效的音频片段")
+            return False
+
+        if len(valid_clips) != len(audio_clips):
+            print(f"⚠️  有 {len(audio_clips) - len(valid_clips)} 个无效片段被跳过")
 
     # 显示将要合并的片段
     print(f"🔗 将合并以下 {len(valid_clips)} 个片段:")
@@ -473,6 +715,9 @@ def process_theme(
     story_filter=None,
     force_regenerate=False,
     preview=False,
+    check_consistency=False,
+    chunk_base_dir=None,
+    lang="en",
 ):
     """
     处理单个主题的所有故事
@@ -484,6 +729,9 @@ def process_theme(
         story_filter (str): 只处理指定故事索引（可选）
         force_regenerate (bool): 是否强制重新生成
         preview (bool): 是否预览模式
+        check_consistency (bool): 是否检查chunk和mp3数量一致性
+        chunk_base_dir (str): chunk文本文件基础目录（当check_consistency=True时需要）
+        lang (str): 语言类型，用于书籍音频处理（en/zh）
 
     Returns:
         dict: 处理结果统计
@@ -496,6 +744,25 @@ def process_theme(
 
     print(f"📁 输入目录: {theme_input_dir}")
     print(f"📁 输出目录: {theme_output_dir}")
+
+    # 如果启用一致性检查，显示相关信息
+    if check_consistency:
+        print(f"🔍 一致性检查: 启用")
+        print(f"📄 Chunk目录: {chunk_base_dir}")
+        print(f"🌐 语言类型: {lang}")
+        
+        if not chunk_base_dir or not os.path.exists(chunk_base_dir):
+            print(f"❌ Chunk目录不存在或未指定: {chunk_base_dir}")
+            return {
+                "theme": theme,
+                "success": False,
+                "error": "Chunk目录不存在或未指定",
+                "processed": 0,
+                "successful": 0,
+                "failed": 0,
+            }
+    else:
+        print(f"🔍 一致性检查: 禁用")
 
     # 检查输入目录是否存在
     if not os.path.exists(theme_input_dir):
@@ -564,15 +831,38 @@ def process_theme(
             output_file = os.path.join(theme_output_dir, story_index, OUTPUT_FILENAME)
 
             # 统计音频片段数量
-            audio_clips = get_audio_clips(story_dir)
-            clip_count = len(
-                [clip for clip in audio_clips if is_valid_audio_file(clip)]
-            )
+            if check_consistency and chunk_base_dir:
+                # 使用一致性检查来获取详细信息
+                uuid = story_index
+                # 使用主题相关的正确路径结构
+                if theme:
+                    chunk_dir_for_check = get_theme_chunk_dir(theme)
+                    mp3_dir_for_check = get_theme_mp3_dir(theme)
+                else:
+                    chunk_dir_for_check = chunk_base_dir
+                    mp3_dir_for_check = get_book_mp3_dir(lang)
+                is_consistent, check_result = check_chunk_mp3_consistency(chunk_dir_for_check, mp3_dir_for_check, uuid)
+                
+                print(f"  {i:3d}. 故事 {story_index}")
+                print(f"       输入: {story_dir}")
+                print(f"       输出: {output_file}")
+                print(f"       Chunk: {check_result['chunk_count']} 个")
+                print(f"       MP3: {check_result['mp3_count']} 个")
+                if is_consistent:
+                    print(f"       状态: ✅ 一致性检查通过，需要合并")
+                else:
+                    print(f"       状态: ❌ 一致性检查失败，跳过合并")
+            else:
+                # 原有逻辑
+                audio_clips = get_audio_clips(story_dir)
+                clip_count = len(
+                    [clip for clip in audio_clips if is_valid_audio_file(clip)]
+                )
 
-            print(f"  {i:3d}. 故事 {story_index}")
-            print(f"       输入: {story_dir} ({clip_count} 个片段)")
-            print(f"       输出: {output_file}")
-            print(f"       状态: 🆕 需要合并")
+                print(f"  {i:3d}. 故事 {story_index}")
+                print(f"       输入: {story_dir} ({clip_count} 个片段)")
+                print(f"       输出: {output_file}")
+                print(f"       状态: 🆕 需要合并")
 
         if stats["completed_stories"] > 0:
             print(f"✅ 主题 {theme} 已完成的故事: {stats['completed_stories']} 个")
@@ -608,6 +898,7 @@ def process_theme(
 
     successful_count = 0
     failed_count = 0
+    skipped_count = 0  # 新增：跳过的故事数量（一致性检查失败）
 
     try:
         start_time = time.time()
@@ -621,13 +912,33 @@ def process_theme(
             )
 
             success = process_story(
-                story_index, story_dir, theme_output_dir, force_regenerate
+                story_index, 
+                story_dir, 
+                theme_output_dir, 
+                force_regenerate,
+                check_consistency,
+                chunk_base_dir,
+                lang,
+                theme
             )
 
             if success:
                 successful_count += 1
             else:
-                failed_count += 1
+                # 检查是否是因为一致性检查失败而跳过
+                if check_consistency and chunk_base_dir:
+                    # 重新检查一致性来确定失败原因
+                    uuid = story_index
+                    # 对于一致性检查，使用书籍音频的正确路径结构
+                    mp3_dir = get_book_mp3_dir(lang)
+                    is_consistent, _ = check_chunk_mp3_consistency(chunk_base_dir, mp3_dir, uuid)
+                    if not is_consistent:
+                        skipped_count += 1
+                        print(f"⏭️  故事 {story_index} 因一致性检查失败被跳过")
+                    else:
+                        failed_count += 1
+                else:
+                    failed_count += 1
 
         end_time = time.time()
         total_time = end_time - start_time
@@ -636,6 +947,8 @@ def process_theme(
         print(f"\n=== 🎉 主题 {theme} 处理完成 ===")
         print(f"✅ 本次成功合并: {successful_count} 个故事")
         print(f"❌ 本次合并失败: {failed_count} 个故事")
+        if check_consistency and skipped_count > 0:
+            print(f"⏭️  一致性检查跳过: {skipped_count} 个故事")
         print(f"⏭️  之前已完成: {stats['completed_stories']} 个故事")
         print(
             f"📊 总体完成: {stats['completed_stories'] + successful_count}/{stats['total_stories']} ({(stats['completed_stories'] + successful_count)/stats['total_stories']*100:.1f}%)"
@@ -712,6 +1025,21 @@ def main():
         default=True,
         help="断点续传模式，跳过已存在的有效音频文件 (默认: True)",
     )
+    parser.add_argument(
+        "--check-consistency",
+        action="store_true",
+        help="启用chunk和mp3文件数量一致性检查（适用于书籍音频合并）",
+    )
+    parser.add_argument(
+        "--chunk-dir",
+        help="chunk文本文件基础目录路径（启用一致性检查时需要）",
+    )
+    parser.add_argument(
+        "--lang",
+        choices=["en", "zh"],
+        default="en",
+        help="语言类型，用于书籍音频处理 (默认: en)",
+    )
 
     args = parser.parse_args()
 
@@ -723,6 +1051,46 @@ def main():
         print(f"🔄 强制重新生成模式: 将重新生成所有文件")
     elif args.resume:
         print(f"⚡ 断点续传模式: 将跳过已存在的有效文件")
+    
+    if args.check_consistency:
+        print(f"🔍 一致性检查: 启用")
+        print(f"🌐 语言类型: {args.lang}")
+        
+        # 如果指定了特定主题，使用主题路径；否则使用传统的书籍路径
+        if args.theme != "all":
+            # 单一主题模式：使用主题路径
+            chunk_dir = args.chunk_dir or get_theme_chunk_dir(args.theme)
+            mp3_dir = get_theme_mp3_dir(args.theme)
+            print(f"📄 主题Chunk目录: {chunk_dir}")
+            print(f"🎵 主题MP3目录: {mp3_dir}")
+        else:
+            # 多主题模式：使用书籍路径（向后兼容）
+            chunk_dir = args.chunk_dir or get_book_chunk_dir(args.lang)
+            mp3_dir = get_book_mp3_dir(args.lang)
+            print(f"📄 Chunk目录: {chunk_dir}")
+            print(f"🎵 MP3目录: {mp3_dir}")
+        
+        # 检查基础目录是否存在
+        if not os.path.exists(chunk_dir):
+            print(f"❌ Chunk目录不存在: {chunk_dir}")
+            if args.theme != "all":
+                print(f"💡 请检查主题 {args.theme} 的chunk文件是否已生成")
+            else:
+                print(f"💡 请先运行 chunk_book_summaries.py 生成chunk文件")
+            return
+            
+        if not os.path.exists(mp3_dir):
+            print(f"❌ MP3目录不存在: {mp3_dir}")
+            if args.theme != "all":
+                print(f"💡 请检查主题 {args.theme} 的mp3文件是否已生成")
+            else:
+                print(f"💡 请先运行 synthesize_book_audio.py --lang {args.lang} 生成音频文件")
+            return
+            
+        print(f"✅ 一致性检查目录验证通过")
+    else:
+        print(f"🔍 一致性检查: 禁用")
+        chunk_dir = None
 
     # 检查 ffmpeg 是否可用
     try:
@@ -759,6 +1127,9 @@ def main():
                 story_filter=args.story,
                 force_regenerate=args.force_regenerate,
                 preview=args.preview,
+                check_consistency=args.check_consistency,
+                chunk_base_dir=chunk_dir,
+                lang=args.lang,
             )
 
             all_results.append(result)
