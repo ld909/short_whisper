@@ -40,6 +40,13 @@
 4. 自动排除以点开头的Mac系统文件
 5. 使用AdsPower浏览器进行上传
 6. 自动选择"知识"分类
+7. 自动输入标签"读书"并按回车确认
+8. 智能计算发布时间：基于Excel中已发布视频的最晚时间 + 设定间隔
+9. 点击空白处关闭日期时间选择器，确保设置生效
+10. 等待视频上传完成（监控上传进度元素）
+11. 自动点击"立即投稿"完成发布
+12. 发布时间限制在14天内，超出则终止程序
+13. 每个视频处理前重新读取Excel表格计算发布时间
 
 💡 使用示例:
 
@@ -667,17 +674,413 @@ class BookBilibiliUploader:
 
             page.wait_for_timeout(3000)
 
-            print("🎉 视频信息填写完成！")
-            print("💡 请手动完成后续步骤（投币、充电等设置）并发布视频")
+            # 5. 输入标签
+            print("🏷️  正在输入标签...")
+            try:
+                # 定位标签输入框（使用first选择第一个匹配的元素）
+                tag_input_selector = "div.tag-input-wrp input.input-val"
+                page.wait_for_selector(
+                    tag_input_selector, state="visible", timeout=10000
+                )
 
-            # 等待一段时间让用户手动操作
-            countdown_timer(30, "等待手动完成发布操作")
+                tag_input = page.locator(tag_input_selector).first
+                tag_input.click()
+                tag_input.type("读书")
+
+                # 按回车键创建标签
+                tag_input.press("Enter")
+                print("✅ 已输入标签: 读书")
+
+                # 等待2秒
+                page.wait_for_timeout(2000)
+
+            except Exception as e:
+                print(f"⚠️  输入标签失败: {e}")
+                # 继续执行，标签不是必需的
+
+            # 6. 计算发布时间并检查是否在14天内
+            print("📅 计算发布时间...")
+            page.wait_for_timeout(2000)
+
+            # 计算发布时间（基于Excel中的最新数据）
+            current_time, publish_time = self.calculate_publish_time()
+
+            # 检查发布时间有效性
+            is_valid, time_info = self.check_publish_time_validity(publish_time)
+
+            if not is_valid:
+                print(f"❌ 发布时间超出14天限制！")
+                print(
+                    f"   当前时间: {time_info['current_time'].strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+                print(
+                    f"   计算发布时间: {time_info['publish_time'].strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+                print(
+                    f"   最大允许时间: {time_info['max_future_time'].strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+                print(f"   间隔设置: {self.interval_hours} 小时")
+                print(f"🛑 程序终止")
+                return False
+
+            print(f"✅ 发布时间检查通过")
+            print(
+                f"   当前时间: {time_info['current_time'].strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            print(
+                f"   计划发布时间: {time_info['publish_time'].strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            print(f"   间隔设置: {self.interval_hours} 小时")
+
+            # 7. 点击定时发布开关
+            print("🔄 正在启用定时发布...")
+            try:
+                # 点击定时发布开关
+                switch_selector = (
+                    'div[class*="time-switch-wrp"] div[class*="switch-container"]'
+                )
+                page.wait_for_selector(switch_selector, state="visible", timeout=10000)
+                switch_element = page.locator(switch_selector).first
+                switch_element.click()
+                print("✅ 已点击定时发布开关")
+            except Exception as e:
+                print(f"⚠️  点击定时发布开关失败: {e}")
+                # 继续执行，可能开关已经是开启状态
+
+            page.wait_for_timeout(2000)
+
+            # 8. 设定发布日期
+            print("📅 正在设定发布日期...")
+            try:
+                # 点击日期选择器的下拉图标
+                date_icon_selector = "div.date-picker-date-wrp .date-show-icon"
+                page.wait_for_selector(
+                    date_icon_selector, state="visible", timeout=10000
+                )
+                date_icon = page.locator(date_icon_selector).first
+                date_icon.click()
+                print("✅ 已点击日期选择器图标")
+
+                # 等待日期选择面板出现
+                page.wait_for_timeout(1000)
+
+                # 获取目标日期
+                target_day = publish_time.day
+                print(f"🗓️  设定目标日期: {target_day}日")
+
+                # 选择对应的日期
+                day_selector = (
+                    f'div.date-picker-body-item.date-item:has-text("{target_day}")'
+                )
+                page.wait_for_selector(day_selector, state="visible", timeout=5000)
+                day_element = page.locator(day_selector).first
+                day_element.click()
+                print(f"✅ 已选择日期: {target_day}日")
+
+            except Exception as e:
+                print(f"⚠️  设定发布日期失败: {e}")
+
+            page.wait_for_timeout(2000)
+
+            # 9. 设定发布时间
+            print("🕐 正在设定发布时间...")
+            try:
+                # 点击时间选择器的下拉图标
+                time_icon_selector = "div.date-picker-timer .date-show-icon"
+                page.wait_for_selector(
+                    time_icon_selector, state="visible", timeout=10000
+                )
+                time_icon = page.locator(time_icon_selector).first
+                time_icon.click()
+                print("✅ 已点击时间选择器图标")
+
+                # 等待时间选择面板出现
+                page.wait_for_timeout(1000)
+
+                # 获取目标时间
+                target_hour = publish_time.hour
+                target_minute = publish_time.minute
+
+                # 分钟需要是5的倍数（根据DOM结构，分钟只有00,05,10,15...等选项）
+                # 将分钟调整为最接近的5的倍数
+                target_minute_rounded = (target_minute // 5) * 5
+
+                print(f"⏰ 设定目标时间: {target_hour:02d}:{target_minute_rounded:02d}")
+
+                # 选择小时 - 第一个时间选择面板
+                hour_selector = f'div.time-picker-panel-select-wrp:first-child span.time-picker-panel-select-item:has-text("{target_hour:02d}")'
+                try:
+                    page.wait_for_selector(hour_selector, state="visible", timeout=5000)
+                    hour_element = page.locator(hour_selector).first
+                    hour_element.click()
+                    print(f"✅ 已选择小时: {target_hour:02d}")
+                except Exception:
+                    print(f"⚠️  选择小时失败，可能时间不可用: {target_hour:02d}")
+
+                # 等待2秒
+                page.wait_for_timeout(2000)
+
+                # 选择分钟 - 第二个时间选择面板
+                minute_selector = f'div.time-picker-panel-select-wrp:last-child span.time-picker-panel-select-item:has-text("{target_minute_rounded:02d}")'
+                try:
+                    page.wait_for_selector(
+                        minute_selector, state="visible", timeout=5000
+                    )
+                    minute_element = page.locator(minute_selector).first
+                    minute_element.click()
+                    print(f"✅ 已选择分钟: {target_minute_rounded:02d}")
+                except Exception:
+                    print(
+                        f"⚠️  选择分钟失败，可能时间不可用: {target_minute_rounded:02d}"
+                    )
+
+            except Exception as e:
+                print(f"⚠️  设定发布时间失败: {e}")
+
+            page.wait_for_timeout(1000)
+
+            # 10. 在空白处点击，确保日期时间选择器关闭
+            print("🖱️  点击空白处关闭日期时间选择器...")
+            try:
+                # 点击页面空白区域（通常选择页面右侧空白处）
+                page.click("body", position={"x": 800, "y": 300})
+                print("✅ 已点击空白处")
+
+                # 等待一下确保选择器关闭
+                page.wait_for_timeout(1000)
+
+            except Exception as e:
+                print(f"⚠️  点击空白处失败（可忽略）: {e}")
+
+            print("🎉 视频信息和定时发布设置完成！")
+            print(f"📅 计划发布时间: {publish_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+            # 11. 等待视频上传完成
+            print("⏳ 等待视频上传完成...")
+            upload_completed = self.wait_for_upload_completion(page)
+
+            if not upload_completed:
+                print("❌ 视频上传超时或失败")
+                return False
+
+            # 12. 点击立即投稿
+            print("📤 正在点击立即投稿...")
+            submit_success = self.click_submit_button(page)
+
+            if not submit_success:
+                print("❌ 点击立即投稿失败")
+                return False
+
+            print("🎉 视频上传和投稿完成！")
+
+            # 13. 上传完成后等待10秒，为下一个视频做准备
+            print("⏳ 上传完成，等待10秒后准备下一个视频...")
+            countdown_timer(10, "等待下一个视频上传")
 
             return True
 
         except Exception as e:
             print(f"❌ 上传视频时出错: {e}")
             return False
+
+    def wait_for_upload_completion(self, page, max_wait_minutes=30):
+        """等待视频上传完成"""
+        print("⏳ 监控视频上传进度...")
+
+        # 设置最大等待时间（默认30分钟）
+        max_wait_seconds = max_wait_minutes * 60
+        check_interval = 5  # 每5秒检查一次
+        elapsed_time = 0
+
+        while elapsed_time < max_wait_seconds:
+            try:
+                # 检查是否存在上传进度元素
+                progress_selector = "span.progress-text[data-v-9d62be74]"
+                progress_elements = page.locator(progress_selector)
+
+                if progress_elements.count() > 0:
+                    # 获取进度文本
+                    progress_text = progress_elements.first.text_content()
+                    print(f"📊 上传进度: {progress_text}")
+
+                    # 继续等待
+                    page.wait_for_timeout(check_interval * 1000)
+                    elapsed_time += check_interval
+                else:
+                    # 进度元素消失，说明上传完成
+                    print("✅ 视频上传完成！")
+
+                    # 等待2秒稳定
+                    page.wait_for_timeout(2000)
+                    return True
+
+            except Exception as e:
+                print(f"⚠️  检查上传进度时出错: {e}")
+                # 继续等待
+                page.wait_for_timeout(check_interval * 1000)
+                elapsed_time += check_interval
+
+        print(f"❌ 等待上传完成超时（{max_wait_minutes}分钟）")
+        return False
+
+    def click_submit_button(self, page):
+        """点击立即投稿按钮"""
+        try:
+            # 查找立即投稿按钮
+            submit_selector = 'span.submit-add[data-v-2a07ca73][data-reporter-id="31"]:has-text("立即投稿")'
+
+            print("🔍 正在查找立即投稿按钮...")
+            page.wait_for_selector(submit_selector, state="visible", timeout=10000)
+
+            submit_button = page.locator(submit_selector)
+            submit_button.click()
+
+            print("✅ 已点击立即投稿按钮")
+
+            # 等待页面响应
+            page.wait_for_timeout(3000)
+
+            # 检查是否投稿成功（可以检查页面是否跳转或出现成功提示）
+            try:
+                # 检查是否跳转离开上传页面
+                current_url = page.url
+                if "upload" not in current_url:
+                    print("✅ 投稿成功，已离开上传页面")
+                    return True
+                else:
+                    print("✅ 投稿按钮点击成功")
+                    return True
+            except Exception:
+                print("✅ 投稿按钮点击成功")
+                return True
+
+        except Exception as e:
+            print(f"❌ 点击立即投稿按钮失败: {e}")
+
+            # 尝试其他可能的选择器
+            try:
+                print("🔄 尝试其他投稿按钮选择器...")
+                alternative_selectors = [
+                    'span:has-text("立即投稿")',
+                    'button:has-text("立即投稿")',
+                    '[data-reporter-id="31"]',
+                    ".submit-add",
+                ]
+
+                for selector in alternative_selectors:
+                    try:
+                        elements = page.locator(selector)
+                        if elements.count() > 0:
+                            elements.first.click()
+                            print(f"✅ 使用备选选择器点击成功: {selector}")
+                            page.wait_for_timeout(3000)
+                            return True
+                    except Exception:
+                        continue
+
+            except Exception as fallback_error:
+                print(f"❌ 备选方案也失败: {fallback_error}")
+
+            return False
+
+    def calculate_publish_time(self):
+        """计算发布时间 - 基于已发布视频的最远时间"""
+        excel_file = self.directories["excel"]
+        current_time = datetime.now()
+
+        try:
+            # 读取Excel文件
+            df = pd.read_excel(excel_file)
+
+            # 查找已发布的视频（是否发布=1 且有发布时间）
+            published_videos = df[
+                (df["是否发布"] == 1)
+                & (df["发布时间"].notna())
+                & (df["发布时间"] != "")
+            ]
+
+            # 确定基准时间（最远发布时间）
+            if len(published_videos) == 0:
+                # 没有已发布的视频，当前时间就是最远发布的时间
+                latest_publish_time = current_time
+                print(f"📅 Excel中没有最远发布时间，以当前时间为基准")
+                print(
+                    f"   基准时间: {latest_publish_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+            else:
+                # 找到最远（最晚）的发布时间
+                latest_publish_time = None
+                for _, row in published_videos.iterrows():
+                    try:
+                        # 解析发布时间
+                        if isinstance(row["发布时间"], str):
+                            time_obj = datetime.strptime(
+                                row["发布时间"], "%Y-%m-%d %H:%M:%S"
+                            )
+                        else:
+                            # 可能是pandas的Timestamp对象
+                            time_obj = pd.to_datetime(row["发布时间"]).to_pydatetime()
+
+                        if (
+                            latest_publish_time is None
+                            or time_obj > latest_publish_time
+                        ):
+                            latest_publish_time = time_obj
+                    except Exception as e:
+                        print(f"⚠️  解析发布时间失败: {row['发布时间']}, 错误: {e}")
+                        continue
+
+                if latest_publish_time is None:
+                    # 解析全部失败，使用当前时间作为基准
+                    latest_publish_time = current_time
+                    print(f"📅 解析发布时间失败，以当前时间为基准")
+                    print(
+                        f"   基准时间: {latest_publish_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
+                else:
+                    print(f"📅 Excel中有发布时间，读取最远发布时间为基准")
+                    print(
+                        f"   基准时间: {latest_publish_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
+
+            # 基于基准时间 + 间隔计算新的发布时间
+            publish_time = latest_publish_time + timedelta(hours=self.interval_hours)
+
+            # 确保发布时间不早于当前时间
+            if publish_time <= current_time:
+                publish_time = current_time + timedelta(hours=self.interval_hours)
+                print(f"📅 调整发布时间到未来: 当前时间 + {self.interval_hours}小时")
+
+            print(f"   计算后发布时间: {publish_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"   间隔设置: {self.interval_hours}小时")
+
+            return current_time, publish_time
+
+        except Exception as e:
+            print(f"⚠️  读取Excel计算发布时间失败: {e}")
+            # 回退到简单计算：当前时间作为基准 + 间隔
+            latest_publish_time = current_time
+            publish_time = latest_publish_time + timedelta(hours=self.interval_hours)
+            print(f"📅 回退计算：以当前时间为基准 + {self.interval_hours}小时")
+            return current_time, publish_time
+
+    def check_publish_time_validity(self, publish_time):
+        """检查发布时间是否在有效范围内（14天内）"""
+        current_time = datetime.now()
+        max_future_time = current_time + timedelta(days=14)
+
+        if publish_time > max_future_time:
+            return False, {
+                "current_time": current_time,
+                "publish_time": publish_time,
+                "max_future_time": max_future_time,
+            }
+
+        return True, {
+            "current_time": current_time,
+            "publish_time": publish_time,
+            "max_future_time": max_future_time,
+        }
 
     def update_excel_status(self, book_info, publish_time):
         """更新Excel中的发布状态"""
@@ -775,13 +1178,18 @@ class BookBilibiliUploader:
                     print(f"🎉 书籍 {book_info['uuid']} 上传成功！")
 
                     if not dry_run:
+                        # 重新计算发布时间（基于Excel中的最新数据）
+                        current_time, publish_time = self.calculate_publish_time()
+
                         # 更新Excel状态
-                        current_time = datetime.now()
                         update_success = self.update_excel_status(
-                            book_info, current_time
+                            book_info, publish_time
                         )
                         if update_success:
                             print(f"✅✅ 完整成功: 视频发布成功且Excel已更新")
+                            print(
+                                f"📅 记录的发布时间: {publish_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                            )
                         else:
                             print(f"❌⚠️ 部分成功: 视频发布成功，但Excel更新失败")
                     else:
@@ -789,12 +1197,13 @@ class BookBilibiliUploader:
                 else:
                     print(f"❌ 书籍 {book_info['uuid']} 上传失败")
 
-                # 视频间隔等待
+                # 简化处理：每个视频上传完成后会自动等待10秒
                 if i < len(books_to_upload):
-                    wait_time = self.interval_hours * 3600  # 转换为秒
-                    countdown_timer(
-                        wait_time, f"视频间隔等待 {self.interval_hours} 小时"
-                    )
+                    print(f"\n⏳ 准备处理下一个视频...")
+                    if not dry_run:
+                        print(f"📝 将在原tab中重新导航到上传页面继续下一个UUID")
+                    else:
+                        print(f"✅ [试运行] 准备下一个视频")
 
         except KeyboardInterrupt:
             print("\n🛑 用户中断操作")
@@ -859,7 +1268,9 @@ def main():
   3. 获取书籍MP4文件、B站封面、标题、描述
   4. 按设定的时间间隔自动上传到B站
   5. 自动选择"知识"分类
-  6. 更新Excel文件中的发布状态
+  6. 自动设置定时发布（发布时间 = 当前时间 + 间隔）
+  7. 发布时间检查（必须在14天内，否则终止）
+  8. 更新Excel文件中的发布状态
 
 Excel文件格式要求:
   - 列名: UUID | 是否发布 | 发布时间
