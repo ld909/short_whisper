@@ -294,6 +294,7 @@ Ensure the total word count reaches at least 5000 words.
         books_to_process = []
         books_without_pdf = 0
         books_already_done = 0
+        books_oversized = 0
 
         for book in book_list:
             uuid_val = book.get("uuid")
@@ -312,14 +313,26 @@ Ensure the total word count reaches at least 5000 words.
                 continue
 
             # 检查是否有对应的PDF文件
-            if self.check_pdf_file_exists(book):
+            pdf_check_result = self.check_pdf_file_exists(book)
+            if pdf_check_result:
                 books_to_process.append(book)
                 if self.debug:
                     print(f"🎯 待处理: {book.get('title', uuid_val)}")
             else:
-                books_without_pdf += 1
+                # 通过检查文件大小来区分是没有PDF还是文件过大
+                uuid_val = book.get("uuid", "")
+                pdf_file_path = os.path.join(self.pdf_dir, f"{uuid_val}.pdf")
+                if os.path.exists(pdf_file_path):
+                    file_size = os.path.getsize(pdf_file_path)
+                    if file_size > 50 * 1024 * 1024:  # 文件存在但超过50MB
+                        books_oversized += 1
+                    else:
+                        books_without_pdf += 1
+                else:
+                    books_without_pdf += 1
+
                 if self.debug:
-                    print(f"📄 无PDF: {book.get('title', uuid_val)}")
+                    print(f"📄 跳过: {book.get('title', uuid_val)}")
 
         # 限制数量
         if max_count and len(books_to_process) > max_count:
@@ -328,7 +341,9 @@ Ensure the total word count reaches at least 5000 words.
         print(f"🎯 筛选出 {len(books_to_process)} 本书需要生成总结")
         print(f"✅ 已完成 {books_already_done} 本书的总结")
         if books_without_pdf > 0:
-            print(f"⏭️  跳过 {books_without_pdf} 本没有PDF文件的书籍")
+            print(f"📄 跳过 {books_without_pdf} 本没有PDF文件或文件损坏的书籍")
+        if books_oversized > 0:
+            print(f"📦 跳过 {books_oversized} 本PDF文件超过50MB的书籍")
         return books_to_process
 
     def check_pdf_file_exists(self, book_info):
@@ -346,12 +361,19 @@ Ensure the total word count reaches at least 5000 words.
 
         if os.path.exists(pdf_file_path):
             file_size = os.path.getsize(pdf_file_path)
-            if file_size > 1000:  # 至少1KB，确保不是空文件
-                print(f"📎 找到PDF文件: {uuid_val}.pdf ({file_size} bytes)")
-                return True
-            else:
+            file_size_mb = file_size / (1024 * 1024)  # 转换为MB
+
+            if file_size < 1000:  # 至少1KB，确保不是空文件
                 print(f"⚠️ PDF文件太小，可能损坏: {uuid_val}.pdf ({file_size} bytes)")
                 return False
+            elif file_size > 50 * 1024 * 1024:  # 50MB限制
+                print(
+                    f"⚠️ PDF文件过大，跳过处理: {title} ({file_size_mb:.2f} MB > 50 MB)"
+                )
+                return False
+            else:
+                print(f"📎 找到PDF文件: {uuid_val}.pdf ({file_size_mb:.2f} MB)")
+                return True
 
         if self.debug:
             print(f"📄 未找到PDF文件: {title} (UUID: {uuid_val})")
@@ -1540,15 +1562,31 @@ Ensure the total word count reaches at least 5000 words.
         # 统计PDF文件情况
         books_with_pdf = 0
         books_without_pdf = 0
+        books_oversized = 0
+        books_corrupted = 0
+
         for book in book_list:
-            if self.check_pdf_file_exists(book):
-                books_with_pdf += 1
+            uuid_val = book.get("uuid", "")
+            pdf_file_path = os.path.join(self.pdf_dir, f"{uuid_val}.pdf")
+
+            if os.path.exists(pdf_file_path):
+                file_size = os.path.getsize(pdf_file_path)
+                if file_size < 1000:  # 文件损坏
+                    books_corrupted += 1
+                elif file_size > 50 * 1024 * 1024:  # 文件过大
+                    books_oversized += 1
+                else:  # 正常文件
+                    books_with_pdf += 1
             else:
                 books_without_pdf += 1
 
         print(f"📚 总书籍数量: {len(book_list)}")
-        print(f"📎 有PDF文件: {books_with_pdf}")
+        print(f"📎 有效PDF文件: {books_with_pdf}")
         print(f"📄 无PDF文件: {books_without_pdf}")
+        if books_oversized > 0:
+            print(f"📦 PDF文件过大(>50MB): {books_oversized}")
+        if books_corrupted > 0:
+            print(f"💥 PDF文件损坏(<1KB): {books_corrupted}")
         print(f"✅ 已生成总结: {len(existing_summaries)}")
 
         # 计算实际可处理的书籍数量（有PDF且未生成总结的）
@@ -1607,7 +1645,10 @@ def main():
   python generate_book_summary_gemini.py --count 10 --lang zh  # 生成中文主题总结
   python generate_book_summary_gemini.py --count 10 --lang en  # 生成英文主题总结
 
-注意：脚本会自动检测并使用 book_pdf_downloader.py 下载的PDF文件
+注意：
+- 脚本会自动检测并使用 book_pdf_downloader.py 下载的PDF文件
+- 大于50MB的PDF文件将被自动跳过
+- 小于1KB的PDF文件被认为是损坏文件并跳过
         """,
     )
 
@@ -1661,6 +1702,7 @@ def main():
         print(f"📎 PDF文件检查已启用，发现 {len(pdf_files)} 个PDF文件")
         print(f"📁 PDF目录: {pdf_dir}")
         print("⚠️  注意：只有存在对应PDF文件的书籍才会被处理")
+        print("📦 文件大小限制：大于50MB的PDF文件将被自动跳过")
     else:
         print("❌ PDF目录不存在，无法处理任何书籍")
         print("💡 请先运行 book_pdf_downloader.py 下载PDF文件")
