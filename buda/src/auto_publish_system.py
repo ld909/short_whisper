@@ -9,9 +9,12 @@
 2. 过滤条件：是否发布=1 且 是否已经发布=0 且 频道名称列不为空
 3. 优先使用Excel中的频道信息定位视频文件和相关资源
 4. 从title_shorten_multi_lang和multi_lang_desc目录获取标题和描述
-5. 计算发布时间：基于已发布视频的最远时间+设定间隔（默认6小时）
-6. 自动发布视频到YouTube（使用Playwright标准方法）
-7. 更新Excel表格，标记为已发布并记录发布时间
+5. 自动上传封面图片（从thumbnail目录）
+6. 根据语言自动添加对应的佛学标签（英文/韩文）
+7. 计算发布时间：基于已发布视频的最远时间+设定间隔（默认6小时）
+8. 自动发布视频到YouTube（使用Playwright+CDP方法支持大文件）
+9. 智能tab管理：达到最大tab数量后自动等待并清理
+10. 更新Excel表格，标记为已发布并记录发布时间
 
 Excel必需列:
 - MP4名称: 视频文件名
@@ -19,6 +22,14 @@ Excel必需列:
 - 是否发布: 1表示需要发布
 - 是否已经发布: 0表示未发布，1表示已发布
 - 发布时间: 发布后自动填入
+
+特色功能:
+- 跨平台支持：macOS (Intel/Apple Silicon)、Linux/Ubuntu
+- 自动浏览器ID选择：英文频道默认kq316tr，韩文频道默认k10i7fjt
+- 智能tab管理：可设置最大tab数量，达到限制后自动等待并清理
+- 大文件支持：使用CDP方法突破浏览器文件上传限制
+- 封面自动上传：支持PNG格式封面图片
+- 语言标签：自动添加对应语言的佛学相关标签
 
 依赖:
 - pandas, openpyxl (Excel操作)
@@ -30,12 +41,19 @@ python auto_publish_system.py [选项]
 
 选项:
 -l, --language      指定语言 (en/ko, 默认en)
--n, --max-count     最大发布数量 (默认1)
+-n, --max-count     最大发布数量 (默认: 发布所有)
 -d, --dry-run       试运行模式，不实际发布
 -w, --wait-minutes  等待时间（分钟） (默认30)
 -i, --interval      视频间隔时间（小时） (默认6)
---ads-id           AdsPower浏览器ID (默认kq316tr)
---studio-url       YouTube Studio URL
+-t, --max-tabs      最大tab数量，达到此数量后将等待并清理 (默认6)
+--ads-id           AdsPower浏览器ID (默认: 根据语言自动选择)
+--studio-url       YouTube Studio URL (默认: 根据语言自动选择)
+
+示例:
+python auto_publish_system.py                    # 发布所有英文视频
+python auto_publish_system.py -l ko -n 5        # 发布5个韩文视频
+python auto_publish_system.py -t 10 -i 4        # 最大10个tab，间隔4小时
+python auto_publish_system.py -d                # 试运行模式
 """
 
 import os
@@ -81,11 +99,13 @@ class AutoPublishSystem:
         studio_url=None,
         wait_minutes=30,
         interval_hours=6,
+        max_tabs=6,
     ):
         self.language = language
         self.ads_id = ads_id
         self.wait_minutes = wait_minutes  # 新增：等待时间（分钟）
         self.interval_hours = interval_hours  # 新增：视频间隔时间（小时）
+        self.max_tabs = max_tabs  # 新增：最大tab数量
 
         # 根据语言自动选择对应的YouTube Studio URL
         if studio_url:
@@ -356,7 +376,27 @@ class AutoPublishSystem:
         return next_time
 
     def get_video_content(self, video_name, channel_name):
-        """获取视频的标题、描述和文件路径"""
+        """获取视频的标题、描述和文件路径
+
+        Args:
+            video_name: 视频文件名（包含.mp4后缀）
+            channel_name: 频道名称
+
+        Returns:
+            dict: 包含以下键的字典
+                - mp4_path: 视频文件路径
+                - title: 视频标题
+                - description: 视频描述（已添加语言标签）
+                - thumbnail_path: 封面图片路径（如果存在）
+                - valid: 文件是否有效（MP4文件存在）
+
+        功能:
+            1. 构建各种文件路径
+            2. 检查MP4文件存在性
+            3. 读取标题和描述文件
+            4. 自动添加对应语言的佛学标签
+            5. 检查封面图片存在性
+        """
         # 去除.mp4后缀
         base_name = video_name.replace(".mp4", "")
 
@@ -532,9 +572,10 @@ class AutoPublishSystem:
                     new_page = context.new_page()
                     print("✅ 已创建新的tab")
 
-                    # 验证新页面是否正常工作
-                    new_page.goto("about:blank")
-                    print("✅ 新tab验证成功")
+                    # 直接跳转到YouTube Studio URL
+                    print(f"🎯 正在跳转到YouTube Studio: {self.studio_url}")
+                    new_page.goto(self.studio_url, timeout=60000)
+                    print("✅ 新tab已跳转到YouTube Studio")
 
                 except Exception as page_error:
                     print(f"❌ 创建新tab失败: {page_error}")
@@ -685,10 +726,30 @@ class AutoPublishSystem:
             return False
 
         try:
-            # 导航到YouTube Studio
-            print("正在导航到YouTube Studio...")
-            page.goto(self.studio_url)
-            page.wait_for_load_state("networkidle")
+            # 检查是否已经在YouTube Studio页面
+            current_url = page.url
+            if "studio.youtube.com" in current_url:
+                print("✅ 已在YouTube Studio页面，无需重新导航")
+                # 使用更宽松的加载状态，确保页面完全加载
+                page.wait_for_load_state("domcontentloaded")
+                print("页面DOM加载完成，等待上传按钮出现...")
+            else:
+                # 导航到YouTube Studio
+                print("正在导航到YouTube Studio...")
+                page.goto(self.studio_url, timeout=60000)  # 增加超时时间到60秒
+                # 使用更宽松的加载状态，而不是networkidle
+                page.wait_for_load_state("domcontentloaded")
+                print("页面DOM加载完成，等待上传按钮出现...")
+
+            # 等待上传按钮出现，确保页面完全加载
+            try:
+                page.wait_for_selector(
+                    '[test-id="upload-icon-url"]', state="visible", timeout=30000
+                )
+                print("上传按钮已出现，页面加载完成")
+            except Exception as wait_error:
+                print(f"⚠️ 等待上传按钮时出错: {wait_error}")
+                print("继续尝试上传操作...")
 
             # 点击上传图标
             print("正在点击上传图标...")
@@ -766,7 +827,9 @@ class AutoPublishSystem:
                     return False
 
             # 等待上传处理
-            page.wait_for_load_state("networkidle")
+            print("等待上传处理完成...")
+            page.wait_for_timeout(8000)  # 使用固定等待时间，避免networkidle超时
+            print("上传处理等待完成")
 
             # 固定等待5秒再输入标题
             print("等待 5 秒后开始输入标题...")
@@ -1718,19 +1781,33 @@ class AutoPublishSystem:
             print(f"🔒 出错时默认认为仍在上传中")
             return "uploading"
 
-    def wait_for_tab_slot_with_countdown(self, context, current_page, max_tabs=6):
+    def wait_for_tab_slot_with_countdown(self, context, current_page, max_tabs=None):
         """当tab数量达到限制时，等待指定时间并显示倒计时，然后新开tab并关闭其他所有tab
 
         Args:
             context: 浏览器上下文
             current_page: 当前页面
-            max_tabs: 最大tab数量限制
+            max_tabs: 最大tab数量限制，如果为None则使用self.max_tabs
 
         Returns:
-            bool: 是否成功处理
+            mixed:
+                - True: tab数量未达限制，无需等待
+                - Page对象: 等待完成后创建的新页面对象
+                - False: 等待过程中出错
+
+        工作流程:
+            1. 检查当前tab数量是否超过限制
+            2. 如果超过限制，显示倒计时等待
+            3. 等待完成后创建新的tab
+            4. 关闭所有其他tab
+            5. 返回新创建的页面对象
         """
         if not context:
             return False
+
+        # 如果没有指定max_tabs，使用实例变量
+        if max_tabs is None:
+            max_tabs = self.max_tabs
 
         current_tab_count = len(context.pages)
 
@@ -1761,10 +1838,15 @@ class AutoPublishSystem:
             # 倒计时结束，换行
             print(f"\n✅ {self.wait_minutes}分钟等待完成！")
 
-            # 创建新的第7个tab
-            print(f"🆕 正在创建第7个tab...")
+            # 创建新的第n+1个tab
+            print(f"🆕 正在创建第{max_tabs+1}个tab...")
             new_page = context.new_page()
             print(f"✅ 已创建新tab")
+
+            # 直接跳转到YouTube Studio URL
+            print(f"🎯 正在跳转到YouTube Studio: {self.studio_url}")
+            new_page.goto(self.studio_url, timeout=60000)
+            print(f"✅ 新tab已跳转到YouTube Studio")
 
             # 切换到新tab
             new_page.bring_to_front()
@@ -1833,8 +1915,23 @@ class AutoPublishSystem:
             print(f"⚠️ 关闭其他tab时出错: {e}")
             return 0
 
-    def run(self, max_count=1, dry_run=False):
-        """运行自动发布系统"""
+    def run(self, max_count=999999, dry_run=False):
+        """运行自动发布系统
+
+        Args:
+            max_count: 最大发布数量，默认发布所有视频
+            dry_run: 是否为试运行模式，试运行时不实际发布
+
+        功能流程:
+            1. 获取待发布视频列表（从Excel）
+            2. 初始化浏览器（非试运行模式）
+            3. 为每个视频创建新的tab
+            4. 智能tab管理：达到最大数量时等待并清理
+            5. 上传视频、标题、描述、封面
+            6. 设置发布时间并发布
+            7. 更新Excel状态
+            8. 自动清理资源
+        """
         print(f"=== 自动发布系统启动 ===")
         print(
             f"语言: {self.language} ({LANGUAGE_NAMES.get(self.language, self.language)})"
@@ -1843,13 +1940,18 @@ class AutoPublishSystem:
         print(f"试运行模式: {dry_run}")
         print(f"等待时间: {self.wait_minutes}分钟")
         print(f"视频间隔: {self.interval_hours}小时")
+        print(f"最大tab数量: {self.max_tabs}")
 
         if not dry_run:
             print("\n📌 重要提示:")
             print("   • 系统将自动管理浏览器tab，初始化时会关闭所有现有tab")
             print("   • 每个视频都会在新的tab中发布")
-            print(f"   • 当tab数量达到6个时，会等待{self.wait_minutes}分钟倒计时")
-            print(f"   • {self.wait_minutes}分钟后会新开第7个tab并关闭其他所有tab")
+            print(
+                f"   • 当tab数量达到{self.max_tabs}个时，会等待{self.wait_minutes}分钟倒计时"
+            )
+            print(
+                f"   • {self.wait_minutes}分钟后会新开第{self.max_tabs+1}个tab并关闭其他所有tab"
+            )
             print("   • 使用 Ctrl+C 可以随时中断程序")
             print("   • 程序结束后浏览器会保持打开，方便检查发布结果")
         print()
@@ -1926,15 +2028,17 @@ class AutoPublishSystem:
                     current_tab_count = len(context.pages)
                     print(f"📊 当前tab数量: {current_tab_count}")
 
-                    if current_tab_count >= 6:
-                        print(f"⏳ Tab数量已达限制 ({current_tab_count}/6)")
+                    if current_tab_count >= self.max_tabs:
+                        print(
+                            f"⏳ Tab数量已达限制 ({current_tab_count}/{self.max_tabs})"
+                        )
                         print(
                             f"🕐 将等待{self.wait_minutes}分钟后新开tab并关闭其他所有tab..."
                         )
 
                         # 执行指定时间等待并创建新tab
                         result = self.wait_for_tab_slot_with_countdown(
-                            context, page, max_tabs=6
+                            context, page, max_tabs=self.max_tabs
                         )
 
                         # 检查结果，如果是新页面对象就更新引用
@@ -1950,6 +2054,11 @@ class AutoPublishSystem:
                             # 创建新的tab
                             new_page = context.new_page()
                             print("✅ 已创建新的tab")
+
+                            # 直接跳转到YouTube Studio URL
+                            print(f"🎯 正在跳转到YouTube Studio: {self.studio_url}")
+                            new_page.goto(self.studio_url, timeout=60000)
+                            print("✅ 新tab已跳转到YouTube Studio")
 
                             # 切换到新的tab
                             new_page.bring_to_front()
@@ -2125,6 +2234,13 @@ def main():
         default=6,
         help="视频间隔时间（小时） (默认: 6)",
     )
+    parser.add_argument(
+        "-t",
+        "--max-tabs",
+        type=int,
+        default=6,
+        help="最大tab数量，达到此数量后将等待并清理 (默认: 6)",
+    )
 
     args = parser.parse_args()
 
@@ -2153,6 +2269,7 @@ def main():
         studio_url=args.studio_url,
         wait_minutes=args.wait_minutes,
         interval_hours=args.interval,
+        max_tabs=args.max_tabs,
     )
 
     # 如果没有指定max_count，则发布所有视频
