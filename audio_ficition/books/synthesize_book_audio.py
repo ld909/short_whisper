@@ -41,20 +41,23 @@
 5. 支持指定语言或自动检测文本语言（中文/英文），智能选择参考音频
 
 💡 使用示例:
-# 处理英文书籍
-python synthesize_book_audio.py --lang en
+# 多语言循环处理（默认，按 zh-en-zh-en 顺序）
+python synthesize_book_audio.py
 
-# 处理中文书籍
-python synthesize_book_audio.py --lang zh
+# 单语言处理
+python synthesize_book_audio.py --lang en     # 仅处理英文书籍
+python synthesize_book_audio.py --lang zh     # 仅处理中文书籍
 
-# 处理指定UUID的书籍
+# 指定UUID的书籍（仅限单语言模式）
 python synthesize_book_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012 --lang en
 
 # 预览模式
-python synthesize_book_audio.py --preview --lang zh
+python synthesize_book_audio.py --preview             # 预览所有语言
+python synthesize_book_audio.py --preview --lang zh   # 预览中文书籍
 
 # 强制重新生成
-python synthesize_book_audio.py --force-regenerate --lang en
+python synthesize_book_audio.py --force-regenerate    # 重新生成所有语言
+python synthesize_book_audio.py --force-regenerate --lang en  # 重新生成英文书籍
 """
 
 import os
@@ -489,6 +492,65 @@ def get_book_directories(input_base_dir):
 
     print(f"📊 找到 {len(book_dirs)} 个书籍目录")
     return book_dirs
+
+
+def get_all_books_multi_language():
+    """
+    获取所有语言的书籍目录，按照 zh-en-zh-en 顺序循环排列
+    
+    Returns:
+        list: 按循环顺序排列的书籍列表，格式：[(uuid, directory_path, lang)]
+    """
+    all_books = []
+    
+    # 获取中文书籍
+    zh_input_dir, _ = get_paths_for_language("zh")
+    print(f"🔍 扫描中文书籍目录: {zh_input_dir}")
+    zh_books = get_book_directories(zh_input_dir)
+    zh_book_list = [(uuid, path, "zh") for uuid, path in zh_books]
+    
+    # 获取英文书籍
+    en_input_dir, _ = get_paths_for_language("en")
+    print(f"🔍 扫描英文书籍目录: {en_input_dir}")
+    en_books = get_book_directories(en_input_dir)
+    en_book_list = [(uuid, path, "en") for uuid, path in en_books]
+    
+    print(f"🌐 发现中文书籍: {len(zh_book_list)} 本")
+    print(f"🌐 发现英文书籍: {len(en_book_list)} 本")
+    
+    # 如果两种语言都没有书籍，返回空列表
+    if not zh_book_list and not en_book_list:
+        return all_books
+    
+    # 按照 zh-en-zh-en 顺序循环排列
+    max_books = max(len(zh_book_list), len(en_book_list))
+    
+    for i in range(max_books):
+        # 先添加中文书籍（如果还有的话）
+        if i < len(zh_book_list):
+            all_books.append(zh_book_list[i])
+        
+        # 再添加英文书籍（如果还有的话）
+        if i < len(en_book_list):
+            all_books.append(en_book_list[i])
+    
+    print(f"🔄 多语言处理顺序: 中文-英文-中文-英文...")
+    print(f"📊 总共将处理 {len(all_books)} 本书籍")
+    
+    # 显示处理顺序预览
+    if len(all_books) <= 10:
+        print(f"📋 处理顺序预览:")
+        for i, (uuid, _, book_lang) in enumerate(all_books, 1):
+            lang_name = "中文" if book_lang == "zh" else "英文"
+            print(f"  {i:2d}. {lang_name} - UUID:{uuid[:8]}...{uuid[-8:]}")
+    else:
+        print(f"📋 处理顺序预览（前10本）:")
+        for i, (uuid, _, book_lang) in enumerate(all_books[:10], 1):
+            lang_name = "中文" if book_lang == "zh" else "英文"
+            print(f"  {i:2d}. {lang_name} - UUID:{uuid[:8]}...{uuid[-8:]}")
+        print(f"       ... 还有 {len(all_books) - 10} 本书籍")
+    
+    return all_books
 
 
 def get_chunk_files_by_uuid(book_directory, uuid):
@@ -943,6 +1005,92 @@ def cleanup_and_exit(use_proxy):
         unset_clash_proxy()
 
 
+def cleanup_zero_size_audio_files(output_base_dir, lang=None):
+    """
+    清理输出目录中文件大小为0的mp3文件
+    
+    Args:
+        output_base_dir (str): 输出基础目录
+        lang (str): 语言类型（en/zh），如果为None则处理所有语言
+    
+    Returns:
+        int: 删除的文件数量
+    """
+    deleted_count = 0
+    
+    if not os.path.exists(output_base_dir):
+        print(f"📁 输出目录不存在，跳过清理: {output_base_dir}")
+        return deleted_count
+    
+    print(f"🧹 开始清理零字节mp3文件: {output_base_dir}")
+    
+    # 遍历所有子目录（书籍UUID目录）
+    for item in os.listdir(output_base_dir):
+        # 排除Mac系统产生的点文件
+        if item.startswith("."):
+            continue
+            
+        item_path = os.path.join(output_base_dir, item)
+        if not os.path.isdir(item_path):
+            continue
+        
+        # 检查目录中的mp3文件
+        for file_name in os.listdir(item_path):
+            # 排除Mac系统产生的点文件
+            if file_name.startswith("."):
+                continue
+                
+            if file_name.endswith(".mp3"):
+                file_path = os.path.join(item_path, file_name)
+                
+                try:
+                    file_size = os.path.getsize(file_path)
+                    if file_size == 0:
+                        print(f"🗑️  删除零字节文件: {file_path}")
+                        os.remove(file_path)
+                        deleted_count += 1
+                except OSError as e:
+                    print(f"❌ 删除文件失败 {file_path}: {e}")
+                except Exception as e:
+                    print(f"⚠️  检查文件时出错 {file_path}: {e}")
+    
+    if deleted_count > 0:
+        print(f"✅ 清理完成，删除了 {deleted_count} 个零字节mp3文件")
+    else:
+        print(f"✅ 清理完成，未发现零字节mp3文件")
+    
+    return deleted_count
+
+
+def cleanup_all_zero_size_files():
+    """
+    清理所有语言输出目录中的零字节mp3文件
+    
+    Returns:
+        int: 总删除的文件数量
+    """
+    total_deleted = 0
+    
+    print(f"\n🧹 开始清理所有语言的零字节mp3文件...")
+    
+    # 清理英文书籍目录
+    en_input_dir, en_output_dir = get_paths_for_language("en")
+    en_deleted = cleanup_zero_size_audio_files(en_output_dir, "en")
+    total_deleted += en_deleted
+    
+    # 清理中文书籍目录
+    zh_input_dir, zh_output_dir = get_paths_for_language("zh")
+    zh_deleted = cleanup_zero_size_audio_files(zh_output_dir, "zh")
+    total_deleted += zh_deleted
+    
+    print(f"🧹 全部清理完成:")
+    print(f"   英文书籍: 删除 {en_deleted} 个文件")
+    print(f"   中文书籍: 删除 {zh_deleted} 个文件")
+    print(f"   总计: 删除 {total_deleted} 个零字节mp3文件")
+    
+    return total_deleted
+
+
 def main():
     """主函数"""
     # 检查是否为支持的系统
@@ -959,11 +1107,16 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 使用示例:
-  # 基本使用
-  python synthesize_book_audio.py --lang en                      # 处理英文书籍
-  python synthesize_book_audio.py --lang zh                      # 处理中文书籍
+  # 多语言循环处理（默认）
+  python synthesize_book_audio.py                                # 处理所有语言，zh-en-zh-en 循环
+  python synthesize_book_audio.py --preview                      # 预览模式
+  python synthesize_book_audio.py --force-regenerate            # 强制重新生成
   
-  # 指定UUID处理
+  # 单语言处理
+  python synthesize_book_audio.py --lang en                      # 仅处理英文书籍
+  python synthesize_book_audio.py --lang zh                      # 仅处理中文书籍
+  
+  # 指定UUID处理（仅限单语言模式）
   python synthesize_book_audio.py --uuid 12345678-abcd-efgh-ijkl-123456789012 --lang en
   
   # 其他选项
@@ -973,9 +1126,8 @@ def main():
     )
     parser.add_argument(
         "--lang", "-l", 
-        required=True,
         choices=["en", "zh"],
-        help="语言类型: en=英文, zh=中文 (必需参数)"
+        help="语言类型: en=英文, zh=中文 (不指定则默认处理所有语言，按 zh-en-zh-en 顺序循环)"
     )
     parser.add_argument("--uuid", "-u", help="要处理的书籍UUID，不指定则处理所有书籍")
     parser.add_argument(
@@ -1023,6 +1175,11 @@ def main():
         help="启用代理设置，用于下载模型文件 (默认: True)",
     )
     parser.add_argument("--no-proxy", action="store_true", help="禁用代理设置")
+    parser.add_argument(
+        "--skip-cleanup",
+        action="store_true",
+        help="跳过清理零字节mp3文件的步骤"
+    )
 
     args = parser.parse_args()
 
@@ -1033,44 +1190,16 @@ def main():
     else:
         print("🌐 未启用代理设置")
 
-    # 根据语言设置路径
+    # 根据是否指定语言设置处理模式
     lang = args.lang
-    
-    # 获取语言对应的路径
-    if args.input_base_dir:
-        input_base_dir = args.input_base_dir
-    else:
-        input_base_dir, _ = get_paths_for_language(lang)
-    
-    if args.output_base_dir:
-        output_base_dir = args.output_base_dir
-    else:
-        _, output_base_dir = get_paths_for_language(lang)
-    
-    # 根据语言设置参考音频
-    if args.ref_audio:
-        ref_audio = args.ref_audio
-    else:
-        ref_audio = get_ref_audio_for_language(lang)
-    
     model = args.model
     resume_mode = not args.no_resume
 
-    lang_name = "中文" if lang == "zh" else "英文"
     print(f"\n🎵 书籍音频合成器 (支持多语言和断点续传)")
-    print(f"🌐 处理语言: {lang_name} ({lang})")
-    print(f"📁 输入基础目录: {input_base_dir}")
-    print(f"📁 输出基础目录: {output_base_dir}")
-    print(f"🎤 参考音频: {ref_audio}")
     print(f"🤖 使用模型: {model}")
     print(f"🔄 断点续传: {'启用' if resume_mode else '禁用'}")
     print(f"🔁 最大重试次数: {args.max_retries}")
     print(f"🚫 自动排除Mac系统文件 (.DS_Store等)")
-
-    if args.uuid:
-        print(f"📚 处理模式: 仅处理指定UUID书籍 ({args.uuid[:8]}...{args.uuid[-8:]})")
-    else:
-        print(f"📚 处理模式: 处理所有发现的书籍")
 
     if args.force_regenerate:
         print(f"🔄 强制重新生成模式: 将重新生成所有文件")
@@ -1080,14 +1209,21 @@ def main():
     if args.preview:
         print(f"👁️  预览模式：只显示将要处理的文件")
 
-    # 检查参考音频文件是否存在
-    if not os.path.exists(ref_audio):
-        audio_type = "中文" if lang == "zh" else "英文"
-        print(f"❌ {audio_type}参考音频文件不存在: {ref_audio}")
-        cleanup_and_exit(use_proxy)
-        return
+    # 清理零字节mp3文件（除非跳过或预览模式）
+    if not args.skip_cleanup and not args.preview:
+        if lang:
+            # 单语言模式，只清理指定语言的目录
+            if args.output_base_dir:
+                output_base_dir = args.output_base_dir
+            else:
+                _, output_base_dir = get_paths_for_language(lang)
+            
+            cleanup_zero_size_audio_files(output_base_dir, lang)
+        else:
+            # 多语言模式，清理所有语言的目录
+            cleanup_all_zero_size_files()
 
-    # 检查所有参考音频文件是否存在（用于自动检测时的后备）
+    # 检查所有参考音频文件是否存在
     missing_audios = []
     if not os.path.exists(REF_AUDIO_EN):
         missing_audios.append(f"英文参考音频: {REF_AUDIO_EN}")
@@ -1095,57 +1231,141 @@ def main():
         missing_audios.append(f"中文参考音频: {REF_AUDIO_ZH}")
 
     if missing_audios:
-        print(f"⚠️  发现缺失的参考音频文件:")
+        print(f"❌ 发现缺失的参考音频文件:")
         for missing in missing_audios:
             print(f"   {missing}")
-        print(f"💡 如果开启自动语言检测，可能会影响功能")
+        print("💡 请确保参考音频文件存在后再运行")
+        cleanup_and_exit(use_proxy)
+        return
 
-    print(f"✅ 当前使用的参考音频文件检查通过:")
-    print(f"   {lang_name}参考音频: {ref_audio}")
+    print(f"✅ 所有参考音频文件检查通过:")
+    print(f"   英文参考音频: {REF_AUDIO_EN}")
+    print(f"   中文参考音频: {REF_AUDIO_ZH}")
 
     # 获取要处理的书籍列表
-    if args.uuid:
-        # 处理指定UUID的书籍
-        book_directory = os.path.join(input_base_dir, args.uuid)
-        if not os.path.exists(book_directory):
-            print(f"❌ 指定UUID的书籍目录不存在: {book_directory}")
+    if lang:
+        # 指定语言处理模式
+        lang_name = "中文" if lang == "zh" else "英文"
+        print(f"🌐 处理语言: {lang_name} ({lang})")
+        
+        # 获取语言对应的路径
+        if args.input_base_dir:
+            input_base_dir = args.input_base_dir
+        else:
+            input_base_dir, _ = get_paths_for_language(lang)
+        
+        if args.output_base_dir:
+            output_base_dir = args.output_base_dir
+        else:
+            _, output_base_dir = get_paths_for_language(lang)
+        
+        # 根据语言设置参考音频
+        if args.ref_audio:
+            ref_audio = args.ref_audio
+        else:
+            ref_audio = get_ref_audio_for_language(lang)
+        
+        print(f"📁 输入基础目录: {input_base_dir}")
+        print(f"📁 输出基础目录: {output_base_dir}")
+        print(f"🎤 参考音频: {ref_audio}")
+
+        if args.uuid:
+            # 处理指定UUID的书籍
+            book_directory = os.path.join(input_base_dir, args.uuid)
+            if not os.path.exists(book_directory):
+                print(f"❌ 指定UUID的书籍目录不存在: {book_directory}")
+                cleanup_and_exit(use_proxy)
+                return
+            book_dirs = [(args.uuid, book_directory)]
+            print(f"📚 处理模式: 仅处理指定UUID书籍 ({args.uuid[:8]}...{args.uuid[-8:]})")
+        else:
+            # 获取所有书籍目录
+            book_dirs = get_book_directories(input_base_dir)
+            if not book_dirs:
+                print(f"❌ 在目录 {input_base_dir} 中未找到任何书籍")
+                print("💡 请确保 chunk_book_summaries.py 已经运行并生成了文本块文件")
+                cleanup_and_exit(use_proxy)
+                return
+            print(f"📚 处理模式: 处理所有发现的书籍")
+    else:
+        # 多语言处理模式
+        print(f"🌐 处理语言: 所有语言 (zh-en-zh-en 循环)")
+        print(f"📚 处理模式: 多语言循环处理")
+        
+        if args.uuid:
+            print(f"❌ 多语言模式不支持指定UUID，请使用 --lang 参数指定语言")
             cleanup_and_exit(use_proxy)
             return
-        book_dirs = [(args.uuid, book_directory)]
-    else:
-        # 获取所有书籍目录
-        book_dirs = get_book_directories(input_base_dir)
-
-        if not book_dirs:
-            print(f"❌ 在目录 {input_base_dir} 中未找到任何书籍")
+        
+        if args.input_base_dir or args.output_base_dir or args.ref_audio:
+            print(f"❌ 多语言模式不支持自定义路径，将使用默认路径配置")
+        
+        # 获取所有语言的书籍目录（按 zh-en-zh-en 顺序）
+        all_books = get_all_books_multi_language()
+        
+        if not all_books:
+            print(f"❌ 未找到任何书籍")
             print("💡 请确保 chunk_book_summaries.py 已经运行并生成了文本块文件")
             cleanup_and_exit(use_proxy)
             return
+        
+        book_dirs = all_books  # 格式：[(uuid, directory_path, lang)]
 
     # 处理所有书籍
     all_results = []
 
     try:
-        for uuid, book_directory in book_dirs:
-            try:
-                result = process_book_by_uuid(
-                    uuid,
-                    book_directory,
-                    ref_audio,
-                    output_base_dir,
-                    model,
-                    args.preview,
-                    resume_mode,
-                    args.force_regenerate,
-                    lang,
-                    args.max_retries,
-                )
-                all_results.append(result)
-            except Exception as e:
-                print(f"❌ 处理书籍 UUID:{uuid[:8]}... 时出错: {e}")
-                import traceback
-
-                traceback.print_exc()
+        if lang:
+            # 单语言处理模式
+            for uuid, book_directory in book_dirs:
+                try:
+                    result = process_book_by_uuid(
+                        uuid,
+                        book_directory,
+                        ref_audio,
+                        output_base_dir,
+                        model,
+                        args.preview,
+                        resume_mode,
+                        args.force_regenerate,
+                        lang,
+                        args.max_retries,
+                    )
+                    all_results.append(result)
+                except Exception as e:
+                    print(f"❌ 处理书籍 UUID:{uuid[:8]}... 时出错: {e}")
+                    import traceback
+                    traceback.print_exc()
+        else:
+            # 多语言处理模式
+            for uuid, book_directory, book_lang in book_dirs:
+                try:
+                    # 根据书籍语言设置相应的参考音频和输出路径
+                    book_ref_audio = get_ref_audio_for_language(book_lang)
+                    _, book_output_base_dir = get_paths_for_language(book_lang)
+                    
+                    lang_name = "中文" if book_lang == "zh" else "英文"
+                    print(f"\n🌐 当前处理语言: {lang_name} ({book_lang})")
+                    print(f"📁 输出基础目录: {book_output_base_dir}")
+                    print(f"🎤 参考音频: {book_ref_audio}")
+                    
+                    result = process_book_by_uuid(
+                        uuid,
+                        book_directory,
+                        book_ref_audio,
+                        book_output_base_dir,
+                        model,
+                        args.preview,
+                        resume_mode,
+                        args.force_regenerate,
+                        book_lang,
+                        args.max_retries,
+                    )
+                    all_results.append(result)
+                except Exception as e:
+                    print(f"❌ 处理书籍 UUID:{uuid[:8]}... 时出错: {e}")
+                    import traceback
+                    traceback.print_exc()
 
         # 统计总结果
         if all_results:

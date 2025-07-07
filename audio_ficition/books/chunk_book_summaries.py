@@ -11,6 +11,8 @@
 - 自动排除Mac系统产生的点开头文件
 - 支持断点续传，跳过已处理的文件
 - 支持中文(zh)和英文(en)两种语言主题
+- 默认情况下处理所有语言，也可指定特定语言
+- 默认启用句级分块模式，将chunk按句号进一步分割为单独的句子文件
 
 📥 输入信息:
 - Intel Mac输入目录: /Volumes/dhl/audio/books/{language}/summary/
@@ -22,10 +24,11 @@
 📤 输出信息:
 - 输出根目录: /home/dhl/Documents/book/{language}/
 - 完整输出路径格式: /home/dhl/Documents/book/{language}/{uuid}/{chunk_index}.txt
-- 完整路径示例(中文): /home/dhl/Documents/book/zh-before-refine/12345678-abcd-efgh-ijkl-123456789012/1.txt
+- 完整路径示例(中文): /home/dhl/Documents/book/zh/12345678-abcd-efgh-ijkl-123456789012/1.txt
 - 完整路径示例(英文): /home/dhl/Documents/book/en/12345678-abcd-efgh-ijkl-123456789012/1.txt
 - 按语言分目录存储，每个书籍有自己的子目录，按UUID命名
-- 每个子目录内的文件按块索引命名（1.txt, 2.txt, 3.txt...）
+- 块级模式: 每个子目录内的文件按块索引命名（1.txt, 2.txt, 3.txt...）
+- 句级模式: 每个子目录内的文件按句索引累加命名（1.txt, 2.txt, 3.txt...）
 
 🔄 处理规则:
 1. 将书籍总结分割成指定最大字符数的块
@@ -34,13 +37,23 @@
 4. 支持断点续传，跳过已处理的书籍
 5. 中文模式下自动将阿拉伯数字转换为中文数字（如12→十二，199→一百九十九）
 6. 中文模式下自动将英文逗号","替换为中文逗号"，"
+7. 默认句级模式下，将每个chunk按句号进一步分割为单独的句子文件
 
 💡 使用示例:
-# 处理英文书籍总结
+# 处理所有语言书籍总结（默认句级分块）
+python chunk_book_summaries.py
+
+# 处理英文书籍总结（默认句级分块）
 python chunk_book_summaries.py --lang en
 
-# 处理中文书籍总结
+# 处理中文书籍总结（默认句级分块）
 python chunk_book_summaries.py --lang zh
+
+# 禁用句级分块，使用块级分块模式
+python chunk_book_summaries.py --no-sentence-level
+
+# 块级分块模式处理中文书籍
+python chunk_book_summaries.py --lang zh --no-sentence-level
 
 # 设置最大字符数
 python chunk_book_summaries.py --max-chars 2500 --lang zh
@@ -109,8 +122,6 @@ def get_default_input_dir(language="en"):
 
 def get_default_output_dir(language="en"):
     """获取默认输出目录（按语言分类）"""
-    if language == "zh":
-        return "/home/dhl/Documents/book/zh-before-refine"
     return f"/home/dhl/Documents/book/{language}"
 
 
@@ -462,6 +473,59 @@ def split_content_into_chunks(content, max_chars=3000):
     return chunks
 
 
+def split_chunk_into_sentences(chunk_content, language="en"):
+    """
+    将chunk内容按句号分割为单独的句子
+
+    Args:
+        chunk_content (str): 块内容
+        language (str): 语言类型，用于选择合适的句号分隔符
+
+    Returns:
+        list: 句子列表
+    """
+    if not chunk_content.strip():
+        return []
+
+    # 根据语言选择句号分隔符
+    if language == "zh":
+        # 中文句号
+        sentence_delimiters = ["。", "！", "？"]
+    else:
+        # 英文句号
+        sentence_delimiters = [".", "!", "?"]
+
+    # 使用正则表达式分割句子
+    import re
+    
+    # 构建分割模式
+    pattern = "|".join(re.escape(delimiter) for delimiter in sentence_delimiters)
+    
+    # 分割文本，保留分隔符
+    sentences = re.split(f"({pattern})", chunk_content)
+    
+    # 重新组合句子和分隔符
+    result_sentences = []
+    for i in range(0, len(sentences), 2):
+        if i < len(sentences):
+            sentence = sentences[i].strip()
+            if sentence:  # 只保留非空句子
+                # 如果有分隔符，加上分隔符
+                if i + 1 < len(sentences):
+                    delimiter = sentences[i + 1]
+                    sentence += delimiter
+                result_sentences.append(sentence)
+    
+    # 过滤掉空句子和只有标点的句子
+    filtered_sentences = []
+    for sentence in result_sentences:
+        sentence = sentence.strip()
+        if sentence and len(sentence) > 1:  # 确保句子不只是标点符号
+            filtered_sentences.append(sentence)
+    
+    return filtered_sentences
+
+
 def get_summary_files(input_dir):
     """
     获取输入目录中的所有书籍总结文件
@@ -544,7 +608,7 @@ def extract_uuid_from_filename(filename):
     return None
 
 
-def process_single_summary(input_file, output_base_dir, max_chars=3000, language="en"):
+def process_single_summary(input_file, output_base_dir, max_chars=3000, language="en", sentence_level=False):
     """
     处理单个书籍总结文件，分割成块并保存
 
@@ -553,6 +617,7 @@ def process_single_summary(input_file, output_base_dir, max_chars=3000, language
         output_base_dir (str): 输出基础目录
         max_chars (int): 每个块的最大字符数
         language (str): 语言类型，用于不同的文本处理规则
+        sentence_level (bool): 是否启用句级分块模式
 
     Returns:
         tuple: (成功标志, 块数量)
@@ -589,11 +654,10 @@ def process_single_summary(input_file, output_base_dir, max_chars=3000, language
         # 保存每个块并显示每个块的信息
         chunk_sizes = []
         total_chars_cleaned = 0
+        total_files_saved = 0
+        global_sentence_index = 0  # 全局句子计数器，从0开始
 
         for chunk_index, chunk_content in enumerate(chunks, 1):
-            chunk_filename = f"{chunk_index}.txt"
-            chunk_filepath = os.path.join(book_output_dir, chunk_filename)
-
             # 去掉换行符，变成一大段话
             chunk_content_no_newlines = chunk_content.replace("\n", " ").strip()
 
@@ -607,40 +671,79 @@ def process_single_summary(input_file, output_base_dir, max_chars=3000, language
             cleaned_length = len(chunk_content_cleaned)
             chars_removed = original_length - cleaned_length
 
-            # 总是显示每个chunk的处理信息
-            print(
-                f"      📝 块 {chunk_index}: {original_length} → {cleaned_length} 字符 (清理了 {chars_removed} 个)"
-            )
-
-            # 如果有字符被清理，显示更详细的信息
-            if chars_removed > 0:
-                print(f"         ✂️  成功清理了 {chars_removed} 个标点符号和特殊字符")
-                # 显示清理前后的片段对比（前50个字符）
-                before_preview = chunk_content_no_newlines[:100] + (
-                    "..." if len(chunk_content_no_newlines) > 100 else ""
+            if sentence_level:
+                # 句级分块模式
+                sentences = split_chunk_into_sentences(chunk_content_cleaned, language)
+                
+                print(
+                    f"      📝 块 {chunk_index}: {original_length} → {cleaned_length} 字符 (清理了 {chars_removed} 个) → {len(sentences)} 句"
                 )
-                after_preview = chunk_content_cleaned[:100] + (
-                    "..." if len(chunk_content_cleaned) > 100 else ""
+                
+                # 保存每个句子为单独的文件
+                for sentence_index, sentence in enumerate(sentences, 1):
+                    global_sentence_index += 1  # 累加全局句子计数器
+                    sentence_filename = f"{global_sentence_index}.txt"
+                    sentence_filepath = os.path.join(book_output_dir, sentence_filename)
+                    
+                    try:
+                        with open(sentence_filepath, "w", encoding="utf-8") as f:
+                            f.write(sentence.strip())
+                        
+                        sentence_size = len(sentence.strip())
+                        print(f"         📄 句子 {global_sentence_index}: {sentence_size} 字符")
+                        print(f"         💾 已保存到: {sentence_filepath}")
+                        
+                        # 显示句子预览
+                        sentence_preview = sentence.strip()[:80] + ("..." if len(sentence.strip()) > 80 else "")
+                        print(f"         📖 内容: {sentence_preview}")
+                        
+                        total_files_saved += 1
+                        
+                    except Exception as write_error:
+                        print(f"         ❌ 写入句子文件失败: {write_error}")
+                        return False, 0
+                        
+            else:
+                # 块级分块模式（原有逻辑）
+                chunk_filename = f"{chunk_index}.txt"
+                chunk_filepath = os.path.join(book_output_dir, chunk_filename)
+
+                # 总是显示每个chunk的处理信息
+                print(
+                    f"      📝 块 {chunk_index}: {original_length} → {cleaned_length} 字符 (清理了 {chars_removed} 个)"
                 )
-                print(f"         📄 清理前片段: {before_preview}")
-                print(f"         ✨ 清理后片段: {after_preview}")
 
-            # 确保写入文件
-            try:
-                with open(chunk_filepath, "w", encoding="utf-8") as f:
-                    f.write(chunk_content_cleaned)
-                print(f"         💾 已保存到: {chunk_filepath}")
+                # 如果有字符被清理，显示更详细的信息
+                if chars_removed > 0:
+                    print(f"         ✂️  成功清理了 {chars_removed} 个标点符号和特殊字符")
+                    # 显示清理前后的片段对比（前50个字符）
+                    before_preview = chunk_content_no_newlines[:100] + (
+                        "..." if len(chunk_content_no_newlines) > 100 else ""
+                    )
+                    after_preview = chunk_content_cleaned[:100] + (
+                        "..." if len(chunk_content_cleaned) > 100 else ""
+                    )
+                    print(f"         📄 清理前片段: {before_preview}")
+                    print(f"         ✨ 清理后片段: {after_preview}")
 
-                # 验证文件确实被写入
-                if os.path.exists(chunk_filepath):
-                    actual_size = os.path.getsize(chunk_filepath)
-                    print(f"         ✅ 文件大小: {actual_size} bytes")
-                else:
-                    print(f"         ❌ 文件未找到: {chunk_filepath}")
+                # 确保写入文件
+                try:
+                    with open(chunk_filepath, "w", encoding="utf-8") as f:
+                        f.write(chunk_content_cleaned)
+                    print(f"         💾 已保存到: {chunk_filepath}")
 
-            except Exception as write_error:
-                print(f"         ❌ 写入文件失败: {write_error}")
-                return False, 0
+                    # 验证文件确实被写入
+                    if os.path.exists(chunk_filepath):
+                        actual_size = os.path.getsize(chunk_filepath)
+                        print(f"         ✅ 文件大小: {actual_size} bytes")
+                    else:
+                        print(f"         ❌ 文件未找到: {chunk_filepath}")
+
+                    total_files_saved += 1
+
+                except Exception as write_error:
+                    print(f"         ❌ 写入文件失败: {write_error}")
+                    return False, 0
 
             chunk_sizes.append(len(chunk_content_cleaned))
             total_chars_cleaned += chars_removed
@@ -649,15 +752,23 @@ def process_single_summary(input_file, output_base_dir, max_chars=3000, language
         avg_chunk_size = sum(chunk_sizes) / len(chunk_sizes)
         chunk_sizes_str = ", ".join([str(size) for size in chunk_sizes])
 
-        print(f"✅ {filename}: {len(chunks)} 个块 (总计 {total_chars} 字符)")
-        print(f"   📁 UUID: {uuid_val}")
-        print(
-            f"   📊 块大小: [{chunk_sizes_str}] 字符, 平均: {avg_chunk_size:.0f} 字符"
-        )
-        print(f"   🧹 总共清理了: {total_chars_cleaned} 个字符")
-        print(f"   📂 输出目录: {book_output_dir}")
+        if sentence_level:
+            print(f"✅ {filename}: {len(chunks)} 个块 → {total_files_saved} 个句子文件 (总计 {total_chars} 字符)")
+            print(f"   📁 UUID: {uuid_val}")
+            print(f"   📊 块大小: [{chunk_sizes_str}] 字符, 平均: {avg_chunk_size:.0f} 字符")
+            print(f"   📄 句子模式: 总计 {total_files_saved} 个句子文件")
+            print(f"   🧹 总共清理了: {total_chars_cleaned} 个字符")
+            print(f"   📂 输出目录: {book_output_dir}")
+        else:
+            print(f"✅ {filename}: {len(chunks)} 个块 (总计 {total_chars} 字符)")
+            print(f"   📁 UUID: {uuid_val}")
+            print(
+                f"   📊 块大小: [{chunk_sizes_str}] 字符, 平均: {avg_chunk_size:.0f} 字符"
+            )
+            print(f"   🧹 总共清理了: {total_chars_cleaned} 个字符")
+            print(f"   📂 输出目录: {book_output_dir}")
 
-        return True, len(chunks)
+        return True, total_files_saved if sentence_level else len(chunks)
 
     except Exception as e:
         filename = os.path.basename(input_file)
@@ -675,6 +786,7 @@ def process_book_summaries(
     preview_mode=False,
     resume_mode=True,
     language="en",
+    sentence_level=False,
 ):
     """
     处理所有书籍总结文件
@@ -686,6 +798,7 @@ def process_book_summaries(
         preview_mode (bool): 是否为预览模式
         resume_mode (bool): 是否启用断点续传
         language (str): 语言类型，用于不同的文本处理规则
+        sentence_level (bool): 是否启用句级分块模式
 
     Returns:
         dict: 处理结果统计
@@ -784,7 +897,7 @@ def process_book_summaries(
         print(f"\n处理第 {i}/{len(files_to_process)} 个总结: {filename}")
 
         success, chunk_count = process_single_summary(
-            input_file, output_dir, max_chars, language
+            input_file, output_dir, max_chars, language, sentence_level
         )
 
         if success:
@@ -810,8 +923,11 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 使用示例:
-  python chunk_book_summaries.py --lang en                # 处理英文书籍总结
-  python chunk_book_summaries.py --lang zh                # 处理中文书籍总结
+  python chunk_book_summaries.py                          # 处理所有语言书籍总结（默认句级分块）
+  python chunk_book_summaries.py --lang en                # 处理英文书籍总结（默认句级分块）
+  python chunk_book_summaries.py --lang zh                # 处理中文书籍总结（默认句级分块）
+  python chunk_book_summaries.py --no-sentence-level      # 禁用句级分块，使用块级分块模式
+  python chunk_book_summaries.py --lang zh --no-sentence-level # 块级分块模式处理中文书籍
   python chunk_book_summaries.py --max-chars 2500 --lang en # 设置最大字符数
   python chunk_book_summaries.py --preview --lang zh      # 预览模式
   python chunk_book_summaries.py --no-resume --lang en    # 禁用断点续传
@@ -824,24 +940,27 @@ def main():
         "--lang",
         "-l",
         choices=["en", "zh"],
-        default="en",
-        help="语言主题: en(英文) 或 zh(中文) [默认: en]",
+        default=None,
+        help="语言主题: en(英文) 或 zh(中文) [默认: 处理所有语言]",
     )
 
     # 获取默认输入和输出目录（现在需要语言参数，所以先解析参数）
     args_preview = parser.parse_known_args()[0]
-    default_input_dir = get_default_input_dir(args_preview.lang)
-    default_output_dir = get_default_output_dir(args_preview.lang)
+    
+    # 当没有指定语言时，使用英文作为默认来显示帮助信息
+    preview_lang = args_preview.lang if args_preview.lang else "en"
+    default_input_dir = get_default_input_dir(preview_lang)
+    default_output_dir = get_default_output_dir(preview_lang)
 
     parser.add_argument(
         "--input-dir",
-        default=default_input_dir,
-        help=f"输入目录路径 (默认: {default_input_dir})",
+        default=None,
+        help=f"输入目录路径 (默认: 根据语言自动选择)",
     )
     parser.add_argument(
         "--output-dir",
-        default=default_output_dir,
-        help=f"输出目录路径 (默认: {default_output_dir})",
+        default=None,
+        help=f"输出目录路径 (默认: 根据语言自动选择)",
     )
     parser.add_argument(
         "--max-chars", type=int, default=3000, help="每个块的最大字符数 (默认: 3000)"
@@ -859,31 +978,37 @@ def main():
         action="store_true",
         help="强制重新处理所有文件，即使已存在（等同于--no-resume）",
     )
+    parser.add_argument(
+        "--sentence-level",
+        action="store_true",
+        default=True,
+        help="启用句级分块模式，将每个chunk按句号进一步分割为单独的句子文件 [默认: 启用]",
+    )
+    parser.add_argument(
+        "--no-sentence-level",
+        action="store_true",
+        help="禁用句级分块模式，使用块级分块模式",
+    )
 
     args = parser.parse_args()
 
-    input_dir = args.input_dir
-    output_dir = args.output_dir
     max_chars = args.max_chars
     resume_mode = not (args.no_resume or args.force)
-    language = args.lang
-
-    # 如果用户没有手动指定input_dir或output_dir，重新计算正确的路径
-    if args.input_dir == default_input_dir:
-        input_dir = get_default_input_dir(language)
-
-    if args.output_dir == default_output_dir:
-        output_dir = get_default_output_dir(language)
-
-    lang_name = "中文" if language == "zh" else "English"
+    # 句级分块模式：默认启用，但可以通过 --no-sentence-level 禁用
+    sentence_level = args.sentence_level and not args.no_sentence_level
+    
+    # 确定要处理的语言列表
+    if args.lang:
+        languages_to_process = [args.lang]
+    else:
+        languages_to_process = ["en", "zh"]
 
     print(f"\n🎯 书籍总结分块器")
-    print(f"🌍 语言主题: {lang_name}")
+    print(f"🌍 语言主题: {', '.join(languages_to_process) if len(languages_to_process) > 1 else ('中文' if languages_to_process[0] == 'zh' else 'English')}")
     print(f"🖥️  系统类型: {platform.system()}")
-    print(f"📁 输入目录: {input_dir}")
-    print(f"📁 输出目录: {output_dir}")
     print(f"📊 最大字符数: {max_chars} 字符/块")
     print(f"🔄 断点续传: {'启用' if resume_mode else '禁用'}")
+    print(f"📄 分块模式: {'句级分块 (默认)' if sentence_level else '块级分块'}")
     if args.force:
         print(f"💪 强制模式: 重新处理所有文件，确保清理功能正常执行")
     print(f"🚫 自动排除Mac系统文件 (.DS_Store等)")
@@ -892,60 +1017,113 @@ def main():
     if args.preview:
         print(f"👁️  预览模式：只显示将要处理的文件")
 
-    # 检查输入目录是否存在
-    if not os.path.exists(input_dir):
-        print(f"❌ 输入目录不存在: {input_dir}")
-        print("💡 请确保 generate_book_summary.py 已经运行并生成了总结文件")
-        return
+    # 处理每种语言
+    all_results = []
+    
+    for language in languages_to_process:
+        lang_name = "中文" if language == "zh" else "English"
+        print(f"\n" + "="*50)
+        print(f"🌐 开始处理 {lang_name} 书籍总结")
+        print(f"="*50)
+        
+        # 确定输入输出目录
+        if args.input_dir:
+            input_dir = args.input_dir
+        else:
+            input_dir = get_default_input_dir(language)
+            
+        if args.output_dir:
+            output_dir = args.output_dir
+        else:
+            output_dir = get_default_output_dir(language)
 
-    try:
-        result = process_book_summaries(
-            input_dir,
-            output_dir,
-            max_chars,
-            args.preview,
-            resume_mode,
-            language,
-        )
+        print(f"📁 输入目录: {input_dir}")
+        print(f"📁 输出目录: {output_dir}")
 
-        # 最终统计
-        print(f"\n=== 🎉 处理完成总结 ===")
+        # 检查输入目录是否存在
+        if not os.path.exists(input_dir):
+            print(f"⚠️  输入目录不存在: {input_dir}")
+            print("💡 请确保 generate_book_summary.py 已经运行并生成了总结文件")
+            continue
 
+        try:
+            result = process_book_summaries(
+                input_dir,
+                output_dir,
+                max_chars,
+                args.preview,
+                resume_mode,
+                language,
+                sentence_level,
+            )
+            result['language'] = language
+            all_results.append(result)
+
+        except Exception as e:
+            print(f"❌ 处理 {lang_name} 时出错: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # 最终统计
+    print(f"\n" + "="*50)
+    print(f"🎉 所有语言处理完成总结")
+    print(f"="*50)
+    
+    if all_results:
+        total_books = sum(r['total'] for r in all_results)
+        total_successful = sum(r['successful'] for r in all_results)
+        total_failed = sum(r['failed'] for r in all_results)
+        total_skipped = sum(r['skipped'] for r in all_results)
+        total_chunks = sum(r['total_chunks'] for r in all_results)
+        
         if args.preview:
             print(f"📊 预览统计:")
-            print(f"  - 发现总结总数: {result['total']} 个")
-            print(f"  - 需要处理: {result.get('preview', 0)} 个")
-            print(f"  - 已处理跳过: {result['skipped']} 个")
+            for result in all_results:
+                lang_name = "中文" if result['language'] == "zh" else "English"
+                print(f"  {lang_name}:")
+                print(f"    - 发现总结总数: {result['total']} 个")
+                print(f"    - 需要处理: {result.get('preview', 0)} 个")
+                print(f"    - 已处理跳过: {result['skipped']} 个")
         else:
-            print(f"📊 处理统计:")
-            print(f"  - 总结总数: {result['total']} 个")
-            print(f"  - 成功处理: {result['successful']} 个")
-            print(f"  - 处理失败: {result['failed']} 个")
-            print(f"  - 跳过书籍: {result['skipped']} 个")
-            print(f"  - 生成块数: {result['total_chunks']} 个")
+            print(f"📊 汇总统计:")
+            print(f"  - 总结总数: {total_books} 个")
+            print(f"  - 成功处理: {total_successful} 个")
+            print(f"  - 处理失败: {total_failed} 个")
+            print(f"  - 跳过书籍: {total_skipped} 个")
+            
+            if sentence_level:
+                print(f"  - 生成文件数: {total_chunks} 个句子文件")
+            else:
+                print(f"  - 生成块数: {total_chunks} 个")
 
-            if result["total"] > 0:
+            if total_books > 0:
                 success_rate = (
-                    (result["successful"] / (result["successful"] + result["failed"]))
+                    (total_successful / (total_successful + total_failed))
                     * 100
-                    if (result["successful"] + result["failed"]) > 0
+                    if (total_successful + total_failed) > 0
                     else 0
                 )
                 print(f"  - 成功率: {success_rate:.1f}%")
 
-                if result["successful"] > 0:
-                    avg_chunks_per_book = result["total_chunks"] / result["successful"]
-                    print(f"  - 平均块数/书籍: {avg_chunks_per_book:.1f} 个")
+                if total_successful > 0:
+                    avg_chunks_per_book = total_chunks / total_successful
+                    avg_label = "平均句子数/书籍" if sentence_level else "平均块数/书籍"
+                    print(f"  - {avg_label}: {avg_chunks_per_book:.1f} 个")
 
-            if result["successful"] > 0:
-                print(f"\n📝 分块后的文件已保存到: {output_dir}")
-                print(f"📁 目录结构: book/{language}/<uuid>/<chunk_index>.txt")
-
-    except Exception as e:
-        print(f"❌ 处理过程中出错: {e}")
-        import traceback
-
-        traceback.print_exc()
+            # 显示每种语言的详细统计
+            print(f"\n📋 分语言统计:")
+            for result in all_results:
+                lang_name = "中文" if result['language'] == "zh" else "English"
+                print(f"  {lang_name}: {result['successful']}/{result['total']} 成功")
+                if result['successful'] > 0:
+                    output_dir = get_default_output_dir(result['language'])
+                    print(f"    📝 文件已保存到: {output_dir}")
+                    if sentence_level:
+                        print(f"    📁 目录结构: book/{result['language']}/<uuid>/<累加索引>.txt")
+                    else:
+                        print(f"    📁 目录结构: book/{result['language']}/<uuid>/<chunk_index>.txt")
+    else:
+        print(f"❌ 没有成功处理任何语言的书籍总结")
 
 
 if __name__ == "__main__":
