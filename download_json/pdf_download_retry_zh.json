@@ -53,20 +53,5 @@
     "retry_count": 3,
     "last_error": "无PDF格式可用",
     "last_attempt": "2025-07-03 10:45:11"
-  },
-  "db6b4a9f-3359-47dd-8b82-3042b5a89e70": {
-    "retry_count": 2,
-    "last_error": "Timeout 60000ms exceeded while waiting for event \"download\"\n=========================== logs ===========================\nwaiting for event \"download\"\n============================================================",
-    "last_attempt": "2025-07-03 10:47:19"
-  },
-  "f85f0d50-add5-44b3-8732-fdfbc39624ad": {
-    "retry_count": 1,
-    "last_error": "未找到下载按钮",
-    "last_attempt": "2025-07-03 10:40:21"
-  },
-  "f073021d-c0c2-4c20-9af2-ba696d444938": {
-    "retry_count": 1,
-    "last_error": "未找到下载按钮",
-    "last_attempt": "2025-07-03 10:40:51"
   }
 }
