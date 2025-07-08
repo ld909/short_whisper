@@ -4,20 +4,20 @@
 Beauty RealESRGAN超分辨率处理工具
 
 功能说明：
-此脚本用于对face_sr_frames.py输出的人脸超分帧进行进一步的RealESRGAN超分辨率处理。
+此脚本用于对extract_video_frames.py输出的帧进行RealESRGAN超分辨率处理。
 
 主要功能：
 1. 只支持Ubuntu系统运行
-2. 使用conda vd2x环境运行RealESRGAN进行最终超分辨率
+2. 使用conda vd2x环境运行RealESRGAN进行超分辨率处理
 3. 支持单个index处理或批量处理所有可用index
 4. 支持断点续传，自动跳过已处理的帧
 5. 自动排除Mac系统产生的点文件
 
 输入路径：
-- Ubuntu: /mnt/dhl/beauty/face_sr_frames/[index]/*.jpg
+- Ubuntu: /mnt/dhl/beauty/frames/[index]/*.jpg
 
 输出路径：
-- Ubuntu: /mnt/dhl/beauty/final_frames/[index]/*.jpg
+- Ubuntu: /mnt/dhl/beauty/face_sr_frames/[index]/*.jpg
 
 依赖环境：
 - Ubuntu操作系统
@@ -119,20 +119,20 @@ def check_realesrgan_environment():
 
 
 def get_available_indices(base_path: str) -> list:
-    """获取所有可用的index（从face_sr_frames目录扫描）"""
-    face_sr_dir = os.path.join(base_path, "face_sr_frames")
+    """获取所有可用的index（从frames目录扫描）"""
+    frames_dir = os.path.join(base_path, "frames")
     
-    if not os.path.exists(face_sr_dir):
-        print(f"❌ 错误：face_sr_frames目录不存在 {face_sr_dir}")
+    if not os.path.exists(frames_dir):
+        print(f"❌ 错误：frames目录不存在 {frames_dir}")
         return []
     
     indices = []
-    for dirname in os.listdir(face_sr_dir):
+    for dirname in os.listdir(frames_dir):
         # 排除Mac产生的点文件
         if dirname.startswith("."):
             continue
             
-        dir_path = os.path.join(face_sr_dir, dirname)
+        dir_path = os.path.join(frames_dir, dirname)
         if os.path.isdir(dir_path):
             try:
                 index = int(dirname)
@@ -229,6 +229,7 @@ def run_realesrgan(input_dir: str, output_dir: str) -> bool:
             realesrgan_binary,
             "-i", input_dir,
             "-o", output_dir,
+            "-n", "realesr-animevideov3",  # 使用动漫视频模型
             "-s", "2",        # 放大倍数
             "-f", "jpg"       # 输出格式
         ]
@@ -285,8 +286,8 @@ def main():
   python realesrgan_upscale_frames.py --force
   
 功能说明:
-  1. 对face_sr_frames.py输出的帧进行RealESRGAN超分辨率处理
-  2. 使用RealESRGAN技术进行最终的图像超分辨率
+  1. 对extract_video_frames.py输出的帧进行RealESRGAN超分辨率处理
+  2. 使用RealESRGAN realesr-animevideov3模型进行图像超分辨率
   3. 支持断点续传，自动跳过已处理的帧
   4. 只支持Ubuntu系统运行
   5. 需要conda vd2x环境和RealESRGAN工具
@@ -333,7 +334,7 @@ def main():
         # 获取所有可用的index
         indices_to_process = get_available_indices(base_path)
         if not indices_to_process:
-            print("❌ 未找到任何可处理的face_sr_frames目录")
+            print("❌ 未找到任何可处理的frames目录")
             return 1
         print(f"📂 自动发现 {len(indices_to_process)} 个index: {indices_to_process}")
     
@@ -349,8 +350,8 @@ def main():
         print(f"\n{'='*20} 处理 {i}/{total_count}: index {index} {'='*20}")
         
         # 构建路径
-        input_dir = os.path.join(base_path, "face_sr_frames", str(index))
-        output_dir = os.path.join(base_path, "final_frames", str(index))
+        input_dir = os.path.join(base_path, "frames", str(index))
+        output_dir = os.path.join(base_path, "face_sr_frames", str(index))
         
         print(f"📁 输入目录: {input_dir}")
         print(f"📤 输出目录: {output_dir}")

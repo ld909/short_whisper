@@ -17,7 +17,7 @@ Beauty视频音乐添加工具
 8. 支持硬件加速提高处理速度
 
 输入路径：
-- 视频文件：/mnt/dhl/beauty/mp4_silent/[index].mp4
+- 视频文件：/mnt/dhl/beauty/merged_2k_videos/[index].mp4
 - 音乐文件：/home/dhl/Documents/short_whisper/beauty/assets/*.mp3
 
 输出路径：
@@ -125,15 +125,15 @@ def get_available_mp3_files(assets_path: str) -> list:
 
 
 def get_available_video_indices(base_path: str) -> list:
-    """获取所有可用的video index（从mp4_silent目录扫描）"""
-    mp4_silent_dir = os.path.join(base_path, "mp4_silent")
+    """获取所有可用的video index（从merged_2k_videos目录扫描）"""
+    merged_2k_videos_dir = os.path.join(base_path, "merged_2k_videos")
     
-    if not os.path.exists(mp4_silent_dir):
-        print(f"❌ 错误：mp4_silent目录不存在 {mp4_silent_dir}")
+    if not os.path.exists(merged_2k_videos_dir):
+        print(f"❌ 错误：merged_2k_videos目录不存在 {merged_2k_videos_dir}")
         return []
     
     indices = []
-    for filename in os.listdir(mp4_silent_dir):
+    for filename in os.listdir(merged_2k_videos_dir):
         # 排除Mac产生的点文件
         if filename.startswith("."):
             continue
@@ -145,7 +145,7 @@ def get_available_video_indices(base_path: str) -> list:
                 index = int(name_without_ext)
                 
                 # 检查文件是否有效
-                file_path = os.path.join(mp4_silent_dir, filename)
+                file_path = os.path.join(merged_2k_videos_dir, filename)
                 file_size = os.path.getsize(file_path)
                 if file_size > 1024:  # 至少1KB
                     indices.append(index)
@@ -567,7 +567,7 @@ def main():
         # 获取所有可用的index
         indices_to_process = get_available_video_indices(base_path)
         if not indices_to_process:
-            print("❌ 未找到任何可处理的mp4_silent视频文件")
+            print("❌ 未找到任何可处理的merged_2k_videos视频文件")
             return 1
         print(f"📂 自动发现 {len(indices_to_process)} 个index: {indices_to_process}")
     
@@ -583,7 +583,7 @@ def main():
         print(f"\n{'='*20} 处理 {i}/{total_count}: index {index} {'='*20}")
         
         # 构建路径
-        input_video = os.path.join(base_path, "mp4_silent", f"{index}.mp4")
+        input_video = os.path.join(base_path, "merged_2k_videos", f"{index}.mp4")
         output_dir = os.path.join(base_path, "mp4_music")
         output_file = os.path.join(output_dir, f"{index}.mp4")
         
