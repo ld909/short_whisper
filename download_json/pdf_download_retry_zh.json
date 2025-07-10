@@ -53,5 +53,40 @@
     "retry_count": 3,
     "last_error": "无PDF格式可用",
     "last_attempt": "2025-07-03 10:45:11"
+  },
+  "494aaa62-40c5-4c8c-9a4e-3288c999ba93": {
+    "retry_count": 1,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-10 10:34:42"
+  },
+  "e4531b26-fe47-4258-9f02-785882594440": {
+    "retry_count": 1,
+    "last_error": "Timeout 300000ms exceeded while waiting for event \"download\"\n=========================== logs ===========================\nwaiting for event \"download\"\n============================================================",
+    "last_attempt": "2025-07-10 10:41:51"
+  },
+  "edc3c488-e31b-452c-869d-7e8b0563657a": {
+    "retry_count": 1,
+    "last_error": "Download.save_as: canceled",
+    "last_attempt": "2025-07-10 10:44:37"
+  },
+  "13b815d8-9d65-4596-834e-087b282f29b4": {
+    "retry_count": 1,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-10 10:44:49"
+  },
+  "11ab68d8-879e-48fd-b7fa-d0435e6658bd": {
+    "retry_count": 1,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-10 10:56:32"
+  },
+  "e19b9521-42e0-4afa-8784-e9bcb03ca49a": {
+    "retry_count": 1,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-10 10:56:45"
+  },
+  "12b96802-cebb-448f-a0c6-9e40492fdd50": {
+    "retry_count": 1,
+    "last_error": "无PDF格式可用",
+    "last_attempt": "2025-07-10 11:01:42"
   }
 }

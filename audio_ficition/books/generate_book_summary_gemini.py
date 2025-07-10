@@ -9,6 +9,8 @@
 🌐 多语言主题支持：完全独立处理英文(en)和中文(zh)书籍
 📚 智能书籍处理：自动识别并处理对应语言的书籍数据
 🤖 Gemini 生成总结：使用 Google Gemini App 生成高质量30分钟音频讲稿
+🔄 智能重试机制：针对大文件处理失败自动重试
+⚡ 文件大小优化：支持45MB以下PDF文件，确保处理稳定性
 
 功能说明：
 1. 从 book_info_scraper.py 抓取的书籍信息中读取数据（按语言分类）
@@ -22,6 +24,13 @@
    - 英文主题：/Volumes/dhl/audio/books/en/
    - 中文主题：/Volumes/dhl/audio/books/zh/
 9. 智能保存到对应语言目录：{基础路径}/books/{语言}/summary/[uuid].txt
+10. 自动重试机制：针对网络错误、服务不可用等情况自动重试
+11. 大文件处理优化：针对30MB+文件提供特殊处理和时间预估
+
+文件大小限制：
+📦 推荐大小：< 30MB（处理速度快，成功率高）
+⚠️ 支持大小：< 45MB（可能需要5-10分钟处理时间）
+❌ 超大文件：> 45MB（容易导致503错误或处理超时）
 
 使用方法：
 # 基础操作
@@ -37,10 +46,15 @@ python generate_book_summary_gemini.py --count 10 --lang zh  # 生成中文主�
 python generate_book_summary_gemini.py --all --lang zh       # 生成所有中文主题总结
 python generate_book_summary_gemini.py --check-status --lang zh  # 检查中文主题状态
 
-注意：
-- 脚本会自动检测 book_pdf_downloader.py 输出的PDF文件并上传到Gemini App
+注意事项：
+- 脚本会自动检测并使用 book_pdf_downloader.py 下载的PDF文件
+- 大于45MB的PDF文件将被自动跳过
+- 小于1KB的PDF文件被认为是损坏文件并跳过
 - 不同语言主题完全独立，拥有独立的目录结构和数据源
 - 默认使用英文主题(en)，中文主题需要明确指定 --lang zh
+- 大文件（>30MB）处理时间较长，请耐心等待
+- 遇到503错误或超时时，脚本会自动重试
+- 建议在网络稳定的环境下运行，避免中断
 """
 
 import os
@@ -324,7 +338,7 @@ Ensure the total word count reaches at least 5000 words.
                 pdf_file_path = os.path.join(self.pdf_dir, f"{uuid_val}.pdf")
                 if os.path.exists(pdf_file_path):
                     file_size = os.path.getsize(pdf_file_path)
-                    if file_size > 50 * 1024 * 1024:  # 文件存在但超过50MB
+                    if file_size > 45 * 1024 * 1024:  # 文件存在但超过45MB
                         books_oversized += 1
                     else:
                         books_without_pdf += 1
@@ -343,7 +357,7 @@ Ensure the total word count reaches at least 5000 words.
         if books_without_pdf > 0:
             print(f"📄 跳过 {books_without_pdf} 本没有PDF文件或文件损坏的书籍")
         if books_oversized > 0:
-            print(f"📦 跳过 {books_oversized} 本PDF文件超过50MB的书籍")
+            print(f"📦 跳过 {books_oversized} 本PDF文件超过45MB的书籍（防止处理超时）")
         return books_to_process
 
     def check_pdf_file_exists(self, book_info):
@@ -366,10 +380,11 @@ Ensure the total word count reaches at least 5000 words.
             if file_size < 1000:  # 至少1KB，确保不是空文件
                 print(f"⚠️ PDF文件太小，可能损坏: {uuid_val}.pdf ({file_size} bytes)")
                 return False
-            elif file_size > 50 * 1024 * 1024:  # 50MB限制
+            elif file_size > 45 * 1024 * 1024:  # 降低到45MB限制，提高成功率
                 print(
-                    f"⚠️ PDF文件过大，跳过处理: {title} ({file_size_mb:.2f} MB > 50 MB)"
+                    f"⚠️ PDF文件过大，跳过处理: {title} ({file_size_mb:.2f} MB > 45 MB)"
                 )
+                print("💡 建议：大文件容易导致Gemini处理超时或503错误")
                 return False
             else:
                 print(f"📎 找到PDF文件: {uuid_val}.pdf ({file_size_mb:.2f} MB)")
@@ -689,111 +704,125 @@ Ensure the total word count reaches at least 5000 words.
             print(f"⚠️ PDF文件不存在: {pdf_file_path}")
             return False
 
+        # 检查文件大小并给出建议
+        file_size = os.path.getsize(pdf_file_path)
+        file_size_mb = file_size / (1024 * 1024)
+
         print(f"📎 使用PDF文件: {pdf_file_path}")
+        print(f"📊 PDF文件大小: {file_size_mb:.2f} MB")
 
-        try:
-            # 第一步：点击 "+" 按钮
-            print("🔘 点击'+'按钮...")
-            add_button_selectors = [
-                'mat-icon[fonticon="add_2"]',
-                'mat-icon[data-mat-icon-name="add_2"]',
-                'mat-icon.mat-icon.notranslate.gds-icon-l.google-symbols[fonticon="add_2"]',
-                'mat-icon.gds-icon-l[fonticon="add_2"]',
-                '.mat-icon.notranslate.gds-icon-l.google-symbols[fonticon="add_2"]',
-                'mat-icon.google-symbols[fonticon="add_2"]',
-                'button[aria-label*="Upload"]',
-                'button[aria-label*="上传"]',
-                '[role="button"]:has(mat-icon[fonticon="add_2"])',
-                'mat-icon[aria-hidden="true"][fonticon="add_2"]',
-            ]
+        if file_size_mb > 45:
+            print("⚠️ 文件较大，可能导致处理超时，建议使用较小的文件")
 
-            add_button = None
+        if file_size_mb > 40:
+            print("💡 大文件处理提示：请耐心等待，可能需要5-10分钟")
 
-            # 等待并重试查找元素（增加等待时间）
-            max_retries = 8
-            for retry in range(max_retries):
-                print(f"🔍 第 {retry + 1} 次查找'+'按钮...")
+        max_retries = 3  # 最多重试3次
 
-                for selector in add_button_selectors:
-                    try:
-                        # 等待元素出现
-                        elements = self.page.locator(selector)
-                        if elements.count() > 0:
-                            add_button = elements.first
-                            # 验证元素是否可见和可点击
-                            if add_button.is_visible():
-                                print(f"✅ 找到可见的'+'按钮，使用选择器: {selector}")
-                                break
+        for attempt in range(1, max_retries + 1):
+            try:
+                print(f"🔄 第 {attempt} 次尝试上传PDF文件...")
+
+                # 第一步：点击 "+" 按钮
+                print("🔘 点击'+'按钮...")
+                add_button_selectors = [
+                    'mat-icon[fonticon="add_2"]',
+                    'mat-icon[data-mat-icon-name="add_2"]',
+                    'mat-icon.mat-icon.notranslate.gds-icon-l.google-symbols[fonticon="add_2"]',
+                    'mat-icon.gds-icon-l[fonticon="add_2"]',
+                    '.mat-icon.notranslate.gds-icon-l.google-symbols[fonticon="add_2"]',
+                    'mat-icon.google-symbols[fonticon="add_2"]',
+                    'button[aria-label*="Upload"]',
+                    'button[aria-label*="上传"]',
+                    '[role="button"]:has(mat-icon[fonticon="add_2"])',
+                    'mat-icon[aria-hidden="true"][fonticon="add_2"]',
+                ]
+
+                add_button = None
+
+                # 等待并重试查找元素（增加等待时间）
+                max_search_retries = 8
+                for retry in range(max_search_retries):
+                    print(f"🔍 第 {retry + 1} 次查找'+'按钮...")
+
+                    for selector in add_button_selectors:
+                        try:
+                            # 等待元素出现
+                            elements = self.page.locator(selector)
+                            if elements.count() > 0:
+                                add_button = elements.first
+                                # 验证元素是否可见和可点击
+                                if add_button.is_visible():
+                                    print(
+                                        f"✅ 找到可见的'+'按钮，使用选择器: {selector}"
+                                    )
+                                    break
+                                else:
+                                    print(f"⚠️ 找到'+'按钮但不可见: {selector}")
+                                    add_button = None
                             else:
-                                print(f"⚠️ 找到'+'按钮但不可见: {selector}")
-                                add_button = None
-                        else:
+                                if self.debug:
+                                    print(f"🔍 选择器 {selector} 未找到元素")
+                        except Exception as e:
                             if self.debug:
-                                print(f"🔍 选择器 {selector} 未找到元素")
-                    except Exception as e:
-                        if self.debug:
-                            print(f"⚠️ 选择器 {selector} 查找失败: {e}")
+                                print(f"⚠️ 选择器 {selector} 查找失败: {e}")
+                            continue
+
+                    if add_button:
+                        break
+
+                    if retry < max_search_retries - 1:
+                        wait_time = 3 if retry < 3 else 5  # 前3次等待3秒，后面等待5秒
+                        print(f"💫 等待{wait_time}秒后重试...")
+                        time.sleep(wait_time)
+
+                if not add_button:
+                    if attempt < max_retries:
+                        print("❌ 未找到'+'按钮，尝试刷新页面...")
+                        self.page.reload()
+                        self.page.wait_for_timeout(8000)
+                        continue
+                    else:
+                        raise Exception("无法找到'+'按钮")
+
+                # 点击+按钮打开菜单
+                add_button.click()
+                print("✅ 已点击'+'按钮，菜单应已打开")
+
+                # 等待菜单打开
+                print("⏳ 等待上传菜单打开...")
+                time.sleep(2)
+
+                # 第二步：在菜单中找到"Upload files"按钮并点击
+                print("🔍 寻找菜单中的'Upload files'按钮...")
+                upload_files_button_selectors = [
+                    'button:has-text("Upload files")',
+                    'mat-menu-item:has-text("Upload files")',
+                    'button.mat-mdc-menu-item:has-text("Upload files")',
+                    '[role="menuitem"]:has-text("Upload files")',
+                    'button[aria-label*="Upload files"]',
+                ]
+
+                upload_files_button = None
+                for selector in upload_files_button_selectors:
+                    try:
+                        if self.page.locator(selector).count() > 0:
+                            upload_files_button = self.page.locator(selector).first
+                            print(f"✅ 找到'Upload files'按钮，使用选择器: {selector}")
+                            break
+                    except:
                         continue
 
-                if add_button:
-                    break
+                if not upload_files_button:
+                    if attempt < max_retries:
+                        print("❌ 未找到'Upload files'按钮，重试...")
+                        continue
+                    else:
+                        raise Exception("无法找到'Upload files'按钮")
 
-                if retry < max_retries - 1:
-                    wait_time = 3 if retry < 3 else 5  # 前3次等待3秒，后面等待5秒
-                    print(f"💫 等待{wait_time}秒后重试...")
-                    time.sleep(wait_time)
+                # 第三步：使用文件选择器上传PDF文件
+                print("📤 正在通过文件选择器上传PDF文件...")
 
-            if not add_button:
-                print("❌ 未找到'+'按钮，输出页面信息用于调试...")
-                if self.debug:
-                    self.debug_page_info()
-                print("🔄 尝试刷新页面...")
-                self.page.reload()
-                self.page.wait_for_timeout(8000)
-                return False
-
-            # 点击+按钮打开菜单
-            add_button.click()
-            print("✅ 已点击'+'按钮，菜单应已打开")
-
-            # 等待菜单打开
-            print("⏳ 等待上传菜单打开...")
-            time.sleep(2)
-
-            # 第二步：在菜单中找到"Upload files"按钮并点击
-            print("🔍 寻找菜单中的'Upload files'按钮...")
-            upload_files_button_selectors = [
-                'button:has-text("Upload files")',
-                'mat-menu-item:has-text("Upload files")',
-                'button.mat-mdc-menu-item:has-text("Upload files")',
-                '[role="menuitem"]:has-text("Upload files")',
-                'button[aria-label*="Upload files"]',
-            ]
-
-            upload_files_button = None
-            for selector in upload_files_button_selectors:
-                try:
-                    if self.page.locator(selector).count() > 0:
-                        upload_files_button = self.page.locator(selector).first
-                        print(f"✅ 找到'Upload files'按钮，使用选择器: {selector}")
-                        break
-                except:
-                    continue
-
-            if not upload_files_button:
-                print("❌ 未找到'Upload files'按钮")
-                return False
-
-            # 第三步：使用文件选择器上传PDF文件（参考 upload_books_to_xiaoyuzhou.py 的方式）
-            print("📤 正在通过文件选择器上传PDF文件...")
-
-            try:
-                # 检查文件大小
-                file_size = os.path.getsize(pdf_file_path)
-                file_size_mb = file_size / (1024 * 1024)
-                print(f"📊 PDF文件大小: {file_size_mb:.2f} MB")
-
-                # 尝试多种方式触发文件选择器
                 upload_success = False
 
                 # 方法1：直接点击 "Upload files" 按钮触发文件选择器
@@ -813,97 +842,43 @@ Ensure the total word count reaches at least 5000 words.
                 except Exception as method1_error:
                     print(f"⚠️ 方法1失败: {method1_error}")
 
-                # 方法2：查找隐藏的文件选择器触发按钮
                 if not upload_success:
-                    try:
-                        print("🎯 方法2：查找隐藏的文件选择器触发按钮...")
+                    if attempt < max_retries:
+                        print(f"⚠️ 第 {attempt} 次上传失败，等待后重试...")
+                        time.sleep(5)
+                        continue
+                    else:
+                        raise Exception("所有上传方法都失败")
 
-                        hidden_button_selectors = [
-                            "button[xapfileselectortrigger]",
-                            "button.hidden-local-file-image-selector-button",
-                            'button[tabindex="-1"][aria-hidden="true"]',
-                            'button:has-text("")',  # 空文本的隐藏按钮
-                        ]
-
-                        for selector in hidden_button_selectors:
-                            try:
-                                hidden_buttons = self.page.locator(selector)
-                                if hidden_buttons.count() > 0:
-                                    print(f"🎯 尝试隐藏按钮选择器: {selector}")
-
-                                    with self.page.expect_file_chooser(
-                                        timeout=5000
-                                    ) as fc_info:
-                                        hidden_buttons.first.click(force=True)
-                                        print("📂 已点击隐藏的文件选择器按钮")
-
-                                    file_chooser = fc_info.value
-                                    file_chooser.set_files(pdf_file_path)
-                                    print("✅ 成功通过隐藏按钮上传PDF文件")
-                                    upload_success = True
-                                    break
-
-                            except Exception:
-                                continue
-
-                    except Exception as method2_error:
-                        print(f"⚠️ 方法2失败: {method2_error}")
-
-                # 方法3：查找任何可能的文件上传触发元素
-                if not upload_success:
-                    try:
-                        print("🎯 方法3：查找任何可能的文件上传触发元素...")
-
-                        # 基于用户提供的HTML结构
-                        upload_trigger_selectors = [
-                            'images-files-uploader button[data-test-id="local-image-file-uploader-button"]',
-                            "images-files-uploader button[mat-list-item]",
-                            'button[data-test-id="local-image-file-uploader-button"]',
-                            'button[aria-label*="Upload files"]',
-                            'button:has(mat-icon[fonticon="attach_file"])',
-                            'mat-icon[fonticon="attach_file"]',
-                        ]
-
-                        for selector in upload_trigger_selectors:
-                            try:
-                                trigger_elements = self.page.locator(selector)
-                                if trigger_elements.count() > 0:
-                                    print(f"🎯 尝试触发元素选择器: {selector}")
-
-                                    with self.page.expect_file_chooser(
-                                        timeout=5000
-                                    ) as fc_info:
-                                        trigger_elements.first.click(force=True)
-                                        print("📂 已点击文件上传触发元素")
-
-                                    file_chooser = fc_info.value
-                                    file_chooser.set_files(pdf_file_path)
-                                    print("✅ 成功通过触发元素上传PDF文件")
-                                    upload_success = True
-                                    break
-
-                            except Exception:
-                                continue
-
-                    except Exception as method3_error:
-                        print(f"⚠️ 方法3失败: {method3_error}")
-
-                if upload_success:
-                    # 等待文件处理
-                    print("⏳ 等待PDF文件处理...")
-                    time.sleep(5)
-                    return True
+                # 等待文件处理（根据文件大小调整等待时间）
+                if file_size_mb > 30:
+                    wait_time = 15  # 大文件等待更长时间
+                    print(f"⏳ 大文件处理中，等待 {wait_time} 秒...")
                 else:
-                    print("❌ 所有文件上传方法都失败")
-                    return False
+                    wait_time = 8
+                    print(f"⏳ 等待PDF文件处理... ({wait_time} 秒)")
+
+                time.sleep(wait_time)
+                return True
 
             except Exception as upload_error:
-                print(f"❌ PDF上传过程出错: {upload_error}")
-                return False
+                print(f"❌ 第 {attempt} 次PDF上传尝试失败: {upload_error}")
+                if attempt < max_retries:
+                    wait_time = 10 * attempt  # 递增等待时间
+                    print(f"💫 等待 {wait_time} 秒后重试...")
+                    time.sleep(wait_time)
+                    # 尝试刷新页面重新开始
+                    try:
+                        self.page.reload()
+                        self.page.wait_for_timeout(8000)
+                        print("🔄 页面已刷新，准备重试")
+                    except:
+                        print("⚠️ 页面刷新失败，但继续重试")
+                else:
+                    print(f"❌ PDF上传最终失败，已尝试 {max_retries} 次")
+                    return False
 
-        except Exception as e:
-            print(f"❌ PDF上传过程出错: {e}")
-            return False
+        return False
 
     def send_generation_request(self):
         """发送生成请求并等待AI开始运行"""
@@ -1084,7 +1059,7 @@ Ensure the total word count reaches at least 5000 words.
     def wait_for_ai_completion(self):
         """等待AI运行完成"""
         print("🔄 正在等待AI运行完成...")
-        print("⚠️  注意：此过程可能需要3-5分钟，请耐心等待，不要重复操作")
+        print("⚠️  注意：此过程可能需要5-10分钟，特别是大文件，请耐心等待，不要重复操作")
 
         # 停止按钮选择器
         stop_selectors = [
@@ -1098,9 +1073,44 @@ Ensure the total word count reaches at least 5000 words.
         check_count = 0
         consecutive_no_stop_button = 0
         ai_was_running = False  # 记录AI是否曾经运行过
+        max_wait_checks = 180  # 增加到15分钟（180 * 5秒 = 900秒）
 
-        while True:
+        # 检查是否有错误信息的选择器
+        error_selectors = [
+            'div:has-text("服务暂时不可用")',
+            'div:has-text("Service Unavailable")',
+            'div:has-text("Error")',
+            'div:has-text("failed")',
+            'div:has-text("timeout")',
+            'div:has-text("analysis unsuccessful")',
+            'div:has-text("处理失败")',
+            ".error-message",
+            '[class*="error"]',
+        ]
+
+        while check_count < max_wait_checks:
             check_count += 1
+
+            # 首先检查是否有错误信息
+            error_found = False
+            for error_selector in error_selectors:
+                try:
+                    if self.page.locator(error_selector).count() > 0:
+                        error_element = self.page.locator(error_selector).first
+                        if error_element.is_visible():
+                            error_text = error_element.inner_text()
+                            print(f"❌ 检测到错误信息: {error_text}")
+                            error_found = True
+                            break
+                except:
+                    continue
+
+            if error_found:
+                print("💡 建议：")
+                print("   1. 检查文件是否过大（建议<40MB）")
+                print("   2. 检查网络连接是否稳定")
+                print("   3. 稍后重试，服务可能临时不可用")
+                raise Exception("检测到处理错误，AI生成失败")
 
             # 检查停止按钮状态
             stop_buttons_exist = False
@@ -1132,21 +1142,40 @@ Ensure the total word count reaches at least 5000 words.
                         f"⏸️ AI运行状态检查 (连续无活动 {consecutive_no_stop_button} 次)"
                     )
 
-                # 连续3次检查都没有停止按钮，认为完成
-                if consecutive_no_stop_button >= 3:
+                # 连续5次检查都没有停止按钮，认为完成（增加检查次数）
+                if consecutive_no_stop_button >= 5:
                     if ai_was_running:
                         print("✅ AI运行完成 (检测到停止按钮消失)")
                     else:
                         print("⚠️ 未检测到AI运行，但将尝试提取结果")
                     break
 
-            # 安全超时（10分钟）
-            if check_count >= 120:
-                print("⏰ AI生成超时 (等待时间超过10分钟)")
-                print("💡 可能的原因：网络延迟、服务器负载或PDF文件过大")
-                raise Exception("AI生成超时")
+            # 每60次检查（5分钟）输出一次状态提示
+            if check_count % 60 == 0:
+                elapsed_minutes = (check_count * 5) // 60
+                print(
+                    f"⏰ 已等待 {elapsed_minutes} 分钟，大文件处理通常需要5-10分钟..."
+                )
+                print("💡 如果一直等待，可能遇到以下情况：")
+                print("   - 文件过大导致处理超时")
+                print("   - 服务器负载高导致延迟")
+                print("   - 网络连接不稳定")
 
             time.sleep(5)
+
+        # 超时处理
+        if check_count >= max_wait_checks:
+            elapsed_minutes = (max_wait_checks * 5) // 60
+            print(f"⏰ AI生成超时 (等待时间超过{elapsed_minutes}分钟)")
+            print("💡 可能的原因：")
+            print("   1. PDF文件过大（建议<40MB）")
+            print("   2. 网络延迟或服务器负载")
+            print("   3. Gemini服务临时不可用")
+            print("🔄 建议：")
+            print("   1. 稍后重试")
+            print("   2. 尝试更小的PDF文件")
+            print("   3. 检查网络连接")
+            raise Exception(f"AI生成超时（超过{elapsed_minutes}分钟）")
 
         # 额外等待确保完成
         print("⏳ 等待3秒确保AI完全完成...")
@@ -1317,6 +1346,18 @@ Ensure the total word count reaches at least 5000 words.
             print("⏭️  未找到对应的PDF文件，跳过该书籍")
             return False
 
+        # 检查文件大小，给出处理时间预估
+        pdf_file_path = os.path.join(self.pdf_dir, f"{uuid_val}.pdf")
+        file_size = os.path.getsize(pdf_file_path)
+        file_size_mb = file_size / (1024 * 1024)
+
+        if file_size_mb > 30:
+            print(f"📊 检测到大文件 ({file_size_mb:.2f} MB)，预计处理时间：5-10分钟")
+        elif file_size_mb > 15:
+            print(f"📊 检测到中等文件 ({file_size_mb:.2f} MB)，预计处理时间：3-5分钟")
+        else:
+            print(f"📊 检测到小文件 ({file_size_mb:.2f} MB)，预计处理时间：1-3分钟")
+
         print("✅ 发现PDF文件，开始生成总结...")
 
         # 状态跟踪变量，避免重复执行
@@ -1324,169 +1365,218 @@ Ensure the total word count reaches at least 5000 words.
         pdf_uploaded = False
         prompt_entered = False
 
-        try:
-            # 第一步：导航到Gemini App
-            print("🔄 正在打开 Gemini App...")
+        # 最多重试2次整个流程
+        max_attempts = 2
 
-            # 增加重试机制，最多尝试3次
-            max_attempts = 3
-            for attempt in range(1, max_attempts + 1):
-                try:
-                    print(f"🌐 第 {attempt} 次尝试打开 Gemini App...")
-                    self.page.goto(
-                        "https://gemini.google.com/app", timeout=120000
-                    )  # 2分钟超时
+        for attempt in range(1, max_attempts + 1):
+            try:
+                print(f"\n🔄 第 {attempt} 次尝试生成总结...")
 
-                    # 等待页面加载完成，使用更简化的策略
-                    print("⏳ 等待页面加载...")
-                    try:
-                        # 只等待DOM内容加载，不等待网络空闲（避免卡住）
-                        self.page.wait_for_load_state("domcontentloaded", timeout=60000)
-                        print("📄 DOM内容已加载")
+                # 第一步：导航到Gemini App
+                if not page_loaded or attempt > 1:
+                    print("🔄 正在打开 Gemini App...")
 
-                    except Exception as load_error:
-                        print(f"⚠️ 页面加载状态检测出错: {load_error}")
-                        print("🔄 继续等待固定时间...")
-
-                    # 等待页面渲染完成（减少等待时间）
-                    print("⏳ 等待页面渲染完成...")
-                    self.page.wait_for_timeout(5000)
-
-                    # 检查页面是否正确加载（查找关键元素）
-                    print("🔍 验证页面是否正确加载...")
-                    key_elements = [
-                        "rich-textarea",
-                        'mat-icon[fonticon="add_2"]',
-                        'mat-icon[data-mat-icon-name="add_2"]',
-                        '[contenteditable="true"]',
-                        ".ql-editor",
-                        "textarea",
-                        "input",
-                    ]
-
-                    element_found = False
-                    for selector in key_elements:
+                    # 增加重试机制，最多尝试3次
+                    max_nav_attempts = 3
+                    for nav_attempt in range(1, max_nav_attempts + 1):
                         try:
-                            # 等待元素出现，最多等待5秒
-                            element = self.page.locator(selector)
-                            if element.count() > 0:
-                                print(
-                                    f"✅ 找到关键元素: {selector} (数量: {element.count()})"
+                            print(f"🌐 第 {nav_attempt} 次尝试打开 Gemini App...")
+                            self.page.goto(
+                                "https://gemini.google.com/app", timeout=120000
+                            )  # 2分钟超时
+
+                            # 等待页面加载完成，使用更简化的策略
+                            print("⏳ 等待页面加载...")
+                            try:
+                                # 只等待DOM内容加载，不等待网络空闲（避免卡住）
+                                self.page.wait_for_load_state(
+                                    "domcontentloaded", timeout=60000
                                 )
-                                element_found = True
+                                print("📄 DOM内容已加载")
+                            except Exception as load_error:
+                                print(f"⚠️ 页面加载状态检测出错: {load_error}")
+                                print("🔄 继续等待固定时间...")
+
+                            # 等待页面渲染完成
+                            print("⏳ 等待页面渲染完成...")
+                            self.page.wait_for_timeout(8000)  # 增加等待时间
+
+                            # 检查页面是否正确加载（查找关键元素）
+                            print("🔍 验证页面是否正确加载...")
+                            key_elements = [
+                                "rich-textarea",
+                                'mat-icon[fonticon="add_2"]',
+                                'mat-icon[data-mat-icon-name="add_2"]',
+                                '[contenteditable="true"]',
+                                ".ql-editor",
+                                "textarea",
+                                "input",
+                            ]
+
+                            element_found = False
+                            for selector in key_elements:
+                                try:
+                                    element = self.page.locator(selector)
+                                    if element.count() > 0:
+                                        print(
+                                            f"✅ 找到关键元素: {selector} (数量: {element.count()})"
+                                        )
+                                        element_found = True
+                                        break
+                                except Exception as e:
+                                    if self.debug:
+                                        print(f"⚠️ 检查元素 {selector} 失败: {e}")
+                                    continue
+
+                            if element_found:
+                                print("✅ Gemini App 页面加载成功")
+                                page_loaded = True
                                 break
-                        except Exception as e:
-                            if self.debug:
-                                print(f"⚠️ 检查元素 {selector} 失败: {e}")
-                            continue
+                            else:
+                                print("⚠️ 未找到关键元素，等待更长时间...")
+                                if nav_attempt < max_nav_attempts:
+                                    print("💫 等待10秒后重试...")
+                                    time.sleep(10)
+                                    continue
+                                else:
+                                    print("⚠️ 页面加载验证失败，但继续尝试")
+                                    page_loaded = True  # 强制继续
 
-                    if element_found:
-                        print("✅ Gemini App 页面加载成功")
-                        page_loaded = True
-                        break
-                    else:
-                        print("⚠️ 未找到关键元素，等待更长时间...")
-                        # 输出调试信息帮助诊断
-                        print("🔍 当前页面状态:")
-                        print(f"   URL: {self.page.url}")
-                        try:
-                            print(f"   Title: {self.page.title()}")
-                        except:
-                            print("   Title: 无法获取")
+                        except Exception as nav_error:
+                            print(f"❌ 第 {nav_attempt} 次导航失败: {nav_error}")
+                            if nav_attempt < max_nav_attempts:
+                                print("💫 等待10秒后重试...")
+                                time.sleep(10)
+                                continue
+                            else:
+                                raise Exception(
+                                    f"无法打开 Gemini App，尝试了 {max_nav_attempts} 次"
+                                )
 
+                if not page_loaded:
+                    raise Exception("页面加载失败")
+
+                print("✅ Gemini App 已打开并准备就绪")
+
+                # 第二步：验证页面完全准备好
+                print("🔄 验证页面是否完全准备好...")
+                page_ready = self.wait_for_page_ready()
+                if not page_ready:
+                    print("⚠️ 页面准备验证失败，但继续尝试...")
+
+                # 第三步：上传PDF文件前倒计时
+                print("🔄 准备上传PDF文件...")
+                self.countdown_timer(3, "上传PDF文件前等待")
+
+                # 第四步：上传PDF文件（只执行一次）
+                if not pdf_uploaded or attempt > 1:
+                    print("🔄 上传PDF文件...")
+                    if not self.upload_pdf_to_gemini(book_info):
                         if attempt < max_attempts:
-                            print("💫 等待10秒后重试...")
-                            time.sleep(10)
+                            print(f"❌ 第 {attempt} 次PDF上传失败，重试整个流程...")
+                            # 重置状态，准备重试
+                            page_loaded = False
+                            pdf_uploaded = False
+                            prompt_entered = False
+                            time.sleep(10)  # 等待10秒后重试
                             continue
                         else:
-                            print("⚠️ 页面加载验证失败，但继续尝试")
-                            page_loaded = True  # 强制继续
+                            print("❌ PDF上传最终失败")
+                            self.update_tracking_failure(uuid_val, title)
+                            return False
+                    pdf_uploaded = True
+                    print("✅ PDF文件上传完成")
 
-                except Exception as nav_error:
-                    print(f"❌ 第 {attempt} 次导航失败: {nav_error}")
+                # 第五步：输入提示词（只执行一次）
+                if not prompt_entered or attempt > 1:
+                    print("🔄 输入提示词...")
+                    if not self.input_prompt_after_pdf_upload(book_info):
+                        if attempt < max_attempts:
+                            print(f"❌ 第 {attempt} 次提示词输入失败，重试整个流程...")
+                            # 重置状态，准备重试
+                            page_loaded = False
+                            pdf_uploaded = False
+                            prompt_entered = False
+                            time.sleep(5)
+                            continue
+                        else:
+                            print("❌ 输入提示词最终失败")
+                            self.update_tracking_failure(uuid_val, title)
+                            return False
+                    prompt_entered = True
+                    print("✅ 提示词输入完成")
+
+                # 第六步：发送请求
+                print("🔄 发送生成请求...")
+                self.send_generation_request()
+
+                # 第七步：等待AI完成（这是最容易失败的步骤）
+                print("🔄 等待AI完成...")
+                try:
+                    self.wait_for_ai_completion()
+                except Exception as ai_error:
+                    print(f"❌ AI处理失败: {ai_error}")
                     if attempt < max_attempts:
-                        print("💫 等待10秒后重试...")
+                        print(f"🔄 第 {attempt} 次AI处理失败，重试整个流程...")
+                        print("💡 可能的问题：文件过大、服务暂时不可用或网络问题")
+                        # 重置所有状态，准备完全重试
+                        page_loaded = False
+                        pdf_uploaded = False
+                        prompt_entered = False
+                        time.sleep(30)  # AI失败后等待更长时间
+                        continue
+                    else:
+                        print("❌ AI处理最终失败")
+                        self.update_tracking_failure(uuid_val, title)
+                        return False
+
+                # 第八步：提取生成的内容
+                print("🔄 提取生成的内容...")
+                content = self.extract_generated_summary()
+
+                if content:
+                    # 保存到文件
+                    summary_file = os.path.join(self.summary_dir, f"{uuid_val}.txt")
+                    with open(summary_file, "w", encoding="utf-8") as f:
+                        f.write(content)
+
+                    print(f"✅ 总结已保存: {summary_file}")
+                    print(f"   内容长度: {len(content)} 字符")
+
+                    # 更新成功记录
+                    self.update_tracking_success(uuid_val, title)
+                    return True
+                else:
+                    if attempt < max_attempts:
+                        print(f"❌ 第 {attempt} 次内容提取失败，重试...")
                         time.sleep(10)
                         continue
                     else:
-                        raise Exception(
-                            f"无法打开 Gemini App，尝试了 {max_attempts} 次"
-                        )
+                        print("❌ 未能提取到生成的内容")
+                        self.update_tracking_failure(uuid_val, title)
+                        return False
 
-            if not page_loaded:
-                raise Exception("页面加载失败")
+            except Exception as e:
+                print(f"❌ 第 {attempt} 次生成总结过程出错: {e}")
+                print(
+                    f"🔍 执行状态: 页面加载={page_loaded}, PDF上传={pdf_uploaded}, 提示词输入={prompt_entered}"
+                )
 
-            print("✅ Gemini App 已打开并准备就绪")
-
-            # 输出调试信息
-            self.debug_page_info()
-
-            # 第二步：验证页面完全准备好
-            print("🔄 验证页面是否完全准备好...")
-            page_ready = self.wait_for_page_ready()
-            if not page_ready:
-                print("⚠️ 页面准备验证失败，但继续尝试...")
-
-            # 第三步：上传PDF文件前倒计时
-            print("🔄 准备上传PDF文件...")
-            self.countdown_timer(3, "上传PDF文件前等待")
-
-            # 第四步：上传PDF文件（只执行一次）
-            if not pdf_uploaded:
-                print("🔄 上传PDF文件...")
-                if not self.upload_pdf_to_gemini(book_info):
-                    print("❌ PDF上传失败")
+                if attempt < max_attempts:
+                    wait_time = 30 * attempt  # 递增等待时间
+                    print(f"💫 等待 {wait_time} 秒后重试整个流程...")
+                    # 重置所有状态
+                    page_loaded = False
+                    pdf_uploaded = False
+                    prompt_entered = False
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    print(f"❌ 生成总结最终失败，已尝试 {max_attempts} 次")
                     self.update_tracking_failure(uuid_val, title)
                     return False
-                pdf_uploaded = True
-                print("✅ PDF文件上传完成")
 
-            # 第五步：输入提示词（只执行一次）
-            if not prompt_entered:
-                print("🔄 输入提示词...")
-                if not self.input_prompt_after_pdf_upload(book_info):
-                    print("❌ 输入提示词失败")
-                    self.update_tracking_failure(uuid_val, title)
-                    return False
-                prompt_entered = True
-                print("✅ 提示词输入完成")
-
-            # 第六步：发送请求
-            print("🔄 发送生成请求...")
-            self.send_generation_request()
-
-            # 第七步：等待AI完成
-            print("🔄 等待AI完成...")
-            self.wait_for_ai_completion()
-
-            # 第八步：提取生成的内容
-            print("🔄 提取生成的内容...")
-            content = self.extract_generated_summary()
-
-            if content:
-                # 保存到文件
-                summary_file = os.path.join(self.summary_dir, f"{uuid_val}.txt")
-                with open(summary_file, "w", encoding="utf-8") as f:
-                    f.write(content)
-
-                print(f"✅ 总结已保存: {summary_file}")
-                print(f"   内容长度: {len(content)} 字符")
-
-                # 更新成功记录
-                self.update_tracking_success(uuid_val, title)
-                return True
-            else:
-                print("❌ 未能提取到生成的内容")
-                self.update_tracking_failure(uuid_val, title)
-                return False
-
-        except Exception as e:
-            print(f"❌ 生成总结过程出错: {e}")
-            print(
-                f"🔍 执行状态: 页面加载={page_loaded}, PDF上传={pdf_uploaded}, 提示词输入={prompt_entered}"
-            )
-            self.update_tracking_failure(uuid_val, title)
-            return False
+        return False
 
     def generate_summaries(self, max_count=None):
         """批量生成书籍总结"""
@@ -1573,7 +1663,7 @@ Ensure the total word count reaches at least 5000 words.
                 file_size = os.path.getsize(pdf_file_path)
                 if file_size < 1000:  # 文件损坏
                     books_corrupted += 1
-                elif file_size > 50 * 1024 * 1024:  # 文件过大
+                elif file_size > 45 * 1024 * 1024:  # 文件过大
                     books_oversized += 1
                 else:  # 正常文件
                     books_with_pdf += 1
@@ -1584,7 +1674,7 @@ Ensure the total word count reaches at least 5000 words.
         print(f"📎 有效PDF文件: {books_with_pdf}")
         print(f"📄 无PDF文件: {books_without_pdf}")
         if books_oversized > 0:
-            print(f"📦 PDF文件过大(>50MB): {books_oversized}")
+            print(f"📦 PDF文件过大(>45MB): {books_oversized}")
         if books_corrupted > 0:
             print(f"💥 PDF文件损坏(<1KB): {books_corrupted}")
         print(f"✅ 已生成总结: {len(existing_summaries)}")
@@ -1647,7 +1737,7 @@ def main():
 
 注意：
 - 脚本会自动检测并使用 book_pdf_downloader.py 下载的PDF文件
-- 大于50MB的PDF文件将被自动跳过
+- 大于45MB的PDF文件将被自动跳过
 - 小于1KB的PDF文件被认为是损坏文件并跳过
         """,
     )
