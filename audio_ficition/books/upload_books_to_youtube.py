@@ -9,7 +9,7 @@
 - 支持中文和英文书籍处理（通过 --language 参数选择）
 - 读取对应语言的Excel文件，获取待上传的书籍列表
 - 从 merge_clips_with_audio.py 的输出中读取MP4视频文件
-- 使用 generate_youtube_titles.py 的逻辑生成标题
+- 从 generate_youtube_titles.py 生成的标题文件中读取YouTube标题
 - 组合描述和hashtags作为视频描述
 - 自动选择对应语言的YouTube频道进行上传
 - 支持设定视频间隔时间
@@ -28,6 +28,7 @@
 - MP4文件: {media_path}/books/{language}/mp4_with_audio/{uuid}.mp4
 - 封面文件: {media_path}/books/{language}/ytb_cover/{uuid}.png
 - 标题信息: {media_path}/books/{language}/info/{uuid}.json
+- YouTube标题文件: {media_path}/books/{language}/youtube_titles/{uuid}.txt (由generate_youtube_titles.py生成)
 - 描述文件: {media_path}/books/{language}/youtube_description/{uuid}.txt
 - 标签文件: {media_path}/books/{language}/youtube_hashtags/{uuid}.txt
 
@@ -72,6 +73,11 @@
   3. 开始等待: 系统等待指定分钟数
   4. 清理tab: 等待结束后关闭所有现有tab
   5. 继续工作: 创建新tab继续上传剩余视频
+
+⚠️ 前置条件:
+# 必须先运行 generate_youtube_titles.py 生成标题文件
+python generate_youtube_titles.py --lang zh                        # 为中文书籍生成标题
+python generate_youtube_titles.py --lang en                        # 为英文书籍生成标题
 
 💡 使用示例:
 
@@ -185,6 +191,9 @@ def get_directories(language="en"):
         "info": os.path.join(books_path, "info"),
         "descriptions": os.path.join(books_path, "youtube_description"),
         "hashtags": os.path.join(books_path, "youtube_hashtags"),
+        "youtube_titles": os.path.join(
+            books_path, "youtube_titles"
+        ),  # 添加youtube_titles目录
         "excel": EXCEL_FILES[language],
     }
 
@@ -303,8 +312,46 @@ class BookYouTubeUploader:
             print(f"❌ [UUID:{uuid[:8]}...] 读取书籍信息失败: {e}")
             return None
 
-    def generate_youtube_title(self, book_title: str) -> str:
-        """生成YouTube标题（参考generate_youtube_titles.py）"""
+    def get_youtube_title(self, uuid: str) -> str:
+        """从generate_youtube_titles.py生成的文件中读取YouTube标题"""
+        title_file = os.path.join(self.directories["youtube_titles"], f"{uuid}.txt")
+        
+        print(f"📄 [UUID:{uuid[:8]}...] 正在读取标题文件: {os.path.basename(title_file)}")
+        
+        # 检查标题文件是否存在
+        if not os.path.exists(title_file):
+            print(f"❌ [UUID:{uuid[:8]}...] 标题文件不存在: {os.path.basename(title_file)}")
+            print(f"💡 请先运行: python generate_youtube_titles.py --lang {self.language} --uuid {uuid}")
+            return None
+        
+        # 检查文件大小
+        if not is_valid_file(title_file, 10):  # 至少10字节
+            print(f"❌ [UUID:{uuid[:8]}...] 标题文件无效或为空")
+            return None
+        
+        try:
+            with open(title_file, "r", encoding="utf-8") as f:
+                youtube_title = f.read().strip()
+            
+            if not youtube_title:
+                print(f"❌ [UUID:{uuid[:8]}...] 标题文件内容为空")
+                return None
+            
+            # 验证标题长度
+            max_length = 99 if self.language == "zh" else 100
+            if len(youtube_title) > max_length:
+                print(f"⚠️  [UUID:{uuid[:8]}...] 标题长度超限 ({len(youtube_title)} > {max_length})，截断处理")
+                youtube_title = youtube_title[:max_length-3] + "..."
+            
+            print(f"✅ [UUID:{uuid[:8]}...] 成功读取标题")
+            return youtube_title
+            
+        except Exception as e:
+            print(f"❌ [UUID:{uuid[:8]}...] 读取标题文件失败: {e}")
+            return None
+
+    def generate_youtube_title_fallback(self, book_title: str) -> str:
+        """后备方案：生成简化的YouTube标题（当标题文件不存在时使用）"""
         # 清理书名
         book_title = " ".join(book_title.split()).strip()
 
@@ -376,9 +423,14 @@ class BookYouTubeUploader:
             print(f"❌ [UUID:{uuid[:8]}...] 无法加载书籍信息")
             return None
 
-        # 生成标题
-        title = self.generate_youtube_title(info["title"])
-        print(f"🎬 [UUID:{uuid[:8]}...] 标题: {title}")
+        # 从generate_youtube_titles.py生成的文件中读取标题
+        title = self.get_youtube_title(uuid)
+        if not title:
+            print(f"⚠️  [UUID:{uuid[:8]}...] 无法读取YouTube标题文件，使用后备方案")
+            title = self.generate_youtube_title_fallback(info["title"])
+            print(f"🔄 [UUID:{uuid[:8]}...] 后备标题: {title}")
+        else:
+            print(f"🎬 [UUID:{uuid[:8]}...] YouTube标题: {title}")
 
         # 获取描述
         description = self.get_book_description(uuid)
@@ -1483,7 +1535,12 @@ def check_dependencies():
 
 def show_usage_examples():
     """显示使用示例"""
-    print("\n💡 使用示例:")
+    print("\n⚠️ 前置条件:")
+    print("# 必须先运行 generate_youtube_titles.py 生成标题文件")
+    print("python generate_youtube_titles.py --lang zh                        # 为中文书籍生成标题")
+    print("python generate_youtube_titles.py --lang en                        # 为英文书籍生成标题")
+    print()
+    print("💡 使用示例:")
     print("# 中文书籍试运行模式，查看待上传的书籍")
     print("python upload_books_to_youtube.py --language zh --dry-run")
     print()
@@ -1535,7 +1592,7 @@ def main():
 功能说明:
   1. 读取对应语言的Excel文件中的书籍列表
   2. 跳过已上传的书籍（是否发布=1）
-  3. 获取书籍MP4文件、封面、标题、描述和hashtags
+  3. 获取书籍MP4文件、封面、从generate_youtube_titles.py生成的标题、描述和hashtags
   4. 按设定的时间间隔自动上传到指定YouTube频道
   5. 更新Excel文件中的发布状态
 
@@ -1543,6 +1600,10 @@ Excel文件格式要求:
   - 列名: UUID | 是否发布 | 发布时间
   - '是否发布' 列: 0=未发布, 1=已发布
   - '发布时间' 列: 日期时间字符串 (YYYY-MM-DD HH:MM:SS)
+
+前置条件:
+  python generate_youtube_titles.py --lang zh                   # 先为中文书籍生成标题
+  python generate_youtube_titles.py --lang en                   # 先为英文书籍生成标题
 
 使用示例:
   python upload_books_to_youtube.py --language zh --dry-run      # 中文书籍试运行
@@ -1684,11 +1745,13 @@ Excel文件格式要求:
         print("   4. 确认Excel文件格式正确，列名为：UUID、是否发布、发布时间")
         print("   5. 检查视频文件路径是否正确")
         print("   6. 确认生成的标题、描述、hashtags文件存在")
-        print("   7. 检查语言参数是否正确 (--language en 或 --language zh)")
+        print("   7. 【重要】先运行generate_youtube_titles.py生成标题文件:")
+        print(f"      python generate_youtube_titles.py --lang {args.language}")
+        print("   8. 检查语言参数是否正确 (--language en 或 --language zh)")
         print(
-            "   8. 运行试运行模式检查：python upload_books_to_youtube.py --language zh --dry-run"
+            "   9. 运行试运行模式检查：python upload_books_to_youtube.py --language zh --dry-run"
         )
-        print("   9. 查看详细示例：python upload_books_to_youtube.py --help-examples")
+        print("   10. 查看详细示例：python upload_books_to_youtube.py --help-examples")
         sys.exit(1)
 
 
