@@ -2,21 +2,20 @@
 科幻故事封面图片超分辨率处理工具
 
 功能说明:
-此脚本使用阿里云图像增强服务对封面图片进行超分辨率处理，提升图片质量和分辨率。
+此脚本使用 GFPGAN 网络对封面图片进行超分辨率处理，提升图片质量和分辨率。
 
 主要功能:
-1. 读取封面图片文件（来自 enhance_cover_images.py 的输出）
-2. 调用阿里云图像增强服务进行超分辨率处理
+1. 读取小尺寸封面图片文件
+2. 使用 GFPGAN 进行超分辨率处理
 3. 将处理后的高清图片保存到指定目录
 4. 支持多个主题：scifi、thriller、horror、fantasy、romance
+5. 只支持 Ubuntu 系统运行
 
 输入:
-- macOS: /Volumes/dhl/audio/{theme}/cover_enhanced/[故事索引].png
-- Linux: /media/dhl/audio/{theme}/cover_enhanced/[故事索引].png
+- Ubuntu: /media/dhl/audio/{theme}/cover_img_small/[故事索引].png
 
 输出:
-- macOS: /Volumes/dhl/audio/{theme}/cover_img_large/[故事索引].png
-- Linux: /media/dhl/audio/{theme}/cover_img_large/[故事索引].png
+- Ubuntu: /media/dhl/audio/{theme}/cover_img_large/[故事索引].png
 
 使用方法:
 1. 处理所有主题: python upscale_cover_images.py
@@ -26,13 +25,18 @@
 5. 指定超分倍数: python upscale_cover_images.py --theme horror --scale 4
 
 注意:
-- 需要设置环境变量 ALIBABA_CLOUD_ACCESS_KEY_ID 和 ALIBABA_CLOUD_ACCESS_KEY_SECRET
+- 只支持 Ubuntu 系统运行
+- 需要安装 conda 环境和 GFPGAN
 - 脚本支持断点续传，中断后可从上次停止的位置继续处理
 - 支持超分倍数 2x 和 4x
-- 处理本地文件，使用阿里云图像增强的advance接口
+- 处理本地文件，使用 GFPGAN 的 inference_gfpgan.py
 - 自动排除以点开头的meta文件（如.DS_Store等）
-- 根据操作系统自动选择合适的路径（macOS使用/Volumes，Linux使用/media）
 - 默认处理所有支持的主题，也可指定单个主题处理
+
+依赖环境:
+- Ubuntu 操作系统
+- conda 环境
+- /home/dhl/Documents/GFPGAN/inference_gfpgan.py
 """
 
 import os
@@ -41,167 +45,247 @@ import time
 import argparse
 import glob
 import re
-import io
+import shutil
 import platform
+import subprocess
 from tqdm import tqdm
 from typing import List
-
-from alibabacloud_imageenhan20190930.client import Client as ImageEnhanClient
-from alibabacloud_credentials.client import Client as CredentialClient
-from alibabacloud_credentials.models import Config as CredentialConfig
-from alibabacloud_tea_openapi import models as open_api_models
-from alibabacloud_imageenhan20190930 import models as imageenhan_20190930_models
-from alibabacloud_imageenhan20190930.models import (
-    MakeSuperResolutionImageAdvanceRequest,
-)
-from alibabacloud_tea_util import models as util_models
-from alibabacloud_tea_util.client import Client as UtilClient
-import requests
-from PIL import Image
+from pathlib import Path
 
 # 支持的主题列表
 SUPPORTED_THEMES = ["scifi", "thriller", "horror", "fantasy", "romance"]
 
 
-def get_base_input_path(theme: str):
-    """根据操作系统和主题返回原始图片的适当路径"""
+def check_ubuntu_system():
+    """检查是否为Ubuntu系统"""
     system = platform.system()
-    if system == "Darwin":  # macOS
-        return f"/Volumes/dhl/audio/{theme}/cover_enhanced"
-    else:  # 默认为Linux/Ubuntu
-        return f"/media/dhl/audio/{theme}/cover_enhanced"
+    if system != "Linux":
+        print(f"❌ 错误：此脚本只支持Ubuntu系统")
+        print(f"   当前系统：{system}")
+        return False
+    
+    # 进一步检查是否为Ubuntu
+    try:
+        with open("/etc/os-release", "r") as f:
+            content = f.read()
+            if "Ubuntu" not in content:
+                print(f"❌ 错误：此脚本只支持Ubuntu系统")
+                print(f"   当前Linux发行版不是Ubuntu")
+                return False
+    except FileNotFoundError:
+        # 尝试检查另一个文件
+        try:
+            with open("/etc/lsb-release", "r") as f:
+                content = f.read()
+                if "Ubuntu" not in content:
+                    print(f"❌ 错误：此脚本只支持Ubuntu系统")
+                    return False
+        except FileNotFoundError:
+            print(f"⚠️ 警告：无法确定Linux发行版，假设为Ubuntu继续执行")
+    
+    print(f"✅ 系统检查通过：Ubuntu")
+    return True
+
+
+def check_gfpgan_environment():
+    """检查GFPGAN环境"""
+    gfpgan_script = "/home/dhl/Documents/GFPGAN/inference_gfpgan.py"
+    
+    if not os.path.exists(gfpgan_script):
+        print(f"❌ 错误：GFPGAN脚本不存在 {gfpgan_script}")
+        return False
+    
+    print(f"✅ GFPGAN脚本存在: {gfpgan_script}")
+    
+    # 检查conda
+    try:
+        result = subprocess.run(
+            ["conda", "--version"], capture_output=True, text=True, check=True
+        )
+        print(f"✅ conda 已安装: {result.stdout.strip()}")
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print(f"❌ 错误：未找到conda命令")
+        print(f"   请确保已安装conda并添加到PATH环境变量")
+        return False
+
+
+def get_base_input_path(theme: str):
+    """根据主题返回原始图片的适当路径（Ubuntu）"""
+    return f"/media/dhl/audio/{theme}/cover_img_small"
 
 
 def get_base_output_path(theme: str):
-    """根据操作系统和主题返回输出图片的适当路径"""
-    system = platform.system()
-    if system == "Darwin":  # macOS
-        return f"/Volumes/dhl/audio/{theme}/cover_img_large"
-    else:  # 默认为Linux/Ubuntu
-        return f"/media/dhl/audio/{theme}/cover_img_large"
+    """根据主题返回输出图片的适当路径（Ubuntu）"""
+    return f"/media/dhl/audio/{theme}/cover_img_large"
 
 
-def create_client() -> ImageEnhanClient:
-    """
-    创建阿里云图像增强客户端
-    @return: ImageEnhanClient
-    @throws Exception
-    """
-    # 从环境变量获取访问密钥
-    access_key_id = os.environ.get("ALIBABA_CLOUD_ACCESS_KEY_ID")
-    access_key_secret = os.environ.get("ALIBABA_CLOUD_ACCESS_KEY_SECRET")
-
-    if not access_key_id or not access_key_secret:
-        print("错误: 未找到阿里云访问密钥")
-        print(
-            "请设置环境变量 ALIBABA_CLOUD_ACCESS_KEY_ID 和 ALIBABA_CLOUD_ACCESS_KEY_SECRET"
-        )
-        print("例如:")
-        print("export ALIBABA_CLOUD_ACCESS_KEY_ID='your-access-key-id'")
-        print("export ALIBABA_CLOUD_ACCESS_KEY_SECRET='your-access-key-secret'")
-        sys.exit(1)
-
-    try:
-        # 使用更标准的配置方式
-        config = open_api_models.Config(
-            access_key_id=access_key_id,
-            access_key_secret=access_key_secret,
-            endpoint="imageenhan.cn-shanghai.aliyuncs.com",
-            region_id="cn-shanghai",
-        )
-
-        return ImageEnhanClient(config)
-    except Exception as e:
-        print(f"初始化阿里云客户端时出错: {e}")
-        sys.exit(1)
-
-
-def upscale_image(
-    client: ImageEnhanClient,
-    image_path: str,
+def upscale_image_with_gfpgan(
+    input_file: str,
+    output_dir: str,
     story_index: int,
     theme: str,
     upscale_factor: int = 2,
     max_retries: int = 3,
 ):
     """
-    使用阿里云图像增强服务进行超分辨率处理
+    使用 GFPGAN 进行超分辨率处理
 
     Args:
-        client: 阿里云图像增强客户端
-        image_path: 本地图片文件路径
+        input_file: 输入图片文件路径
+        output_dir: 输出目录
         story_index: 故事索引
         theme: 主题名称
         upscale_factor: 超分倍数（2 或 4）
         max_retries: 最大重试次数
 
     Returns:
-        处理后的图片数据，失败时返回 None
+        处理是否成功
     """
 
     # 检查文件是否存在
-    if not os.path.exists(image_path):
-        print(f"❌ 图片文件不存在: {image_path}")
-        return None
+    if not os.path.exists(input_file):
+        print(f"❌ 图片文件不存在: {input_file}")
+        return False
 
-    for attempt in range(max_retries):
-        try:
-            print(
-                f"正在处理 {theme} 主题故事 {story_index} 的图片超分 (尝试 {attempt+1}/{max_retries})..."
-            )
-            print(f"处理本地文件: {image_path}")
+    # 创建临时目录用于单个文件处理
+    temp_input_dir = f"/tmp/gfpgan_input_{theme}_{story_index}"
+    temp_output_dir = f"/tmp/gfpgan_output_{theme}_{story_index}"
+    
+    try:
+        # 清理并创建临时目录
+        if os.path.exists(temp_input_dir):
+            shutil.rmtree(temp_input_dir)
+        if os.path.exists(temp_output_dir):
+            shutil.rmtree(temp_output_dir)
+        
+        os.makedirs(temp_input_dir, exist_ok=True)
+        os.makedirs(temp_output_dir, exist_ok=True)
+        
+        # 将输入文件复制到临时目录
+        temp_input_file = os.path.join(temp_input_dir, f"{story_index}.png")
+        shutil.copy2(input_file, temp_input_file)
 
-            # 打开本地图片文件
-            with open(image_path, "rb") as img_file:
-                # 创建超分请求（使用本地文件）
-                request = MakeSuperResolutionImageAdvanceRequest(
-                    url_object=img_file,
-                    mode="base",  # 使用base模式而不是enhancement
-                    upscale_factor=upscale_factor,
+        for attempt in range(max_retries):
+            try:
+                print(
+                    f"正在处理 {theme} 主题故事 {story_index} 的图片超分 (尝试 {attempt+1}/{max_retries})..."
                 )
+                print(f"处理文件: {input_file}")
 
-                # 运行时选项
-                runtime = util_models.RuntimeOptions()
-
-                # 调用API (使用advance方法处理本地文件)
-                response = client.make_super_resolution_image_advance(request, runtime)
-
-                if (
-                    response
-                    and response.body
-                    and response.body.data
-                    and response.body.data.url
-                ):
-                    # 获取处理后的图片URL
-                    result_url = response.body.data.url
-
-                    print(f"正在下载超分后的图片...")
-                    img_response = requests.get(result_url, timeout=30)
-                    img_response.raise_for_status()
-
-                    print(f"✅ 已成功处理 {theme} 主题故事 {story_index} 的图片超分")
-                    return img_response.content
+                # 运行GFPGAN处理
+                success = run_gfpgan(temp_input_dir, temp_output_dir, upscale_factor)
+                
+                if success:
+                    # 查找输出文件（GFPGAN输出文件在 restored_imgs 子目录中）
+                    restored_dir = os.path.join(temp_output_dir, "restored_imgs")
+                    if os.path.exists(restored_dir):
+                        output_files = [f for f in os.listdir(restored_dir) 
+                                      if f.endswith(('.png', '.jpg', '.jpeg')) and not f.startswith('.')]
+                        
+                        if output_files:
+                            # 移动处理后的文件到最终输出目录
+                            os.makedirs(output_dir, exist_ok=True)
+                            source_file = os.path.join(restored_dir, output_files[0])
+                            target_file = os.path.join(output_dir, f"{story_index}.png")
+                            
+                            shutil.move(source_file, target_file)
+                            print(f"✅ 已成功处理 {theme} 主题故事 {story_index} 的图片超分")
+                            return True
+                        else:
+                            print(f"❌ GFPGAN输出目录中未找到处理后的文件")
+                    else:
+                        print(f"❌ GFPGAN输出的restored_imgs目录不存在")
                 else:
-                    print(f"❌ API返回数据格式异常或未包含图片URL")
-                    return None
+                    print(f"❌ GFPGAN处理失败")
 
+            except Exception as e:
+                print(f"图片超分处理出错 (尝试 {attempt+1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    retry_delay = (attempt + 1) * 5
+                    print(f"等待{retry_delay}秒后重试...")
+                    time.sleep(retry_delay)
+                else:
+                    print(f"达到最大重试次数 ({max_retries})，处理失败")
+
+        return False
+
+    finally:
+        # 清理临时目录
+        try:
+            if os.path.exists(temp_input_dir):
+                shutil.rmtree(temp_input_dir)
+            if os.path.exists(temp_output_dir):
+                shutil.rmtree(temp_output_dir)
         except Exception as e:
-            print(f"图片超分处理出错 (尝试 {attempt+1}/{max_retries}): {e}")
-            if attempt < max_retries - 1:
-                retry_delay = (attempt + 1) * 5
-                print(f"等待{retry_delay}秒后重试...")
-                time.sleep(retry_delay)
-            else:
-                print(f"达到最大重试次数 ({max_retries})，处理失败")
-                return None
+            print(f"⚠️ 清理临时目录失败: {e}")
+
+
+def run_gfpgan(input_dir: str, output_dir: str, upscale_factor: int = 2) -> bool:
+    """运行GFPGAN进行超分辨率处理"""
+    try:
+        gfpgan_script = "/home/dhl/Documents/GFPGAN/inference_gfpgan.py"
+        
+        print(f"🔧 开始运行GFPGAN...")
+        print(f"📁 输入目录: {input_dir}")
+        print(f"📤 输出目录: {output_dir}")
+        
+        # 构建conda命令
+        cmd = [
+            "conda", "run", "-n", "base",  # 使用conda base环境
+            "python", gfpgan_script,
+            "-i", input_dir,
+            "-o", output_dir,
+            "-v", "1.4",      # GFPGAN版本
+            "-s", str(upscale_factor)  # 放大倍数
+        ]
+        
+        print(f"🔧 执行命令: {' '.join(cmd)}")
+        
+        # 切换到GFPGAN目录执行
+        gfpgan_dir = "/home/dhl/Documents/GFPGAN"
+        
+        # 执行命令
+        result = subprocess.run(
+            cmd, 
+            cwd=gfpgan_dir,
+            capture_output=True, 
+            text=True, 
+            check=True
+        )
+        
+        print(f"✅ GFPGAN处理完成!")
+        
+        # 检查输出文件
+        restored_dir = os.path.join(output_dir, "restored_imgs")
+        if os.path.exists(restored_dir):
+            output_files = [f for f in os.listdir(restored_dir) 
+                           if f.endswith(('.png', '.jpg', '.jpeg')) and not f.startswith('.')]
+            print(f"📊 生成文件数量: {len(output_files)}")
+            return len(output_files) > 0
+        else:
+            print(f"❌ 输出目录的restored_imgs子目录未创建")
+            return False
+            
+    except subprocess.CalledProcessError as e:
+        print(f"❌ GFPGAN执行失败:")
+        print(f"   错误代码: {e.returncode}")
+        if e.stdout:
+            print(f"   标准输出: {e.stdout}")
+        if e.stderr:
+            print(f"   错误输出: {e.stderr}")
+        return False
+    except Exception as e:
+        print(f"❌ GFPGAN处理过程出错: {e}")
+        return False
 
 
 def get_existing_images(theme: str):
-    """获取指定主题的原始封面图片列表"""
+    """获取指定主题的小尺寸封面图片列表"""
     image_dir = get_base_input_path(theme)
 
     if not os.path.exists(image_dir):
-        print(f"原始图片目录不存在: {image_dir}")
+        print(f"小尺寸图片目录不存在: {image_dir}")
         return {}
 
     image_files = glob.glob(os.path.join(image_dir, "*.png"))
@@ -243,48 +327,7 @@ def get_existing_upscaled_images(theme: str):
     return existing_indices
 
 
-def save_upscaled_image(story_index: int, image_data: bytes, theme: str):
-    """保存指定主题的超分后的图片到文件"""
-    output_dir = get_base_output_path(theme)
-
-    # 检查并创建目录
-    try:
-        os.makedirs(output_dir, exist_ok=True)
-        print(f"📂 确保目录存在: {output_dir}")
-    except Exception as e:
-        print(f"❌ 创建目录失败: {e}")
-        return False
-
-    file_path = os.path.join(output_dir, f"{story_index}.png")
-
-    # 检查图片数据是否为空
-    if not image_data:
-        print(f"⚠️ 警告: {theme} 主题故事 {story_index} 的图片数据为空，跳过保存")
-        return False
-
-    try:
-        # 使用PIL Image处理图片数据
-        image = Image.open(io.BytesIO(image_data))
-        image.save(file_path, "PNG")
-
-        # 验证文件是否成功写入
-        if os.path.exists(file_path):
-            file_size = os.path.getsize(file_path)
-            print(
-                f"📁 已保存 {theme} 主题超分图片到: {file_path} (大小: {file_size} 字节)"
-            )
-            return True
-        else:
-            print(f"❌ 文件保存后未找到: {file_path}")
-            return False
-
-    except Exception as e:
-        print(f"❌ 保存图片到 {file_path} 时出错: {e}")
-        return False
-
-
 def process_theme_images(
-    client: ImageEnhanClient,
     theme: str,
     force: bool = False,
     start_index: int = None,
@@ -295,12 +338,12 @@ def process_theme_images(
 
     print(f"\n🎨 开始处理 {theme.upper()} 主题...")
 
-    # 获取所有已存在的原始图片
-    original_images = get_existing_images(theme)
+    # 获取所有已存在的小尺寸图片
+    small_images = get_existing_images(theme)
 
-    if not original_images:
-        print(f"未找到 {theme} 主题的色彩增强封面图片文件")
-        print(f"请先运行 enhance_cover_images.py 生成 {theme} 主题的色彩增强图片")
+    if not small_images:
+        print(f"未找到 {theme} 主题的小尺寸封面图片文件")
+        print(f"请先确保 {theme} 主题的小尺寸封面图片已生成")
         return False
 
     # 获取已存在的超分图片
@@ -309,7 +352,7 @@ def process_theme_images(
     # 过滤需要处理的图片
     images_to_process = {}
 
-    for story_index, image_path in original_images.items():
+    for story_index, image_path in small_images.items():
         # 应用索引范围过滤
         if start_index is not None and story_index < start_index:
             continue
@@ -325,7 +368,7 @@ def process_theme_images(
         return True
 
     print(f"\n=== 📊 {theme.upper()} 主题图片超分处理分析 ===")
-    print(f"总原始图片数量: {len(original_images)}")
+    print(f"总小尺寸图片数量: {len(small_images)}")
     print(f"已有超分图片: {len(existing_upscaled)}")
     print(f"需要处理的图片: {len(images_to_process)}")
     print(f"超分倍数: {upscale_factor}x")
@@ -334,6 +377,9 @@ def process_theme_images(
     # 统计变量
     success_count = 0
     failure_count = 0
+    
+    # 获取输出目录
+    output_dir = get_base_output_path(theme)
 
     # 处理每个图片
     with tqdm(
@@ -343,29 +389,24 @@ def process_theme_images(
             image_path = images_to_process[story_index]
 
             print(f"\n=== 处理 {theme} 主题故事 {story_index} ===")
-            print(f"原始图片路径: {image_path}")
+            print(f"小尺寸图片路径: {image_path}")
 
             # 进行超分处理
-            upscaled_data = upscale_image(
-                client, image_path, story_index, theme, upscale_factor
+            success = upscale_image_with_gfpgan(
+                image_path, output_dir, story_index, theme, upscale_factor
             )
 
-            if upscaled_data:
-                # 保存超分后的图片
-                if save_upscaled_image(story_index, upscaled_data, theme):
-                    success_count += 1
-                    print(f"✅ {theme} 主题故事 {story_index} 图片超分处理成功")
-                else:
-                    failure_count += 1
-                    print(f"❌ {theme} 主题故事 {story_index} 图片保存失败")
+            if success:
+                success_count += 1
+                print(f"✅ {theme} 主题故事 {story_index} 图片超分处理成功")
             else:
                 failure_count += 1
                 print(f"❌ {theme} 主题故事 {story_index} 图片超分处理失败")
 
             pbar.update(1)
 
-            # 短暂延迟，避免API请求过快
-            time.sleep(2)
+            # 短暂延迟，避免处理过快
+            time.sleep(1)
 
     # 输出最终统计
     print(f"\n=== 📈 {theme.upper()} 主题处理完成统计 ===")
@@ -377,7 +418,6 @@ def process_theme_images(
 
 
 def process_images(
-    client: ImageEnhanClient,
     themes: List[str],
     force: bool = False,
     start_index: int = None,
@@ -398,7 +438,7 @@ def process_images(
         print(f"{'='*60}")
 
         success = process_theme_images(
-            client, theme, force, start_index, end_index, upscale_factor
+            theme, force, start_index, end_index, upscale_factor
         )
 
         if success:
@@ -418,7 +458,7 @@ def process_images(
 def main():
     """主函数"""
     # 创建命令行参数解析器
-    parser = argparse.ArgumentParser(description="对故事封面图片进行超分辨率处理")
+    parser = argparse.ArgumentParser(description="对故事封面图片进行超分辨率处理（使用GFPGAN）")
 
     # 添加命令行参数
     parser.add_argument(
@@ -463,6 +503,17 @@ def main():
             print("❌ 错误：索引必须大于 0")
             return
 
+    print("🔍 故事封面图片超分辨率处理器 (GFPGAN)")
+    print("=" * 50)
+
+    # 检查操作系统
+    if not check_ubuntu_system():
+        return 1
+
+    # 检查GFPGAN环境
+    if not check_gfpgan_environment():
+        return 1
+
     # 确定要处理的主题
     if args.theme:
         themes_to_process = [args.theme]
@@ -471,16 +522,9 @@ def main():
         themes_to_process = SUPPORTED_THEMES
         print(f"🌟 默认处理所有主题: {', '.join(SUPPORTED_THEMES)}")
 
-    print("🔍 故事封面图片超分辨率处理器")
-    print("=" * 50)
-
-    # 创建阿里云客户端
-    client = create_client()
-    print("✅ 阿里云图像增强客户端初始化成功")
-
     # 处理图片超分
     process_images(
-        client, themes_to_process, args.force, args.start, args.end, args.scale
+        themes_to_process, args.force, args.start, args.end, args.scale
     )
 
     print("\n🎉 图片超分处理任务完成!")

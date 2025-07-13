@@ -13,10 +13,12 @@
 输入:
 - Intel Mac: /Volumes/dhl/audio/{theme}/cover_prompts/[故事索引].txt
 - Apple Silicon: /Users/donghaoliu/Documents/audio/{theme}/cover_prompts/[故事索引].txt
+- Ubuntu: /mnt/dhl/audio/{theme}/cover_prompts/[故事索引].txt
 
 输出:
 - Intel Mac: /Volumes/dhl/audio/{theme}/cover_img_small/[故事索引].png
 - Apple Silicon: /Users/donghaoliu/Documents/audio/{theme}/cover_img_small/[故事索引].png
+- Ubuntu: /mnt/dhl/audio/{theme}/cover_img_small/[故事索引].png
 
 使用方法:
 1. 基本使用: python generate_cover_images.py (生成所有主题的图片)
@@ -58,6 +60,8 @@ def get_system_info():
             return "intel_mac"
         elif machine == "arm64":
             return "apple_silicon"
+    elif system == "Linux":  # Linux/Ubuntu
+        return "ubuntu"
 
     return "unknown"
 
@@ -70,10 +74,12 @@ def get_base_path():
         return "/Volumes/dhl/audio"
     elif system_type == "apple_silicon":
         return "/Users/donghaoliu/Documents/audio"
+    elif system_type == "ubuntu":
+        return "/mnt/dhl/audio"
     else:
         print(f"⚠️ 未知系统类型: {system_type}")
-        # 默认使用Apple Silicon路径
-        return "/Users/donghaoliu/Documents/audio"
+        # 默认使用Ubuntu路径
+        return "/mnt/dhl/audio"
 
 
 def get_theme_paths(theme):
@@ -101,7 +107,7 @@ def setup_leonardo_client():
     config = {
         "api_key": api_key,
         "base_url": "https://cloud.leonardo.ai/api/rest/v1",
-        "model_id": "de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3",
+        "model_id": "05ce0082-2d80-4a2d-8653-4d1c85e2418e",
         "headers": {
             "accept": "application/json",
             "authorization": f"Bearer {api_key}",
