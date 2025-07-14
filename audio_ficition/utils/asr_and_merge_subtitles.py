@@ -19,7 +19,8 @@ ASR识别和字幕合并脚本
 
 路径说明:
 输入:
-- MP3 clip: /media/dhl/audio/{theme}/mp3_clips/[故事索引]/[块索引].mp3
+- MP3 clip: /home/dhl/Documents/audio/mp3_clips/{theme}/[故事索引]/[块索引].mp3
+- 文本块: /home/dhl/Documents/audio/chunks/{theme}/[故事索引]/[块索引].txt
 
 输出:
 - Word level 字幕: /mnt/dhl/audio/{theme}/word_level_srt/[故事索引]/[块索引].srt
@@ -128,8 +129,8 @@ def get_theme_paths(theme: str) -> Dict[str, str]:
         )
 
     return {
-        "input_dir": f"/media/dhl/audio/{theme}/mp3_clips",
-        "text_chunks_dir": f"/mnt/dhl/audio/{theme}/story_chunks",
+        "input_dir": f"/home/dhl/Documents/audio/mp3_clips/{theme}",
+        "text_chunks_dir": f"/home/dhl/Documents/audio/chunks/{theme}",
         "word_level_srt_dir": f"/mnt/dhl/audio/{theme}/word_level_srt",
         "seg_level_srt_dir": f"/mnt/dhl/audio/{theme}/seg_level_srt",
         "merge_srt_dir": f"/mnt/dhl/audio/{theme}/srt_merge",
