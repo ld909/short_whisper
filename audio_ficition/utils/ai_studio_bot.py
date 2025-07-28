@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-AI Studio 多主题故事生成自动化脚本
+AI Studio 多主题故事生成自动化脚本 (已升级为 Gemini App)
 
 功能说明：
-这是一个用于 Google AI Studio 的自动化故事生成脚本，支持多种主题类型：
+这是一个用于 Google Gemini App 的自动化故事生成脚本，支持多种主题类型：
 
 📚 支持的主题类型：
 - scifi: 科幻故事
@@ -26,6 +26,7 @@ AI Studio 多主题故事生成自动化脚本
    - 通过 AdsPower 浏览器实现多开隔离
    - 使用 Playwright 进行精确的网页操作控制
    - 单窗口顺序处理模式：确保严格按照轮流顺序生成
+   - **新版本使用 Gemini App 接口替代老旧的 AI Studio**
 
 3. 🎯 智能热身机制
    - 首次运行时自动进行AI热身，发送随机问题激活模型
@@ -90,8 +91,8 @@ python ai_studio_bot.py --check-resume --theme scifi thriller        # 检查指
 - multi_theme_story_generator.py：提供故事参数文件
 
 作者：AI Studio 自动化团队
-版本：v4.1
-更新：优化为严格轮流生成模式，避免单一主题连续生成，确保真正的主题轮流
+版本：v5.0 (Gemini App)
+更新：升级到 Gemini App 接口，提升稳定性和生成质量
 """
 
 import time
@@ -395,40 +396,129 @@ def countdown_wait(seconds=20, window_index=None):
 
 
 def get_adspower_info(ads_id):
-    """连接AdsPower浏览器"""
+    """连接AdsPower浏览器，带重试和详细错误提示"""
     try:
         import urllib3
     except ImportError:
-        print("错误: 缺少 urllib3 模块，请安装: pip install urllib3")
+        print("❌ 错误: 缺少 urllib3 模块，请安装: pip install urllib3")
         return None, None, None
 
-    open_url = f"http://local.adspower.net:50325/api/v1/browser/start?user_id={ads_id}"
+    # 先检查 AdsPower 服务是否运行
+    test_url = "http://127.0.0.1:50325/api/v1/status"
+    open_url = f"http://127.0.0.1:50325/api/v1/browser/start?user_id={ads_id}"
 
     http = urllib3.PoolManager()
 
-    print("正在连接AdsPower...")
-    r = http.request("GET", open_url)
+    print("🔍 检查 AdsPower 服务状态...")
 
-    if r.status != 200:
-        print(f"错误: API返回状态码 {r.status}")
-        print("请确保AdsPower已启动并且本地API已启用")
-        return None, None, http
+    # 检查服务是否运行
+    try:
+        test_resp = http.request("GET", test_url, timeout=10)
+        print("✅ AdsPower 服务已运行")
+    except Exception as e:
+        print("❌ AdsPower 服务未运行或无法连接")
+        print("请确保:")
+        print("  1. AdsPower 客户端已启动")
+        print("  2. 本地API已启用 (设置 -> 本地API -> 启用)")
+        print("  3. 端口 50325 未被占用")
+        print("  4. 防火墙允许本地连接")
+        print(f"详细错误: {e}")
+        return None, None, None
 
-    resp = json.loads(r.data.decode("utf-8"))
+    print(f"🚀 正在启动浏览器 (ID: {ads_id})...")
 
-    if resp["code"] != 0:
-        print(f"错误: {resp['msg']}")
-        print("请检查ads_id是否正确")
-        return None, None, http
+    # 尝试启动浏览器，最多重试3次
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            r = http.request("GET", open_url, timeout=30)
 
-    ws_endpoint = resp["data"]["ws"]["puppeteer"]
-    debug_port = resp["data"]["debug_port"]
-    remote_debugging_url = f"http://localhost:{debug_port}"
+            if r.status != 200:
+                print(f"❌ 错误: API返回状态码 {r.status}")
+                if attempt < max_retries - 1:
+                    print(f"🔄 第 {attempt + 1} 次尝试失败，{5} 秒后重试...")
+                    time.sleep(5)
+                    continue
+                else:
+                    print("请确保AdsPower已启动并且本地API已启用")
+                    return None, None, http
 
-    print(f"成功连接AdsPower，WebSocket地址: {ws_endpoint}")
-    print(f"远程调试URL: {remote_debugging_url}")
+            # 解析响应
+            try:
+                resp = json.loads(r.data.decode("utf-8"))
+            except json.JSONDecodeError as e:
+                print(f"❌ 解析响应JSON失败: {e}")
+                if attempt < max_retries - 1:
+                    print(f"🔄 第 {attempt + 1} 次尝试失败，{5} 秒后重试...")
+                    time.sleep(5)
+                    continue
+                else:
+                    return None, None, http
 
-    return ws_endpoint, remote_debugging_url, http
+            if resp["code"] != 0:
+                error_msg = resp.get("msg", "未知错误")
+                print(f"❌ AdsPower 错误: {error_msg}")
+
+                # 针对常见错误提供解决建议
+                if "not found" in error_msg.lower():
+                    print(f"💡 浏览器ID '{ads_id}' 不存在，请检查:")
+                    print("  1. 浏览器ID是否正确")
+                    print("  2. 浏览器配置文件是否存在")
+                    print("  3. 尝试在AdsPower客户端中手动启动该浏览器")
+                elif "running" in error_msg.lower():
+                    print("💡 浏览器可能已在运行，请:")
+                    print("  1. 在AdsPower中关闭该浏览器")
+                    print("  2. 等待几秒后重试")
+                elif "license" in error_msg.lower():
+                    print("💡 许可证问题，请检查AdsPower账户状态")
+
+                if attempt < max_retries - 1:
+                    print(f"🔄 第 {attempt + 1} 次尝试失败，{10} 秒后重试...")
+                    time.sleep(10)
+                    continue
+                else:
+                    return None, None, http
+
+            # 成功获取浏览器信息
+            ws_endpoint = resp["data"]["ws"]["puppeteer"]
+            debug_port = resp["data"]["debug_port"]
+            remote_debugging_url = f"http://localhost:{debug_port}"
+
+            print(f"✅ 成功连接AdsPower浏览器!")
+            print(f"   浏览器ID: {ads_id}")
+            print(f"   调试端口: {debug_port}")
+            print(f"   WebSocket: {ws_endpoint}")
+
+            return ws_endpoint, remote_debugging_url, http
+
+        except urllib3.exceptions.MaxRetryError as e:
+            print(f"❌ 网络连接错误: {e}")
+            if attempt < max_retries - 1:
+                print(f"🔄 第 {attempt + 1} 次尝试失败，{5} 秒后重试...")
+                time.sleep(5)
+                continue
+            else:
+                print("请检查:")
+                print("  1. AdsPower是否正在运行")
+                print("  2. 网络连接是否正常")
+                print("  3. 是否有防火墙阻止连接")
+                return None, None, None
+
+        except Exception as e:
+            print(f"❌ 连接 AdsPower 时发生意外错误: {e}")
+            if attempt < max_retries - 1:
+                print(f"🔄 第 {attempt + 1} 次尝试失败，{5} 秒后重试...")
+                time.sleep(5)
+                continue
+            else:
+                print("请尝试:")
+                print("  1. 重启 AdsPower 客户端")
+                print("  2. 检查系统资源使用情况")
+                print("  3. 更换浏览器ID重试")
+                return None, None, None
+
+    print(f"❌ 所有重试都失败了，无法连接到AdsPower浏览器 (ID: {ads_id})")
+    return None, None, None
 
 
 def get_existing_stories(story_dir_path):
@@ -769,25 +859,16 @@ def prepare_multi_theme_generation(themes, num_per_theme):
 
 
 def wait_for_warmup_completion(page, window_index):
-    """等待热身问题的AI回答完成 - 停止按钮状态判断+错误检测"""
+    """等待热身问题的AI回答完成 - 停止按钮状态判断 (Gemini App版本)"""
     print(f"🔄 窗口 {window_index}: 正在等待热身问题AI回答完成...")
 
-    # 多种可能的停止按钮选择器
+    # Gemini App的停止按钮选择器
     stop_selectors = [
-        'rect[class*="stoppable-stop"]',
-        'button[aria-label*="stop"]',
-        'button[aria-label*="Stop"]',
-        '[class*="stop-button"]',
-        '[class*="stoppable"]',
-        'rect[class="stoppable-stop ng-tns-c51961493-15"]',
-    ]
-
-    # 错误提示选择器
-    error_selectors = [
-        'div.model-error:has-text("An internal error has occurred")',  # 具体的错误元素
-        'div:has-text("An internal error has occurred")',  # 更通用的选择器
-        '[class*="model-error"]:has-text("internal error")',  # 包含internal error的元素
-        'div:has-text("internal error")',  # 最通用的错误检测
+        'mat-icon[fonticon="stop"]',
+        'mat-icon.icon-filled[fonticon="stop"]',
+        '.mat-icon.icon-filled[fonticon="stop"]',
+        'mat-icon[data-mat-icon-name="stop"]',
+        'button:has(mat-icon[fonticon="stop"])',
     ]
 
     try:
@@ -795,26 +876,10 @@ def wait_for_warmup_completion(page, window_index):
         print(f"⏳ 窗口 {window_index}: 等待热身AI启动...")
         time.sleep(3)
 
-        # 检查停止按钮状态和错误提示
+        # 检查停止按钮状态
         print(f"👀 窗口 {window_index}: 监控热身AI运行状态...")
 
         while True:
-            # 首先检查是否有错误提示
-            error_detected = False
-            for error_selector in error_selectors:
-                try:
-                    if page.locator(error_selector).count() > 0:
-                        print(f"❌ 窗口 {window_index}: 热身阶段检测到AI生成错误")
-                        error_detected = True
-                        break
-                except:
-                    continue
-
-            if error_detected:
-                raise Exception(
-                    f"窗口 {window_index}: 热身阶段AI生成出现internal error"
-                )
-
             # 检查停止按钮是否存在
             stop_buttons_exist = False
             for selector in stop_selectors:
@@ -840,28 +905,19 @@ def wait_for_warmup_completion(page, window_index):
 
 
 def wait_for_ai_completion(page, window_index):
-    """等待AI运行完成 - 停止按钮状态判断+错误检测"""
+    """等待AI运行完成 - 停止按钮状态判断 (Gemini App版本)"""
     print(f"🔄 窗口 {window_index}: 正在等待AI运行完成...")
 
     # 等待一下让AI开始运行
     page.wait_for_timeout(3000)
 
-    # 停止按钮选择器
+    # Gemini App的停止按钮选择器
     stop_selectors = [
-        'rect[class*="stoppable-stop"]',  # 更通用的停止按钮选择器
-        'button[aria-label*="stop"]',
-        'button[aria-label*="Stop"]',
-        '[class*="stop-button"]',
-        '[class*="stoppable"]',
-        'rect[class="stoppable-stop ng-tns-c51961493-15"]',  # 原有的具体选择器作为备用
-    ]
-
-    # 错误提示选择器
-    error_selectors = [
-        'div.model-error:has-text("An internal error has occurred")',  # 具体的错误元素
-        'div:has-text("An internal error has occurred")',  # 更通用的选择器
-        '[class*="model-error"]:has-text("internal error")',  # 包含internal error的元素
-        'div:has-text("internal error")',  # 最通用的错误检测
+        'mat-icon[fonticon="stop"]',
+        'mat-icon.icon-filled[fonticon="stop"]',
+        '.mat-icon.icon-filled[fonticon="stop"]',
+        'mat-icon[data-mat-icon-name="stop"]',
+        'button:has(mat-icon[fonticon="stop"])',
     ]
 
     try:
@@ -870,20 +926,6 @@ def wait_for_ai_completion(page, window_index):
         found_stop_button = False
 
         for attempt in range(15):  # 等待最多30秒
-            # 首先检查是否有错误提示
-            for error_selector in error_selectors:
-                try:
-                    if page.locator(error_selector).count() > 0:
-                        print(f"❌ 窗口 {window_index}: 检测到AI生成错误")
-                        raise Exception(
-                            f"窗口 {window_index}: AI生成出现internal error"
-                        )
-                except Exception as e:
-                    if "AI生成出现internal error" in str(e):
-                        raise e  # 重新抛出我们的错误
-                    # 其他异常（如选择器语法错误）继续下一个
-                    continue
-
             for selector in stop_selectors:
                 try:
                     count = page.locator(selector).count()
@@ -905,27 +947,13 @@ def wait_for_ai_completion(page, window_index):
             print(f"⚠️ 窗口 {window_index}: 未检测到AI启动，可能存在问题")
             raise Exception(f"窗口 {window_index}: 无法检测到AI运行状态")
 
-        # 第二步：等待停止按钮消失，同时检测错误
+        # 第二步：等待停止按钮消失
         print(f"👀 窗口 {window_index}: 监控AI运行状态...")
         consecutive_no_stop_button = 0
         check_count = 0
 
         while True:
             check_count += 1
-
-            # 首先检查是否有错误提示
-            error_detected = False
-            for error_selector in error_selectors:
-                try:
-                    if page.locator(error_selector).count() > 0:
-                        print(f"❌ 窗口 {window_index}: 检测到AI生成错误")
-                        error_detected = True
-                        break
-                except:
-                    continue
-
-            if error_detected:
-                raise Exception(f"窗口 {window_index}: AI生成过程中出现internal error")
 
             # 检查所有停止按钮是否都消失了
             stop_buttons_exist = False
@@ -975,7 +1003,7 @@ def wait_for_ai_completion(page, window_index):
 
 
 def save_generated_story(page, story_index, story_dir_path, theme=""):
-    """保存生成的故事内容到指定路径
+    """保存生成的故事内容到指定路径 (Gemini App版本)
 
     参数:
         page: Playwright页面对象
@@ -997,23 +1025,19 @@ def save_generated_story(page, story_index, story_dir_path, theme=""):
         # 等待内容生成完成
         page.wait_for_timeout(2000)
 
-        # 查找生成的内容区域 - 重点关注ms-prompt-chunk等AI Studio特有的元素
+        # 查找生成的内容区域 - Gemini App的消息内容选择器
         content_selectors = [
-            "ms-prompt-chunk.text-chunk",  # 具体的AI Studio响应容器
-            "ms-prompt-chunk",  # AI Studio的主要内容容器
-            "ms-text-chunk",  # AI Studio的文本块
-            "ms-cmark-node",  # AI Studio的markdown节点
-            "ms-prompt-chunk .text-chunk",  # 嵌套的文本块
-            "ms-prompt-chunk span",  # 直接选择span内的文本
-            ".text-chunk",  # 通用文本块类
+            "message-content",
+            ".message-content",
+            '[class*="message-content"]',
+            "div.message-content",
+            "response-container .message-content",
+            ".response .message-content",
             'div[class*="response"]',
-            'div[class*="message-content"]',
-            'div[class*="output"]',
-            'div[data-testid*="response"]',
-            'div[class*="generated"]',
-            "pre",
-            ".markdown-content",
-            "[data-message-content]",
+            'div[class*="content"]',
+            'div[class*="message"]',
+            "gemini-message .content",
+            "chat-message .message-content",
         ]
 
         content = ""
@@ -1026,40 +1050,18 @@ def save_generated_story(page, story_index, story_dir_path, theme=""):
                         f"{theme_name}故事 {story_index}: 找到 {elements.count()} 个元素使用选择器: {selector}"
                     )
 
-                    # 对于AI Studio特有的元素，优先选择最后一个元素
-                    if (
-                        "ms-prompt-chunk" in selector
-                        or "ms-text-chunk" in selector
-                        or "ms-cmark-node" in selector
-                    ):
-                        # 从最后一个元素开始检查，这通常是最新生成的内容
-                        for i in range(elements.count() - 1, -1, -1):
-                            element_text = elements.nth(i).inner_text().strip()
-                            if (
-                                element_text and len(element_text) > 50
-                            ):  # 过滤掉太短的内容
-                                content = element_text
-                                print(
-                                    f"{theme_name}故事 {story_index}: 从AI Studio元素 #{i+1}（最后一个）提取到内容，长度: {len(content)}"
-                                )
-                                break
+                    # 从最后一个元素开始检查，这通常是最新生成的内容
+                    for i in range(elements.count() - 1, -1, -1):
+                        element_text = elements.nth(i).inner_text().strip()
+                        if element_text and len(element_text) > 100:  # 过滤掉太短的内容
+                            content = element_text
+                            print(
+                                f"{theme_name}故事 {story_index}: 从元素 #{i+1}（最后一个）提取到内容，长度: {len(content)}"
+                            )
+                            break
 
-                        if content:
-                            break
-                    else:
-                        # 对于其他元素，也优先选择最后一个元素
-                        for i in range(elements.count() - 1, -1, -1):
-                            element_content = elements.nth(i).inner_text()
-                            if (
-                                element_content.strip() and len(element_content) > 100
-                            ):  # 确保内容足够长
-                                content = element_content
-                                print(
-                                    f"{theme_name}故事 {story_index}: 从选择器 {selector} 的最后一个元素提取到内容，长度: {len(content)}"
-                                )
-                                break
-                        if content:
-                            break
+                    if content:
+                        break
 
             except Exception as e:
                 theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
@@ -1067,6 +1069,36 @@ def save_generated_story(page, story_index, story_dir_path, theme=""):
                     f"{theme_name}故事 {story_index}: 选择器 {selector} 提取失败: {e}"
                 )
                 continue
+
+        # 如果没有找到内容，尝试通用选择器
+        if not content:
+            print(f"⚠️ 未能提取到内容，尝试通用选择器...")
+            generic_selectors = [
+                'div:has-text("story")',
+                'div:has-text("chapter")',
+                'div:has-text("Once")',
+                'div:has-text("The")',
+                'div[role="main"]',
+                "main",
+                "article",
+            ]
+
+            for selector in generic_selectors:
+                try:
+                    elements = page.locator(selector)
+                    if elements.count() > 0:
+                        for i in range(elements.count() - 1, -1, -1):
+                            element_text = elements.nth(i).inner_text().strip()
+                            if element_text and len(element_text) > 500:  # 降低阈值
+                                content = element_text
+                                print(
+                                    f"通用选择器提取到内容，长度: {len(content)} 字符"
+                                )
+                                break
+                        if content:
+                            break
+                except Exception as e:
+                    continue
 
         if content.strip():
             # 清理内容 - 移除多余的换行和空白
@@ -1089,13 +1121,13 @@ def save_generated_story(page, story_index, story_dir_path, theme=""):
             # 尝试打印页面的部分内容用于调试
             try:
                 page_content = page.content()
-                if "ms-prompt-chunk" in page_content:
+                if "message-content" in page_content:
                     print(
-                        f"{theme_name}故事 {story_index}: 页面中发现ms-prompt-chunk元素，但无法提取内容"
+                        f"{theme_name}故事 {story_index}: 页面中发现message-content元素，但无法提取内容"
                     )
                 else:
                     print(
-                        f"{theme_name}故事 {story_index}: 页面中未发现ms-prompt-chunk元素"
+                        f"{theme_name}故事 {story_index}: 页面中未发现message-content元素"
                     )
             except:
                 pass
@@ -1110,39 +1142,67 @@ def save_generated_story(page, story_index, story_dir_path, theme=""):
 def process_window(
     page, window_index, story_data, theme, is_first_story=True, need_warmup=False
 ):
-    """处理单个窗口的故事生成"""
+    """处理单个窗口的故事生成 (Gemini App版本)"""
     max_retries = 3  # 最大重试次数
     theme_name = SUPPORTED_THEMES.get(theme, {}).get("name", theme)
 
     # 首次运行时处理页面初始化（热身、导航等）
     if is_first_story and need_warmup:
         # 全局第一次：先进行热身，然后开新tab进行正式生成
-        print(f"🌐 窗口 {window_index}: 首次启动，正在打开AI Studio...")
-        page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
-        page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(8000)
+        print(f"🌐 窗口 {window_index}: 首次启动，正在打开Gemini App...")
+
+        # 简化页面加载等待逻辑
+        max_navigation_retries = 3
+        for nav_attempt in range(max_navigation_retries):
+            try:
+                print(
+                    f"🔗 窗口 {window_index}: 导航尝试 {nav_attempt + 1}/{max_navigation_retries}"
+                )
+                page.goto("https://gemini.google.com/app", timeout=60000)
+                print(f"✅ 窗口 {window_index}: 页面导航成功")
+
+                # 使用更简单的等待策略
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=15000)
+                    print(f"✅ 窗口 {window_index}: DOM加载完成")
+                except:
+                    print(f"⚠️ 窗口 {window_index}: DOM等待超时，继续...")
+
+                # 固定等待时间，不依赖网络状态
+                page.wait_for_timeout(10000)  # 等待10秒确保页面初始化
+                print(f"✅ 窗口 {window_index}: 页面初始化完成")
+                break
+            except Exception as nav_error:
+                print(
+                    f"❌ 窗口 {window_index}: 导航尝试 {nav_attempt + 1} 失败: {nav_error}"
+                )
+                if nav_attempt == max_navigation_retries - 1:
+                    raise Exception(f"窗口 {window_index}: 所有导航尝试都失败")
+                else:
+                    print(f"🔄 窗口 {window_index}: 等待5秒后重试...")
+                    time.sleep(5)
 
         # 发送随机问题进行热身
         random_question = random.choice(WARMUP_QUESTIONS)
         print(f"🔥 窗口 {window_index}: 发送热身问题: {random_question}")
 
-        # 热身逻辑...（保持不变）
+        # 热身文本框选择器 - 使用Gemini App的选择器
         textarea_selectors = [
-            ".text-wrapper textarea",
-            "ms-autosize-textarea textarea",
-            'textarea[aria-label*="Type something"]',
-            'textarea[class*="textarea"]',
-            'textarea[class*="gmat-body-medium"]',
-            ".text-input-wrapper textarea",
-            "div.text-wrapper textarea",
-            "textarea",
+            'rich-textarea .ql-editor[contenteditable="true"]',
+            "rich-textarea div.ql-editor",
+            ".text-input-field_textarea .ql-editor",
+            'div.ql-editor[data-placeholder="Ask Gemini"]',
+            'div[contenteditable="true"][role="textbox"]',
+            '[contenteditable="true"]',
+            'div[role="textbox"]',
+            ".ql-editor",
         ]
 
         warmup_textarea = None
         for selector in textarea_selectors:
             try:
                 if page.locator(selector).count() > 0:
-                    warmup_textarea = page.locator(selector)
+                    warmup_textarea = page.locator(selector).first
                     print(
                         f"窗口 {window_index}: 找到热身文本框，使用选择器: {selector}"
                     )
@@ -1155,26 +1215,33 @@ def process_window(
             page.wait_for_timeout(1000)
             warmup_textarea.focus()
             page.wait_for_timeout(500)
-            warmup_textarea.fill("")
+
+            # 对于contenteditable元素，使用不同的清空方法
+            page.keyboard.press("Control+a")
             page.wait_for_timeout(300)
-            warmup_textarea.type(random_question)
+            page.keyboard.press("Delete")
+            page.wait_for_timeout(300)
+
+            warmup_textarea.fill(random_question)
             page.wait_for_timeout(1000)
             print(f"窗口 {window_index}: 已输入热身问题到文本框")
 
+            # 发送按钮选择器 - 使用Gemini App的选择器
             run_button_selectors = [
-                'button[aria-label="Run"][type="submit"]',
-                'button[aria-label="Run"]',
+                "button.send-button",
+                "button.mdc-icon-button.send-button",
+                "button.mat-mdc-icon-button.send-button",
+                'button[aria-label="Send message"]',
+                'button:has(mat-icon[fonticon="send"])',
+                'button:has-text("Send")',
                 'button[type="submit"]',
-                'button:has-text("Run")',
-                ".run-button",
-                'button[class*="run"]',
             ]
 
             warmup_run_button = None
             for selector in run_button_selectors:
                 try:
                     if page.locator(selector).count() > 0:
-                        warmup_run_button = page.locator(selector)
+                        warmup_run_button = page.locator(selector).first
                         break
                 except:
                     continue
@@ -1194,33 +1261,104 @@ def process_window(
                 time.sleep(5)
 
                 print(f"窗口 {window_index}: 开新tab进行正式故事生成...")
-                page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
-                page.wait_for_load_state("networkidle")
-                page.wait_for_timeout(8000)
-                print(f"窗口 {window_index}: 新页面已完全加载")
+
+                # 热身后导航，使用简化的等待机制
+                for nav_attempt in range(3):
+                    try:
+                        print(
+                            f"🔗 窗口 {window_index}: 新tab导航尝试 {nav_attempt + 1}/3"
+                        )
+                        page.goto("https://gemini.google.com/app", timeout=60000)
+                        print(f"✅ 窗口 {window_index}: 新tab导航成功")
+
+                        # 简化等待策略
+                        try:
+                            page.wait_for_load_state("domcontentloaded", timeout=15000)
+                            print(f"✅ 窗口 {window_index}: 新tab DOM加载完成")
+                        except:
+                            print(f"⚠️ 窗口 {window_index}: 新tab DOM等待超时，继续...")
+
+                        page.wait_for_timeout(10000)
+                        print(f"✅ 窗口 {window_index}: 新页面已完全加载")
+                        break
+                    except Exception as nav_error:
+                        print(
+                            f"❌ 窗口 {window_index}: 新tab导航尝试 {nav_attempt + 1} 失败: {nav_error}"
+                        )
+                        if nav_attempt == 2:
+                            raise Exception(f"窗口 {window_index}: 新tab导航失败")
+                        else:
+                            print(f"🔄 窗口 {window_index}: 等待5秒后重试...")
+                            time.sleep(5)
             else:
-                print(f"窗口 {window_index}: 热身阶段未找到运行按钮，跳过热身")
+                print(f"窗口 {window_index}: 热身阶段未找到发送按钮，跳过热身")
         else:
             print(f"窗口 {window_index}: 热身阶段未找到文本框，跳过热身")
     elif is_first_story and not need_warmup:
-        print(f"窗口 {window_index}: 窗口第一次（跳过热身），正在打开AI Studio...")
-        page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
-        page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(8000)
-        print(f"窗口 {window_index}: 页面已完全加载")
+        print(f"窗口 {window_index}: 窗口第一次（跳过热身），正在打开Gemini App...")
+
+        # 第一次无热身导航，使用简化的等待机制
+        for nav_attempt in range(3):
+            try:
+                print(f"🔗 窗口 {window_index}: 首次导航尝试 {nav_attempt + 1}/3")
+                page.goto("https://gemini.google.com/app", timeout=60000)
+                print(f"✅ 窗口 {window_index}: 首次导航成功")
+
+                # 简化等待策略
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=15000)
+                    print(f"✅ 窗口 {window_index}: 首次DOM加载完成")
+                except:
+                    print(f"⚠️ 窗口 {window_index}: 首次DOM等待超时，继续...")
+
+                page.wait_for_timeout(10000)
+                print(f"✅ 窗口 {window_index}: 页面已完全加载")
+                break
+            except Exception as nav_error:
+                print(
+                    f"❌ 窗口 {window_index}: 首次导航尝试 {nav_attempt + 1} 失败: {nav_error}"
+                )
+                if nav_attempt == 2:
+                    raise Exception(f"窗口 {window_index}: 首次导航失败")
+                else:
+                    print(f"🔄 窗口 {window_index}: 等待5秒后重试...")
+                    time.sleep(5)
     elif not is_first_story:
-        print(f"窗口 {window_index}: 导航到新的聊天页面...")
-        page.goto("https://aistudio.google.com/u/1/prompts/new_chat")
-        page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(8000)
-        print(f"窗口 {window_index}: 新页面已完全加载")
+        print(f"窗口 {window_index}: 导航到新的Gemini聊天页面...")
+
+        # 非第一次故事导航，使用简化的等待机制
+        for nav_attempt in range(3):
+            try:
+                print(f"🔗 窗口 {window_index}: 新聊天导航尝试 {nav_attempt + 1}/3")
+                page.goto("https://gemini.google.com/app", timeout=60000)
+                print(f"✅ 窗口 {window_index}: 新聊天导航成功")
+
+                # 简化等待策略
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=15000)
+                    print(f"✅ 窗口 {window_index}: 新聊天DOM加载完成")
+                except:
+                    print(f"⚠️ 窗口 {window_index}: 新聊天DOM等待超时，继续...")
+
+                page.wait_for_timeout(10000)
+                print(f"✅ 窗口 {window_index}: 新页面已完全加载")
+                break
+            except Exception as nav_error:
+                print(
+                    f"❌ 窗口 {window_index}: 新聊天导航尝试 {nav_attempt + 1} 失败: {nav_error}"
+                )
+                if nav_attempt == 2:
+                    raise Exception(f"窗口 {window_index}: 新聊天导航失败")
+                else:
+                    print(f"🔄 窗口 {window_index}: 等待5秒后重试...")
+                    time.sleep(5)
 
     # 重试逻辑：最多尝试3次生成故事
     for retry_count in range(max_retries):
         try:
             if retry_count > 0:
                 print(
-                    f"窗口 {window_index}: {theme_name}故事 {story_data['index']} 第 {retry_count + 1} 次尝试（重试原因：internal error）"
+                    f"窗口 {window_index}: {theme_name}故事 {story_data['index']} 第 {retry_count + 1} 次尝试（重试原因：生成失败）"
                 )
             else:
                 print(
@@ -1228,16 +1366,16 @@ def process_window(
                 )
 
             # 正式的故事生成流程
-            # 多种可能的文本框选择器 - 使用更精确的选择器
+            # Gemini App的文本框选择器
             textarea_selectors = [
-                ".text-wrapper textarea",  # 根据提供的HTML结构
-                "ms-autosize-textarea textarea",  # 具体的组件选择器
-                'textarea[aria-label*="Type something"]',  # aria-label匹配
-                'textarea[class*="textarea"]',
-                'textarea[class*="gmat-body-medium"]',
-                ".text-input-wrapper textarea",
-                "div.text-wrapper textarea",
-                "textarea",
+                'rich-textarea .ql-editor[contenteditable="true"]',
+                "rich-textarea div.ql-editor",
+                ".text-input-field_textarea .ql-editor",
+                'div.ql-editor[data-placeholder="Ask Gemini"]',
+                'div[contenteditable="true"][role="textbox"]',
+                '[contenteditable="true"]',
+                'div[role="textbox"]',
+                ".ql-editor",
             ]
 
             print(f"窗口 {window_index}: 尝试查找文本框...")
@@ -1247,7 +1385,8 @@ def process_window(
             try:
                 print(f"窗口 {window_index}: 等待文本输入容器...")
                 page.wait_for_selector(
-                    ".text-wrapper, .text-input-wrapper, ms-chunk-input", timeout=20000
+                    "rich-textarea, .text-input-field_textarea, .ql-editor",
+                    timeout=20000,
                 )
                 page.wait_for_timeout(3000)  # 额外等待容器内容加载
                 print(f"窗口 {window_index}: 文本输入容器已加载")
@@ -1261,7 +1400,7 @@ def process_window(
                         f"🔍 窗口 {window_index}: 尝试定位文本框... ({i+1}/{len(textarea_selectors)})"
                     )
                     page.wait_for_selector(selector, timeout=15000)
-                    textarea = page.locator(selector)
+                    textarea = page.locator(selector).first
                     if textarea.count() > 0:
                         print(f"✅ 窗口 {window_index}: 成功找到文本框")
                         break
@@ -1290,8 +1429,11 @@ def process_window(
             textarea.focus()
             page.wait_for_timeout(500)
 
-            # 清空现有内容并直接输入故事参数
-            textarea.fill("")  # 清空
+            # 清空现有内容 - 对于contenteditable元素
+            print(f"🧹 窗口 {window_index}: 清空现有内容...")
+            page.keyboard.press("Control+a")
+            page.wait_for_timeout(500)
+            page.keyboard.press("Delete")
             page.wait_for_timeout(500)
 
             # 分段输入长文本，避免一次性输入过多导致问题
@@ -1304,13 +1446,13 @@ def process_window(
                 textarea.fill(story_prompt)
                 page.wait_for_timeout(500)
 
-                # 验证输入是否成功
-                current_value = textarea.input_value()
+                # 验证输入是否成功 - 对于contenteditable元素使用inner_text()
+                current_text = textarea.inner_text()
                 if (
-                    len(current_value) >= len(story_prompt) * 0.95
+                    len(current_text) >= len(story_prompt) * 0.95
                 ):  # 如果输入了95%以上内容，认为成功
                     print(
-                        f"✅ 窗口 {window_index}: 快速输入成功 ({len(current_value)} 字符)"
+                        f"✅ 窗口 {window_index}: 快速输入成功 ({len(current_text)} 字符)"
                     )
                 else:
                     raise Exception("快速输入不完整，切换到分段输入")
@@ -1320,7 +1462,9 @@ def process_window(
 
                 # 备用方案：分段输入，但使用更快的方式
                 chunk_size = 2000  # 增大chunk大小
-                textarea.fill("")  # 先清空
+                page.keyboard.press("Control+a")
+                page.wait_for_timeout(300)
+                page.keyboard.press("Delete")
                 page.wait_for_timeout(300)
 
                 accumulated_text = ""
@@ -1333,11 +1477,11 @@ def process_window(
                         page.evaluate(
                             """
                             (text) => {
-                                const textarea = document.querySelector('.text-wrapper textarea') || 
-                                               document.querySelector('ms-autosize-textarea textarea') || 
-                                               document.querySelector('textarea');
+                                const textarea = document.querySelector('rich-textarea .ql-editor[contenteditable="true"]') || 
+                                               document.querySelector('.ql-editor[contenteditable="true"]') || 
+                                               document.querySelector('[contenteditable="true"]');
                                 if (textarea) {
-                                    textarea.value = text;
+                                    textarea.textContent = text;
                                     textarea.dispatchEvent(new Event('input', { bubbles: true }));
                                     textarea.dispatchEvent(new Event('change', { bubbles: true }));
                                 }
@@ -1370,26 +1514,59 @@ def process_window(
             textarea.focus()
             page.wait_for_timeout(500)
 
-            # 使用 Mac 的 cmd+enter 快捷键发送提示词
+            # 查找并点击发送按钮
             print(f"🚀 窗口 {window_index}: 发送故事生成请求...")
-            page.keyboard.press("Meta+Enter")
-            page.wait_for_timeout(1000)
+
+            # Gemini App的发送按钮选择器
+            send_button_selectors = [
+                "button.send-button",
+                "button.mdc-icon-button.send-button",
+                "button.mat-mdc-icon-button.send-button",
+                'button[aria-label="Send message"]',
+                'button:has(mat-icon[fonticon="send"])',
+                'button:has-text("Send")',
+                'button[type="submit"]',
+            ]
+
+            send_button = None
+            for selector in send_button_selectors:
+                try:
+                    if page.locator(selector).count() > 0:
+                        send_button = page.locator(selector).first
+                        print(
+                            f"✅ 窗口 {window_index}: 找到发送按钮，使用选择器: {selector}"
+                        )
+                        break
+                except:
+                    continue
+
+            if send_button and send_button.count() > 0:
+                send_button.click()
+                page.wait_for_timeout(1000)
+            else:
+                # 备用方案：使用快捷键发送
+                print(f"⚠️ 窗口 {window_index}: 未找到发送按钮，使用快捷键发送...")
+                page.keyboard.press("Control+Enter")
+                page.wait_for_timeout(1000)
 
             # 等待AI运行完成
             try:
                 wait_for_ai_completion(page, window_index)
             except Exception as e:
                 error_msg = str(e)
-                print(f"窗口 {window_index}: AI生成失败 - {error_msg}")
+                print(f"窗口 {window_index}: AI等待完成失败 - {error_msg}")
 
-                # 检查是否是 internal error
-                if "internal error" in error_msg.lower():
-                    print(f"🔄 窗口 {window_index}: 检测到内部错误，准备重试...")
+                # 检查是否是超时错误（不重试）
+                if "超时" in error_msg or "timeout" in error_msg.lower():
+                    print(f"❌ 窗口 {window_index}: 遇到超时错误，停止重试")
+                    return False
+                else:
+                    # 其他情况都重试
                     if retry_count < max_retries - 1:
+                        print(f"🔄 窗口 {window_index}: AI等待失败，准备重试...")
                         print(
                             f"🔁 窗口 {window_index}: 将在当前标签页重新输入并重试..."
                         )
-                        # 等待3秒后重试
                         print(f"⏳ 窗口 {window_index}: 等待3秒后重试...")
                         time.sleep(3)
                         continue  # 继续下一次重试
@@ -1398,10 +1575,6 @@ def process_window(
                             f"❌ 窗口 {window_index}: 已达到最大重试次数({max_retries})，跳过此故事"
                         )
                         return False
-                else:
-                    # 非 internal error，直接失败
-                    print(f"❌ 窗口 {window_index}: 遇到其他错误，停止重试")
-                    return False
 
             # 保存生成的故事
             success = save_generated_story(
@@ -1435,23 +1608,26 @@ def process_window(
                 f"窗口 {window_index}: 处理{theme_name}故事 {story_data['index']} 时出错: {error_msg}"
             )
 
-            # 检查是否是 internal error
-            if "internal error" in error_msg.lower():
-                print(f"窗口 {window_index}: 异常中检测到 internal error")
-                if retry_count < max_retries - 1:
-                    print(f"窗口 {window_index}: 将重试...")
-                    # 等待3秒后重试
-                    time.sleep(3)
-                    continue
-                else:
-                    print(f"窗口 {window_index}: 已达到最大重试次数，跳过此故事")
-                    return False
-            else:
-                # 非 internal error，打印错误并返回失败
+            # 检查是否是超时错误（不重试）
+            if "超时" in error_msg or "timeout" in error_msg.lower():
+                print(f"❌ 窗口 {window_index}: 遇到超时错误，停止重试")
                 import traceback
 
                 traceback.print_exc()
                 return False
+            else:
+                # 其他错误都重试
+                if retry_count < max_retries - 1:
+                    print(f"🔄 窗口 {window_index}: 处理出错，将重试...")
+                    print(f"⏳ 窗口 {window_index}: 等待3秒后重试...")
+                    time.sleep(3)
+                    continue
+                else:
+                    print(f"❌ 窗口 {window_index}: 已达到最大重试次数，跳过此故事")
+                    import traceback
+
+                    traceback.print_exc()
+                    return False
 
     # 如果所有重试都用完了但没有成功
     print(
@@ -1584,7 +1760,7 @@ def main():
         print(f"  📚 {theme_name}({theme}): {story_count_per_theme} 个故事")
     print(f"🌐 使用 AdsPower ID: {ads_id}")
 
-    close_url = f"http://local.adspower.net:50325/api/v1/browser/stop?user_id={ads_id}"
+    close_url = f"http://127.0.0.1:50325/api/v1/browser/stop?user_id={ads_id}"
 
     try:
         # 显示系统信息和保存路径
@@ -1676,8 +1852,8 @@ def main():
             # 逐一处理每个故事，严格按照轮流顺序
             all_results = []
 
-            # 全局热身标志，只在第一次运行时进行热身
-            global_warmup_done = False
+            # 全局热身标志，跳过热身直接开始故事生成
+            global_warmup_done = True
             # 第一个故事标志
             is_first_story = True
 
@@ -1718,6 +1894,8 @@ def main():
                     if need_warmup:
                         global_warmup_done = True
                         print(f"🎯 全局热身已完成，后续所有故事生成将跳过热身步骤")
+                    else:
+                        print(f"⚡ 已跳过热身，直接进行故事生成")
 
                     if is_first_story:
                         is_first_story = False

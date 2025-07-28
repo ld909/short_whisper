@@ -8,7 +8,7 @@ Beauty视频音乐添加工具
 
 主要功能：
 1. 支持 macOS (Intel/Apple Silicon) 和 Linux/Ubuntu 系统
-2. 随机选择assets目录中的MP3文件作为背景音乐
+2. 随机选择bg_music目录中的MP3文件作为背景音乐
 3. 自动匹配音频长度到视频长度（循环拼接或裁剪）
 4. 使用ffmpeg合并音视频
 5. 支持单个index处理或批量处理所有可用index
@@ -17,13 +17,13 @@ Beauty视频音乐添加工具
 8. 支持硬件加速提高处理速度
 
 支持系统及路径：
-- Intel Mac: /Volumes/dhl/beauty/
-- Apple Silicon Mac: /Users/donghaoliu/Documents/beauty/
-- Ubuntu: /mnt/dhl/beauty/
+- Intel Mac: /Volumes/dhl/beauty/ (音乐: /Volumes/dhl/beauty/bg_music/)
+- Apple Silicon Mac: /Users/donghaoliu/Documents/beauty/ (音乐: /Users/donghaoliu/Documents/beauty/bg_music/)
+- Ubuntu: /mnt/dhl/beauty/ (音乐: /mnt/dhl/beauty/bg_music/)
 
 输入路径：
 - 视频文件：{base_path}/merged_2k_videos/[index].mp4
-- 音乐文件：{script_dir}/assets/*.mp3
+- 音乐文件：{base_path}/bg_music/*.mp3
 
 输出路径：
 - {base_path}/mp4_music/[index].mp4
@@ -120,16 +120,28 @@ def get_base_media_path():
 
 
 def get_assets_path():
-    """返回assets目录路径"""
-    # 获取当前脚本所在目录
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(current_dir, "assets")
+    """根据系统类型返回音乐文件路径"""
+    system = platform.system()
+
+    if system == "Darwin":
+        # macOS 系统
+        machine = platform.machine()
+        if machine == "x86_64":
+            # Intel Mac
+            return "/Volumes/dhl/beauty/bg_music"
+        else:
+            # Apple Silicon Mac (arm64) 或其他
+            return "/Users/donghaoliu/Documents/beauty/bg_music"
+    else:
+        # Linux/Ubuntu 系统 - 自动适配
+        base_path = get_base_media_path()
+        return os.path.join(base_path, "bg_music")
 
 
 def get_available_mp3_files(assets_path: str) -> list:
     """获取所有可用的MP3文件（排除Mac产生的点文件）"""
     if not os.path.exists(assets_path):
-        print(f"❌ 错误：assets目录不存在 {assets_path}")
+        print(f"❌ 错误：bg_music目录不存在 {assets_path}")
         return []
 
     mp3_files = []
@@ -144,7 +156,7 @@ def get_available_mp3_files(assets_path: str) -> list:
                 mp3_files.append(file_path)
 
     if not mp3_files:
-        print(f"❌ 错误：assets目录中未找到MP3文件 {assets_path}")
+        print(f"❌ 错误：bg_music目录中未找到MP3文件 {assets_path}")
         return []
 
     print(f"✅ 发现 {len(mp3_files)} 个MP3文件:")
@@ -383,6 +395,7 @@ def add_music_to_video(
     has_vaapi: bool = False,
     has_qsv: bool = False,
     gpu_info: dict = None,
+    reencode: bool = False,
 ) -> bool:
     """使用ffmpeg为视频添加背景音乐"""
     try:
@@ -437,22 +450,16 @@ def add_music_to_video(
         cmd.extend(["-map", "0:v"])  # 使用第一个输入的视频流
         cmd.extend(["-map", "[audio]"])  # 使用滤镜处理后的音频流
 
-        # 根据GPU类型选择编码器
-        if gpu_info and gpu_info.get("nvidia_gpu", False):
-            print(f"🚀 使用NVIDIA GPU加速编码")
-            cmd.extend(["-c:v", "h264_nvenc"])
-            cmd.extend(["-preset", "fast"])
-            cmd.extend(["-cq", "18"])
-        elif gpu_info and gpu_info.get("intel_gpu", False):
-            print(f"🚀 使用Intel GPU加速编码")
-            cmd.extend(["-c:v", "h264_qsv"])
-            cmd.extend(["-preset", "fast"])
-            cmd.extend(["-global_quality", "18"])
-        else:
-            print(f"⚠️ 使用CPU软件编码")
+        # 根据reencode参数选择视频处理方式
+        if reencode:
+            print(f"🔄 使用CPU软件编码（高质量模式，速度较慢）")
             cmd.extend(["-c:v", "libx264"])
-            cmd.extend(["-preset", "fast"])
-            cmd.extend(["-crf", "18"])
+            cmd.extend(["-preset", "slow"])  # 使用slow预设获得更好质量
+            cmd.extend(["-crf", "15"])  # 降低CRF值提高质量（15比18质量更高）
+            cmd.extend(["-tune", "film"])  # 针对电影内容优化
+        else:
+            print(f"🔄 使用视频流复制（保持原始质量）")
+            cmd.extend(["-c:v", "copy"])  # 直接复制视频流，不重新编码
 
         # 音频编码参数
         cmd.extend(["-c:a", "aac"])
@@ -509,7 +516,15 @@ def add_music_to_video(
         ).lower():
             print(f"⚠️ GPU加速失败，尝试软件编码...")
             return add_music_to_video(
-                video_file, music_file, output_file, volume, False, False, False, None
+                video_file,
+                music_file,
+                output_file,
+                volume,
+                False,
+                False,
+                False,
+                None,
+                True,
             )
 
         return False
@@ -525,7 +540,7 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 使用示例:
-  # 处理单个index
+  # 处理单个index（默认使用视频流复制，保持原始质量）
   python add_music_to_beauty_clips.py --index 1
   python add_music_to_beauty_clips.py --index 2 --force --volume 0.3
   
@@ -533,13 +548,17 @@ def main():
   python add_music_to_beauty_clips.py
   python add_music_to_beauty_clips.py --force --volume 0.2
   
+  # 如需重新编码（高质量CPU编码，速度较慢）
+  python add_music_to_beauty_clips.py --index 1 --reencode --volume 0.3
+  
 功能说明:
-   1. 随机选择assets目录中的MP3文件作为背景音乐
+   1. 随机选择bg_music目录中的MP3文件作为背景音乐
    2. 自动匹配音频长度到视频长度（循环拼接或裁剪）
    3. 使用ffmpeg合并音视频，保持原视频长度
-   4. 支持硬件加速，提高处理速度
+   4. 默认使用视频流复制以保持原始质量（推荐）
    5. 支持断点续传，自动跳过已处理的视频
    6. 支持 macOS (Intel/Apple Silicon) 和 Ubuntu/Linux 系统
+   7. --reencode 选项可以重新编码视频（质量稍降但支持更多处理）
 
 支持系统:
    - Intel Mac: /Volumes/dhl/beauty/
@@ -558,6 +577,12 @@ def main():
 
     parser.add_argument(
         "--volume", type=float, default=0.2, help="背景音乐音量 (0.0-1.0, 默认: 0.2)"
+    )
+
+    parser.add_argument(
+        "--reencode",
+        action="store_true",
+        help="重新编码视频（CPU高质量模式，速度较慢）。默认使用视频流复制以保持原始质量",
     )
 
     args = parser.parse_args()
@@ -586,12 +611,10 @@ def main():
 
     # 显示推荐的处理方式
     print(f"\n💡 处理方式:")
-    if gpu_info.get("nvidia_gpu", False):
-        print(f"✅ 将使用NVIDIA GPU硬件加速（推荐）")
-    elif gpu_info.get("intel_gpu", False):
-        print(f"✅ 将使用Intel GPU硬件加速")
+    if args.reencode:
+        print(f"🔄 将使用CPU软件编码（高质量模式，速度较慢）")
     else:
-        print(f"⚠️ 将使用CPU软件编码（较慢）")
+        print(f"🔄 将使用视频流复制模式（保持原始质量，推荐）")
 
     # 获取基础路径
     base_path = get_base_media_path()
@@ -600,12 +623,13 @@ def main():
     print(f"\n📂 路径配置:")
     print(f"   系统类型: {platform.system()} ({platform.machine()})")
     print(f"   媒体路径: {base_path}")
-    print(f"   Assets路径: {assets_path}")
+    print(f"   音乐路径: {assets_path}")
 
     # 获取可用的MP3文件
     print(f"\n🎵 音乐文件检查:")
     mp3_files = get_available_mp3_files(assets_path)
     if not mp3_files:
+        print(f"💡 提示：请确保在 {assets_path} 目录中放置MP3音乐文件")
         return 1
 
     # 确定要处理的index列表
@@ -670,6 +694,7 @@ def main():
             has_vaapi,
             has_qsv,
             gpu_info,
+            args.reencode,
         )
 
         if success:

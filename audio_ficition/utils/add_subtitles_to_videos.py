@@ -725,7 +725,8 @@ def burn_subtitles_to_video(video_path, subtitle_path, output_path, **kwargs):
                 hw_accel_used = True
                 encoder_used = "h264_nvenc"
             elif gpu_type == "videotoolbox":
-                cmd.extend(["-hwaccel", "videotoolbox"])
+                # VideoToolbox硬件加速 - 与CUDA类似，为提高稳定性，解码在CPU上进行
+                # -hwaccel videotoolbox 已移除，以避免在GPU解码和CPU滤镜之间传输帧时出现问题，特别是字体加载
                 hw_accel_used = True
                 encoder_used = "h264_videotoolbox"
 
@@ -752,11 +753,11 @@ def burn_subtitles_to_video(video_path, subtitle_path, output_path, **kwargs):
 
     # 字幕滤镜设置 - 确保字体正确加载
     subtitle_filter = f"subtitles={subtitle_path}"
-    
+
     # 总是添加字体目录，除非是极致速度模式
     if fonts_dir and not extreme_speed:
         subtitle_filter += f":fontsdir={fonts_dir}"
-    
+
     # 添加字体样式
     subtitle_filter += f":force_style='{force_style}'"
 
@@ -941,11 +942,12 @@ def burn_subtitles_to_video(video_path, subtitle_path, output_path, **kwargs):
 
 
 class ParallelGPUProcessor:
-    """GPU并行处理器"""
+    """并行处理器"""
 
-    def __init__(self, max_workers=4, gpu_monitor=None):
+    def __init__(self, max_workers=4, gpu_monitor=None, use_gpu=False):
         self.max_workers = max_workers
         self.gpu_monitor = gpu_monitor
+        self.use_gpu = use_gpu
         self.results = {"successful": 0, "failed": 0}
         self.active_tasks = 0
         self.lock = threading.Lock()
@@ -983,10 +985,19 @@ class ParallelGPUProcessor:
         """并行处理故事"""
         total_stories = len(stories_to_process)
 
+        # 根据处理模式选择进度条描述
+        if self.use_gpu:
+            desc = f"🚀 GPU并行字幕添加 (并行数:{self.max_workers})"
+        else:
+            if self.max_workers > 1:
+                desc = f"💻 CPU并行字幕添加 (并行数:{self.max_workers})"
+            else:
+                desc = f"💻 CPU字幕添加 (串行处理)"
+
         # 创建进度条
         with tqdm(
             total=total_stories,
-            desc=f"🚀 GPU并行字幕添加 (并行数:{self.max_workers})",
+            desc=desc,
             bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
         ) as pbar:
 
@@ -1168,6 +1179,9 @@ def main():
     # 性能优化参数
     parser.add_argument("--gpu", action="store_true", help="启用GPU硬件加速")
     parser.add_argument(
+        "--cpu", action="store_true", help="明确使用CPU模式（默认行为）"
+    )
+    parser.add_argument(
         "--debug-gpu", action="store_true", help="🔍 显示详细的GPU检测信息（用于调试）"
     )
     parser.add_argument(
@@ -1209,7 +1223,7 @@ def main():
     print("🚀 视频字幕添加器 - GPU优化并行处理版")
     print("=" * 60)
     print(f"🖥️  操作系统: {platform.system()}")
-    
+
     # 确定要处理的主题列表
     all_themes = ["scifi", "thriller", "horror", "fantasy", "romance"]
     if args.theme == "all":
@@ -1266,6 +1280,12 @@ def main():
             args.gpu = True
         else:
             args.gpu = False
+
+    # 处理CPU模式强制设置
+    if args.cpu:
+        args.gpu = False
+        args.gpu_max = False
+        print("💻 强制使用CPU模式")
 
     # GPU模式设置和并行数计算
     gpu_monitor = None
@@ -1444,8 +1464,17 @@ def main():
         # 确保输出目录存在
         os.makedirs(paths["output_dir"], exist_ok=True)
 
-        # 开始GPU并行处理
-        print(f"\n🎬 启动 {current_theme} 主题字幕添加处理（GPU并行模式）")
+        # 开始字幕添加处理
+        if args.gpu:
+            if args.gpu_parallel > 1:
+                print(f"\n🎬 启动 {current_theme} 主题字幕添加处理（GPU并行模式）")
+            else:
+                print(f"\n🎬 启动 {current_theme} 主题字幕添加处理（GPU模式）")
+        else:
+            if args.gpu_parallel > 1:
+                print(f"\n🎬 启动 {current_theme} 主题字幕添加处理（CPU并行模式）")
+            else:
+                print(f"\n🎬 启动 {current_theme} 主题字幕添加处理（CPU串行模式）")
         if args.extreme_speed:
             print("⚡ 极致速度模式已启用")
 
@@ -1475,13 +1504,15 @@ def main():
         try:
             start_time = time.time()
 
-            # 创建GPU并行处理器
+            # 创建并行处理器
             processor = ParallelGPUProcessor(
-                max_workers=args.gpu_parallel, gpu_monitor=gpu_monitor
+                max_workers=args.gpu_parallel, gpu_monitor=gpu_monitor, use_gpu=args.gpu
             )
 
-            # 执行GPU并行处理
-            session_stats = processor.process_stories(stories_to_process_current, **process_kwargs)
+            # 执行字幕添加处理
+            session_stats = processor.process_stories(
+                stories_to_process_current, **process_kwargs
+            )
 
             end_time = time.time()
             total_time = end_time - start_time
@@ -1502,7 +1533,9 @@ def main():
 
             if session_stats["successful"] > 0:
                 avg_time = total_time / session_stats["successful"]
-                throughput = session_stats["successful"] / (total_time / 60)  # 每分钟处理数
+                throughput = session_stats["successful"] / (
+                    total_time / 60
+                )  # 每分钟处理数
 
                 print(f"📊 平均处理时间: {avg_time:.1f} 秒/故事")
                 print(f"🎬 处理速度: {throughput:.1f} 故事/分钟")
@@ -1528,13 +1561,13 @@ def main():
 
         except KeyboardInterrupt:
             print(f"\n⚠️  用户中断程序")
-            total_session_stats["successful"] += processor.results['successful']
-            total_session_stats["failed"] += processor.results['failed']
+            total_session_stats["successful"] += processor.results["successful"]
+            total_session_stats["failed"] += processor.results["failed"]
             break
         except Exception as e:
             print(f"\n❌ {current_theme} 主题处理异常: {e}")
-            total_session_stats["successful"] += processor.results['successful']
-            total_session_stats["failed"] += processor.results['failed']
+            total_session_stats["successful"] += processor.results["successful"]
+            total_session_stats["failed"] += processor.results["failed"]
 
     # 停止GPU监控
     if gpu_monitor:
@@ -1556,7 +1589,9 @@ def main():
 
     if total_session_stats["successful"] > 0:
         avg_time = all_total_time / total_session_stats["successful"]
-        throughput = total_session_stats["successful"] / (all_total_time / 60)  # 每分钟处理数
+        throughput = total_session_stats["successful"] / (
+            all_total_time / 60
+        )  # 每分钟处理数
 
         print(f"📊 平均处理时间: {avg_time:.1f} 秒/故事")
         print(f"🎬 处理速度: {throughput:.1f} 故事/分钟")
@@ -1575,7 +1610,7 @@ def main():
 
     total_stories = total_session_stats["successful"] + total_session_stats["failed"]
     if total_stories > 0:
-        success_rate = (total_session_stats["successful"] / total_stories * 100)
+        success_rate = total_session_stats["successful"] / total_stories * 100
         print(f"📊 总成功率: {success_rate:.1f}%")
 
     # 模式提醒
