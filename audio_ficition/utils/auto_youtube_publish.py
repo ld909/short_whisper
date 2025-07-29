@@ -327,7 +327,7 @@ class YouTubeAutoPublisher:
         self.wait_minutes = wait_minutes
         self.http = None
         self.close_url = (
-            f"http://local.adspower.net:50325/api/v1/browser/stop?user_id={self.ads_id}"
+            f"http://127.0.0.1:50325/api/v1/browser/stop?user_id={self.ads_id}"
         )
 
         # tab管理相关
@@ -714,35 +714,129 @@ class YouTubeAutoPublisher:
         return topic_descriptions.get(topic, f"Enjoy this amazing {topic} story!")
 
     def get_adspower_info(self):
-        """连接AdsPower浏览器"""
-        open_url = f"http://local.adspower.net:50325/api/v1/browser/start?user_id={self.ads_id}"
+        """连接AdsPower浏览器，带重试和详细错误提示"""
+        try:
+            import urllib3
+        except ImportError:
+            print("❌ 错误: 缺少 urllib3 模块，请安装: pip install urllib3")
+            return None, None
+
+        # 先检查 AdsPower 服务是否运行
+        test_url = "http://127.0.0.1:50325/api/v1/status"
+        open_url = f"http://127.0.0.1:50325/api/v1/browser/start?user_id={self.ads_id}"
 
         self.http = urllib3.PoolManager()
 
-        print("🔌 正在连接AdsPower...")
-        r = self.http.request("GET", open_url)
+        print("🔍 检查 AdsPower 服务状态...")
 
-        if r.status != 200:
-            print(f"❌ API返回状态码 {r.status}")
-            print("请确保AdsPower已启动并且本地API已启用")
+        # 检查服务是否运行
+        try:
+            test_resp = self.http.request("GET", test_url, timeout=10)
+            print("✅ AdsPower 服务已运行")
+        except Exception as e:
+            print("❌ AdsPower 服务未运行或无法连接")
+            print("请确保:")
+            print("  1. AdsPower 客户端已启动")
+            print("  2. 本地API已启用 (设置 -> 本地API -> 启用)")
+            print("  3. 端口 50325 未被占用")
+            print("  4. 防火墙允许本地连接")
+            print(f"详细错误: {e}")
             return None, None
 
-        resp = json.loads(r.data.decode("utf-8"))
+        print(f"🚀 正在启动浏览器 (ID: {self.ads_id})...")
 
-        if resp["code"] != 0:
-            print(f"❌ 错误: {resp['msg']}")
-            print("请检查ads_id是否正确")
-            return None, None
+        # 尝试启动浏览器，最多重试3次
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                r = self.http.request("GET", open_url, timeout=30)
 
-        ws_endpoint = resp["data"]["ws"]["puppeteer"]
-        debug_port = resp["data"]["debug_port"]
-        remote_debugging_url = f"http://localhost:{debug_port}"
+                if r.status != 200:
+                    print(f"❌ 错误: API返回状态码 {r.status}")
+                    if attempt < max_retries - 1:
+                        print(f"🔄 第 {attempt + 1} 次尝试失败，{5} 秒后重试...")
+                        time.sleep(5)
+                        continue
+                    else:
+                        print("请确保AdsPower已启动并且本地API已启用")
+                        return None, None
 
-        print(f"✅ 成功连接AdsPower")
-        print(f"🔗 WebSocket地址: {ws_endpoint}")
-        print(f"🔗 远程调试URL: {remote_debugging_url}")
+                # 解析响应
+                try:
+                    resp = json.loads(r.data.decode("utf-8"))
+                except json.JSONDecodeError as e:
+                    print(f"❌ 解析响应JSON失败: {e}")
+                    if attempt < max_retries - 1:
+                        print(f"🔄 第 {attempt + 1} 次尝试失败，{5} 秒后重试...")
+                        time.sleep(5)
+                        continue
+                    else:
+                        return None, None
 
-        return ws_endpoint, remote_debugging_url
+                if resp["code"] != 0:
+                    error_msg = resp.get("msg", "未知错误")
+                    print(f"❌ AdsPower 错误: {error_msg}")
+
+                    # 针对常见错误提供解决建议
+                    if "not found" in error_msg.lower():
+                        print(f"💡 浏览器ID '{self.ads_id}' 不存在，请检查:")
+                        print("  1. 浏览器ID是否正确")
+                        print("  2. 浏览器配置文件是否存在")
+                        print("  3. 尝试在AdsPower客户端中手动启动该浏览器")
+                    elif "running" in error_msg.lower():
+                        print("💡 浏览器可能已在运行，请:")
+                        print("  1. 在AdsPower中关闭该浏览器")
+                        print("  2. 等待几秒后重试")
+                    elif "license" in error_msg.lower():
+                        print("💡 许可证问题，请检查AdsPower账户状态")
+
+                    if attempt < max_retries - 1:
+                        print(f"🔄 第 {attempt + 1} 次尝试失败，{10} 秒后重试...")
+                        time.sleep(10)
+                        continue
+                    else:
+                        return None, None
+
+                # 成功获取浏览器信息
+                ws_endpoint = resp["data"]["ws"]["puppeteer"]
+                debug_port = resp["data"]["debug_port"]
+                remote_debugging_url = f"http://localhost:{debug_port}"
+
+                print(f"✅ 成功连接AdsPower浏览器!")
+                print(f"   浏览器ID: {self.ads_id}")
+                print(f"   调试端口: {debug_port}")
+                print(f"   WebSocket: {ws_endpoint}")
+
+                return ws_endpoint, remote_debugging_url
+
+            except urllib3.exceptions.MaxRetryError as e:
+                print(f"❌ 网络连接错误: {e}")
+                if attempt < max_retries - 1:
+                    print(f"🔄 第 {attempt + 1} 次尝试失败，{5} 秒后重试...")
+                    time.sleep(5)
+                    continue
+                else:
+                    print("请检查:")
+                    print("  1. AdsPower是否正在运行")
+                    print("  2. 网络连接是否正常")
+                    print("  3. 是否有防火墙阻止连接")
+                    return None, None
+
+            except Exception as e:
+                print(f"❌ 连接 AdsPower 时发生意外错误: {e}")
+                if attempt < max_retries - 1:
+                    print(f"🔄 第 {attempt + 1} 次尝试失败，{5} 秒后重试...")
+                    time.sleep(5)
+                    continue
+                else:
+                    print("请尝试:")
+                    print("  1. 重启 AdsPower 客户端")
+                    print("  2. 检查系统资源使用情况")
+                    print("  3. 更换浏览器ID重试")
+                    return None, None
+
+        print(f"❌ 所有重试都失败了，无法连接到AdsPower浏览器 (ID: {self.ads_id})")
+        return None, None
 
     def initialize_browser(self, max_retries=3):
         """初始化浏览器，关闭所有其他tab并创建一个新tab"""
@@ -1108,66 +1202,265 @@ class YouTubeAutoPublisher:
             # 上传视频文件
             print(f"📁 正在上传视频: {video_content['mp4_path']}")
 
-            # 优先使用CDP方法上传大文件，绕过50MB限制
+            # 检查文件大小，决定上传策略
             try:
-                # 获取文件输入选择器
-                file_selector = 'input[type="file"][name="Filedata"]'
+                file_size = os.path.getsize(video_content["mp4_path"])
+                file_size_mb = file_size / (1024 * 1024)
+                print(f"📊 文件大小: {file_size_mb:.2f} MB")
 
-                # 首先检查文件输入元素是否存在
-                file_input_handle = page.query_selector(file_selector)
-                if not file_input_handle:
-                    print("❌ 文件输入元素未找到!")
-                    return False
+                # 大于50MB的文件必须使用CDP方法
+                use_cdp = file_size_mb > 50
+                if use_cdp:
+                    print("🔧 文件大于50MB，将使用CDP方法上传")
+                else:
+                    print("📁 文件小于50MB，尝试标准方法上传")
 
-                # 创建CDP会话
-                print("🔗 创建CDP会话...")
-                cdp_session = page.context.new_cdp_session(page)
+            except Exception as size_error:
+                print(f"⚠️ 无法获取文件大小: {size_error}")
+                print("🔧 默认使用CDP方法确保兼容性")
+                use_cdp = True
 
-                # 获取DOM文档
-                print("📄 获取DOM文档...")
-                dom_snapshot = cdp_session.send("DOM.getDocument")
+            upload_success = False
 
-                # 查找文件输入节点
-                print("🔍 查找文件输入节点...")
-                node_result = cdp_session.send(
-                    "DOM.querySelector",
-                    {
-                        "nodeId": dom_snapshot["root"]["nodeId"],
-                        "selector": file_selector,
-                    },
-                )
+            # 模拟人工操作的预处理步骤（减少反检测）
+            print("🎭 执行人工行为模拟...")
+            try:
+                # 随机移动鼠标到不同位置
+                page.mouse.move(random.randint(100, 500), random.randint(100, 300))
+                page.wait_for_timeout(random.randint(500, 1000))
 
-                if not node_result.get("nodeId"):
-                    print("❌ 无法找到文件输入节点!")
-                    cdp_session.detach()
-                    return False
+                # 模拟鼠标悬停在上传区域
+                upload_area = page.locator('input[type="file"][name="Filedata"]').first
+                if upload_area.count() > 0:
+                    # 悬停在上传区域附近
+                    box = upload_area.bounding_box()
+                    if box:
+                        page.mouse.move(
+                            box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+                        )
+                        page.wait_for_timeout(random.randint(800, 1500))
 
-                # 使用CDP设置文件
-                print("📁 使用CDP设置文件...")
-                cdp_session.send(
-                    "DOM.setFileInputFiles",
-                    {
-                        "nodeId": node_result["nodeId"],
-                        "files": [video_content["mp4_path"]],
-                    },
-                )
+                # 模拟键盘操作（如Tab键导航）
+                page.keyboard.press("Tab")
+                page.wait_for_timeout(random.randint(300, 600))
+                page.keyboard.press("Tab")
+                page.wait_for_timeout(random.randint(300, 600))
 
-                # 关闭CDP会话
-                cdp_session.detach()
-                print("✅ 视频文件上传完成（使用CDP方法）")
+            except Exception as simulation_error:
+                print(f"⚠️ 人工行为模拟失败: {simulation_error}")
 
-            except Exception as cdp_error:
-                print(f"❌ CDP上传方法失败: {cdp_error}")
-                print("🔄 尝试使用标准Playwright方法...")
-
-                # 如果CDP方法失败，回退到标准方法
+            if not use_cdp:
+                # 对于小文件，先尝试标准方法
                 try:
+                    print("🔄 尝试标准Playwright方法...")
                     file_input = page.locator('input[type="file"][name="Filedata"]')
-                    file_input.set_input_files(video_content["mp4_path"])
-                    print("✅ 视频文件上传完成（使用标准方法）")
+
+                    if file_input.count() > 0:
+                        # 人工操作延迟
+                        delay = random.uniform(2.0, 4.0)
+                        print(f"⏳ 人工操作延迟 {delay:.2f} 秒...")
+                        time.sleep(delay)
+
+                        file_input.set_input_files(video_content["mp4_path"])
+                        print("✅ 标准方法上传完成")
+                        upload_success = True
+
+                        # 等待文件处理并检查错误
+                        page.wait_for_timeout(5000)
+
+                        try:
+                            error_text = page.locator("body").inner_text()
+                            if (
+                                "you're all set" in error_text.lower()
+                                or "already have access" in error_text.lower()
+                            ):
+                                print("⚠️ 检测到限制错误，切换到CDP方法...")
+                                upload_success = False
+                                use_cdp = True
+                        except:
+                            pass
+
                 except Exception as standard_error:
-                    print(f"❌ 标准上传方法也失败: {standard_error}")
-                    return False
+                    print(f"❌ 标准方法失败: {standard_error}")
+                    print("🔄 切换到CDP方法...")
+                    use_cdp = True
+
+            # 使用CDP方法上传（大文件必需，或标准方法失败时的回退）
+            if use_cdp and not upload_success:
+                print("🔧 使用优化的CDP方法上传...")
+
+                # 多次尝试，增加成功率
+                max_cdp_attempts = 3
+                for attempt in range(max_cdp_attempts):
+                    try:
+                        print(f"🔄 CDP尝试 {attempt + 1}/{max_cdp_attempts}")
+
+                        # 如果不是第一次尝试，刷新页面重置状态
+                        if attempt > 0:
+                            print("🔄 刷新页面重置状态...")
+                            page.reload()
+                            page.wait_for_load_state("domcontentloaded", timeout=15000)
+                            page.wait_for_timeout(3000)
+
+                            # 重新点击上传图标
+                            upload_selectors = [
+                                '[test-id="upload-icon-url"]',
+                                'button[aria-label*="Create"]',
+                                'button[aria-label*="Upload"]',
+                                "#upload-icon",
+                                ".upload-icon",
+                            ]
+
+                            for selector in upload_selectors:
+                                if page.locator(selector).count() > 0:
+                                    page.locator(selector).first.click()
+                                    print("✅ 重新点击上传图标")
+                                    break
+
+                            page.wait_for_selector(
+                                'input[type="file"][name="Filedata"]', state="attached"
+                            )
+
+                            # 刷新后的人工行为模拟
+                            page.wait_for_timeout(random.randint(2000, 4000))
+
+                        # 人工交互热身（重要：让页面认为这是真实用户）
+                        print("🎭 执行用户交互热身...")
+
+                        # 模拟鼠标在页面上的自然移动
+                        for _ in range(3):
+                            x = random.randint(200, 800)
+                            y = random.randint(150, 400)
+                            page.mouse.move(x, y)
+                            page.wait_for_timeout(random.randint(500, 1200))
+
+                        # 模拟点击页面空白区域
+                        page.mouse.click(400, 200)
+                        page.wait_for_timeout(random.randint(1000, 2000))
+
+                        # 获取文件输入选择器
+                        file_selector = 'input[type="file"][name="Filedata"]'
+
+                        # 验证元素存在
+                        file_input_handle = page.query_selector(file_selector)
+                        if not file_input_handle:
+                            print("❌ 文件输入元素未找到!")
+                            if attempt == max_cdp_attempts - 1:
+                                return False
+                            continue
+
+                        # 创建CDP会话
+                        print("🔗 创建CDP会话...")
+                        cdp_session = page.context.new_cdp_session(page)
+
+                        # 启用DOM域
+                        cdp_session.send("DOM.enable")
+
+                        # 获取DOM文档
+                        dom_snapshot = cdp_session.send(
+                            "DOM.getDocument", {"depth": -1}
+                        )
+
+                        # 查找文件输入节点
+                        node_result = cdp_session.send(
+                            "DOM.querySelector",
+                            {
+                                "nodeId": dom_snapshot["root"]["nodeId"],
+                                "selector": file_selector,
+                            },
+                        )
+
+                        if not node_result.get("nodeId"):
+                            print("❌ 无法找到文件输入节点!")
+                            cdp_session.detach()
+                            if attempt == max_cdp_attempts - 1:
+                                return False
+                            continue
+
+                        # 在设置文件前，模拟一些用户事件
+                        print("🎭 触发用户事件...")
+                        try:
+                            # 触发focus事件
+                            cdp_session.send(
+                                "DOM.focus", {"nodeId": node_result["nodeId"]}
+                            )
+                            page.wait_for_timeout(500)
+
+                            # 触发鼠标事件
+                            page.mouse.click(400, 300)
+                            page.wait_for_timeout(300)
+                        except:
+                            pass
+
+                        # 关键延迟：让页面完全"相信"这是人工操作
+                        critical_delay = random.uniform(3.0, 6.0)
+                        print(f"⏳ 关键人工延迟 {critical_delay:.2f} 秒...")
+                        time.sleep(critical_delay)
+
+                        # 使用CDP设置文件
+                        print("📁 设置文件...")
+                        cdp_session.send(
+                            "DOM.setFileInputFiles",
+                            {
+                                "nodeId": node_result["nodeId"],
+                                "files": [video_content["mp4_path"]],
+                            },
+                        )
+
+                        # 立即触发change事件确保页面响应
+                        try:
+                            cdp_session.send(
+                                "Runtime.evaluate",
+                                {
+                                    "expression": f"document.querySelector('{file_selector}').dispatchEvent(new Event('change', {{bubbles: true}}))"
+                                },
+                            )
+                        except:
+                            pass
+
+                        # 关闭CDP会话
+                        cdp_session.detach()
+                        print("✅ 视频文件上传完成（优化CDP方法）")
+                        upload_success = True
+
+                        # 等待处理并检查是否成功
+                        page.wait_for_timeout(5000)
+
+                        # 检查是否仍然出现错误
+                        try:
+                            error_text = page.locator("body").inner_text()
+                            if (
+                                "you're all set" in error_text.lower()
+                                or "already have access" in error_text.lower()
+                            ):
+                                print(f"⚠️ 第{attempt + 1}次尝试仍有错误，准备重试...")
+                                upload_success = False
+                                if attempt < max_cdp_attempts - 1:
+                                    # 增加重试间隔
+                                    retry_delay = random.uniform(5.0, 10.0)
+                                    print(f"⏳ 重试前等待 {retry_delay:.2f} 秒...")
+                                    time.sleep(retry_delay)
+                                    continue
+                            else:
+                                print("✅ CDP上传成功，未检测到错误")
+                                break
+                        except:
+                            print("✅ CDP上传完成（无法验证状态，继续执行）")
+                            break
+
+                    except Exception as cdp_error:
+                        print(f"❌ CDP尝试 {attempt + 1} 失败: {cdp_error}")
+                        if attempt < max_cdp_attempts - 1:
+                            retry_delay = random.uniform(3.0, 6.0)
+                            print(f"⏳ CDP重试前等待 {retry_delay:.2f} 秒...")
+                            time.sleep(retry_delay)
+                            continue
+                        else:
+                            print("❌ 所有CDP尝试都失败")
+
+            if not upload_success:
+                print("❌ 文件上传失败")
+                return False
 
             # 等待上传处理
             page.wait_for_load_state("networkidle")
