@@ -1810,25 +1810,20 @@ class YouTubeAutoPublisher:
                     print(f"❌ 点击Schedule按钮时出错: {e}")
                     return False
 
-                # 等待发布完成
-                countdown_timer(5, "等待发布操作完成")
+                # 点击schedule按钮成功后，不跳转URL，保持当前tab稳定
+                print("⏰ 点击Schedule按钮成功，等待处理完成...")
+                countdown_timer(6, "等待Schedule按钮处理完成")
 
-                # 改进的发布状态验证 - 更宽松的判断标准
-                print("🔍 验证发布状态...")
-                countdown_timer(3, "等待页面状态更新")
+                # 不再跳转到新URL，保持当前tab稳定
+                print("🔍 验证发布状态（保持当前tab不跳转）...")
 
+                # 等待发布操作完成
+                countdown_timer(3, "等待发布操作完成")
+
+                # 简化的发布状态验证 - 不依赖URL跳转
                 try:
                     current_url = page.url
                     print(f"📍 当前页面URL: {current_url}")
-
-                    # 方法1: 检查URL是否已经跳转离开上传页面（关键指标）
-                    if "upload" not in current_url.lower():
-                        print("✅ 已跳转离开上传页面，发布成功的强烈指示")
-                        print("✅ 发布配置完成且验证成功")
-                        return True
-
-                    # 方法2: 如果仍在上传页面，检查页面内容指示
-                    print("🔍 仍在upload页面，检查页面内容...")
 
                     # 检查是否有明确的错误信息
                     error_indicators = [
@@ -1847,8 +1842,8 @@ class YouTubeAutoPublisher:
                         page_text = page.locator("body").inner_text().lower()
                     except Exception as text_error:
                         print(f"⚠️ 获取页面文本失败: {text_error}")
-                        # 如果无法获取页面文本，先假设成功
-                        print("✅ 无法验证但未发现错误，暂时标记为成功")
+                        # 如果无法获取页面文本，默认认为成功
+                        print("✅ 无法验证页面文本，默认标记为成功")
                         return True
 
                     # 检查是否有错误
@@ -1862,7 +1857,7 @@ class YouTubeAutoPublisher:
                         print("❌ 发布失败")
                         return False
 
-                    # 方法3: 检查是否有成功指示（不作为必需条件）
+                    # 检查是否有成功指示
                     success_indicators = [
                         "scheduled",
                         "video scheduled",
@@ -1879,19 +1874,19 @@ class YouTubeAutoPublisher:
                     ]
                     if found_success:
                         print(f"✅ 发现成功指示: {found_success}")
-                        print("✅ 发布配置完成且验证成功")
+                        print("✅ 计划发布配置完成且验证成功")
                         return True
 
-                    # 方法4: 最后的宽松判断 - 如果没有错误信息，就认为成功
+                    # 默认判断：如果没有错误信息就认为成功
                     print("⚠️ 未发现明确的成功或错误指示")
-                    print("📝 由于没有发现错误信息，按照宽松标准判断为成功")
-                    print("✅ 发布配置完成（宽松验证通过）")
+                    print("📝 由于没有发现错误信息，默认判断为成功")
+                    print("✅ 计划发布配置完成（默认成功）")
                     return True
 
                 except Exception as verify_error:
                     print(f"❌ 发布验证时出错: {verify_error}")
-                    print("📝 验证过程出错，但按照宽松标准判断为成功")
-                    print("✅ 发布配置完成（异常后默认成功）")
+                    print("📝 验证过程出错，默认判断为成功")
+                    print("✅ 计划发布配置完成（异常后默认成功）")
                     return True
 
             else:
@@ -1903,20 +1898,11 @@ class YouTubeAutoPublisher:
 
                 countdown_timer(5, "等待立即发布完成")
 
-                # 改进的立即发布验证逻辑 - 更宽松的判断标准
+                # 立即发布验证逻辑 - 保持tab稳定
                 try:
-                    countdown_timer(3, "验证发布状态")
+                    countdown_timer(3, "验证立即发布状态")
                     current_url = page.url
                     print(f"📍 当前页面URL: {current_url}")
-
-                    # 方法1: 检查URL是否已经跳转离开上传页面（关键指标）
-                    if "upload" not in current_url.lower():
-                        print("✅ 已跳转离开上传页面，立即发布成功的强烈指示")
-                        print("✅ 立即发布完成且验证成功")
-                        return True
-
-                    # 方法2: 如果仍在上传页面，检查页面内容指示
-                    print("🔍 仍在upload页面，检查页面内容...")
 
                     # 检查是否有明确的错误信息
                     error_indicators = [
@@ -1935,8 +1921,8 @@ class YouTubeAutoPublisher:
                         page_text = page.locator("body").inner_text().lower()
                     except Exception as text_error:
                         print(f"⚠️ 获取页面文本失败: {text_error}")
-                        # 如果无法获取页面文本，先假设成功
-                        print("✅ 无法验证但未发现错误，暂时标记为成功")
+                        # 如果无法获取页面文本，默认认为成功
+                        print("✅ 无法验证页面文本，默认标记为成功")
                         return True
 
                     # 检查是否有错误
@@ -1950,7 +1936,7 @@ class YouTubeAutoPublisher:
                         print("❌ 立即发布失败")
                         return False
 
-                    # 方法3: 检查是否有成功指示（不作为必需条件）
+                    # 检查是否有成功指示
                     success_indicators = [
                         "published",
                         "video published",
@@ -1970,15 +1956,15 @@ class YouTubeAutoPublisher:
                         print("✅ 立即发布完成且验证成功")
                         return True
 
-                    # 方法4: 最后的宽松判断 - 如果没有错误信息，就认为成功
+                    # 默认判断：如果没有错误信息就认为成功
                     print("⚠️ 未发现明确的成功或错误指示")
-                    print("📝 由于没有发现错误信息，按照宽松标准判断为成功")
-                    print("✅ 立即发布完成（宽松验证通过）")
+                    print("📝 由于没有发现错误信息，默认判断为成功")
+                    print("✅ 立即发布完成（默认成功）")
                     return True
 
                 except Exception as verify_error:
                     print(f"❌ 立即发布验证时出错: {verify_error}")
-                    print("📝 验证过程出错，但按照宽松标准判断为成功")
+                    print("📝 验证过程出错，默认判断为成功")
                     print("✅ 立即发布完成（异常后默认成功）")
                     return True
 

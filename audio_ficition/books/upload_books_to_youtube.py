@@ -315,37 +315,45 @@ class BookYouTubeUploader:
     def get_youtube_title(self, uuid: str) -> str:
         """从generate_youtube_titles.py生成的文件中读取YouTube标题"""
         title_file = os.path.join(self.directories["youtube_titles"], f"{uuid}.txt")
-        
-        print(f"📄 [UUID:{uuid[:8]}...] 正在读取标题文件: {os.path.basename(title_file)}")
-        
+
+        print(
+            f"📄 [UUID:{uuid[:8]}...] 正在读取标题文件: {os.path.basename(title_file)}"
+        )
+
         # 检查标题文件是否存在
         if not os.path.exists(title_file):
-            print(f"❌ [UUID:{uuid[:8]}...] 标题文件不存在: {os.path.basename(title_file)}")
-            print(f"💡 请先运行: python generate_youtube_titles.py --lang {self.language} --uuid {uuid}")
+            print(
+                f"❌ [UUID:{uuid[:8]}...] 标题文件不存在: {os.path.basename(title_file)}"
+            )
+            print(
+                f"💡 请先运行: python generate_youtube_titles.py --lang {self.language} --uuid {uuid}"
+            )
             return None
-        
+
         # 检查文件大小
         if not is_valid_file(title_file, 10):  # 至少10字节
             print(f"❌ [UUID:{uuid[:8]}...] 标题文件无效或为空")
             return None
-        
+
         try:
             with open(title_file, "r", encoding="utf-8") as f:
                 youtube_title = f.read().strip()
-            
+
             if not youtube_title:
                 print(f"❌ [UUID:{uuid[:8]}...] 标题文件内容为空")
                 return None
-            
+
             # 验证标题长度
             max_length = 99 if self.language == "zh" else 100
             if len(youtube_title) > max_length:
-                print(f"⚠️  [UUID:{uuid[:8]}...] 标题长度超限 ({len(youtube_title)} > {max_length})，截断处理")
-                youtube_title = youtube_title[:max_length-3] + "..."
-            
+                print(
+                    f"⚠️  [UUID:{uuid[:8]}...] 标题长度超限 ({len(youtube_title)} > {max_length})，截断处理"
+                )
+                youtube_title = youtube_title[: max_length - 3] + "..."
+
             print(f"✅ [UUID:{uuid[:8]}...] 成功读取标题")
             return youtube_title
-            
+
         except Exception as e:
             print(f"❌ [UUID:{uuid[:8]}...] 读取标题文件失败: {e}")
             return None
@@ -457,33 +465,108 @@ class BookYouTubeUploader:
         }
 
     def get_adspower_info(self):
-        """连接AdsPower浏览器"""
-        open_url = f"http://local.adspower.net:50325/api/v1/browser/start?user_id={self.browser_id}"
+        """连接AdsPower浏览器，带重试和详细错误提示"""
+        try:
+            import urllib3
+        except ImportError:
+            print("❌ 错误: 缺少 urllib3 模块，请安装: pip install urllib3")
+            return None, None
+
+        # 先检查 AdsPower 服务是否运行
+        test_url = "http://127.0.0.1:50325/api/v1/status"
+        open_url = (
+            f"http://127.0.0.1:50325/api/v1/browser/start?user_id={self.browser_id}"
+        )
 
         self.http = urllib3.PoolManager()
 
-        print("🔌 正在连接AdsPower...")
-        r = self.http.request("GET", open_url)
+        print("🔍 检查 AdsPower 服务状态...")
 
-        if r.status != 200:
-            print(f"❌ API返回状态码 {r.status}")
+        # 检查服务是否运行
+        try:
+            test_resp = self.http.request("GET", test_url, timeout=10)
+            print("✅ AdsPower 服务已运行")
+        except Exception as e:
+            print("❌ AdsPower 服务未运行或无法连接")
+            print("请确保:")
+            print("  1. AdsPower 客户端已启动")
+            print("  2. 本地API已启用 (设置 -> 本地API -> 启用)")
+            print("  3. 端口 50325 未被占用")
+            print("  4. 防火墙允许本地连接")
+            print(f"详细错误: {e}")
             return None, None
 
-        resp = json.loads(r.data.decode("utf-8"))
+        print(f"🚀 正在启动浏览器 (ID: {self.browser_id})...")
 
-        if resp["code"] != 0:
-            print(f"❌ 错误: {resp['msg']}")
-            return None, None
+        # 尝试启动浏览器，最多重试3次
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                print(f"🔄 浏览器启动尝试 {attempt + 1}/{max_retries}")
+                r = self.http.request("GET", open_url, timeout=30)
 
-        ws_endpoint = resp["data"]["ws"]["puppeteer"]
-        debug_port = resp["data"]["debug_port"]
-        remote_debugging_url = f"http://localhost:{debug_port}"
+                if r.status != 200:
+                    print(f"❌ API返回状态码 {r.status}")
+                    if attempt < max_retries - 1:
+                        countdown_timer(5, "等待重试")
+                        continue
+                    return None, None
 
-        print(f"✅ 成功连接AdsPower")
-        return ws_endpoint, remote_debugging_url
+                resp = json.loads(r.data.decode("utf-8"))
+
+                if resp["code"] != 0:
+                    error_msg = resp.get("msg", "未知错误")
+                    print(f"❌ 启动失败: {error_msg}")
+
+                    # 分析常见错误并提供解决建议
+                    if "browser is not exist" in error_msg.lower():
+                        print("💡 解决建议:")
+                        print(f"   - 检查浏览器ID '{self.browser_id}' 是否正确")
+                        print("   - 确认在AdsPower中已创建该浏览器配置")
+                    elif "browser is running" in error_msg.lower():
+                        print("💡 解决建议:")
+                        print("   - 浏览器可能已在运行，请先关闭")
+                        print("   - 或直接使用已运行的浏览器")
+                    elif "port" in error_msg.lower():
+                        print("💡 解决建议:")
+                        print("   - 检查端口是否被占用")
+                        print("   - 重启AdsPower客户端")
+
+                    if attempt < max_retries - 1:
+                        countdown_timer(8, "等待重试")
+                        continue
+                    return None, None
+
+                # 成功启动浏览器
+                ws_endpoint = resp["data"]["ws"]["puppeteer"]
+                debug_port = resp["data"]["debug_port"]
+                remote_debugging_url = f"http://127.0.0.1:{debug_port}"
+
+                print(f"✅ 浏览器启动成功!")
+                print(f"📍 调试端口: {debug_port}")
+                print(f"🔗 连接地址: {remote_debugging_url}")
+
+                return ws_endpoint, remote_debugging_url
+
+            except json.JSONDecodeError as e:
+                print(f"❌ 响应解析失败: {e}")
+                if attempt < max_retries - 1:
+                    countdown_timer(5, "等待重试")
+                    continue
+                return None, None
+
+            except Exception as e:
+                print(f"❌ 浏览器启动异常: {e}")
+                if attempt < max_retries - 1:
+                    countdown_timer(8, "等待重试")
+                    continue
+                return None, None
+
+        print("❌ 所有启动尝试都失败了")
+        return None, None
 
     def initialize_browser(self, max_retries=3):
-        """初始化浏览器"""
+        """初始化浏览器，关闭所有其他tab并创建一个新tab"""
         print("🔄 正在初始化浏览器...")
 
         for attempt in range(max_retries):
@@ -492,6 +575,7 @@ class BookYouTubeUploader:
             # 连接AdsPower
             ws_endpoint, remote_debugging_url = self.get_adspower_info()
             if not ws_endpoint:
+                print(f"❌ AdsPower连接失败 (第 {attempt + 1} 次)")
                 if attempt < max_retries - 1:
                     countdown_timer(5, "等待重试")
                     continue
@@ -500,11 +584,16 @@ class BookYouTubeUploader:
 
             playwright = None
             try:
+                print("🎭 创建Playwright实例...")
                 playwright = sync_playwright().start()
+
+                print(f"🌐 尝试连接到浏览器: {remote_debugging_url}")
                 browser = playwright.chromium.connect_over_cdp(
                     remote_debugging_url, timeout=15000
                 )
+                print("✅ 成功连接到浏览器！")
 
+                # 获取上下文
                 if not browser.contexts:
                     context = browser.new_context()
                     print("📝 创建了新的浏览器上下文")
@@ -515,31 +604,51 @@ class BookYouTubeUploader:
                 # 保存上下文引用
                 self.context = context
 
-                # 关闭现有tab
+                # 关闭所有现有tab
+                print("🧹 正在关闭所有现有tab...")
                 existing_pages = context.pages
+                print(f"📊 发现 {len(existing_pages)} 个现有tab")
+
                 for page in existing_pages:
                     try:
+                        print(f"❌ 关闭tab: {page.url[:50]}...")
                         page.close()
-                    except:
-                        pass
+                    except Exception as e:
+                        print(f"⚠️  关闭tab时出错: {e}")
 
-                # 创建新tab
+                print("✅ 已关闭所有现有tab")
+
+                # 创建第一个新tab
+                print("🆕 正在创建第一个新tab...")
                 new_page = context.new_page()
+                print("✅ 已创建第一个新tab")
+
+                # 将新页面添加到tab列表
                 self.current_tabs = [new_page]
+
+                # 验证新页面是否正常工作
+                new_page.goto("about:blank")
+                print("✅ 新tab验证成功")
+                print(f"📑 当前tab数量: {len(self.current_tabs)}")
 
                 return playwright, browser, new_page
 
             except Exception as e:
                 print(f"❌ 浏览器连接失败 (第 {attempt + 1} 次): {e}")
+
                 if playwright:
                     try:
                         playwright.stop()
+                        print("🧹 已清理Playwright实例")
                     except:
                         pass
 
                 if attempt < max_retries - 1:
                     countdown_timer(10, "等待重试")
                     continue
+                else:
+                    print("❌ 所有重试都失败了")
+                    return None, None, None
 
         return None, None, None
 
@@ -1537,8 +1646,12 @@ def show_usage_examples():
     """显示使用示例"""
     print("\n⚠️ 前置条件:")
     print("# 必须先运行 generate_youtube_titles.py 生成标题文件")
-    print("python generate_youtube_titles.py --lang zh                        # 为中文书籍生成标题")
-    print("python generate_youtube_titles.py --lang en                        # 为英文书籍生成标题")
+    print(
+        "python generate_youtube_titles.py --lang zh                        # 为中文书籍生成标题"
+    )
+    print(
+        "python generate_youtube_titles.py --lang en                        # 为英文书籍生成标题"
+    )
     print()
     print("💡 使用示例:")
     print("# 中文书籍试运行模式，查看待上传的书籍")
