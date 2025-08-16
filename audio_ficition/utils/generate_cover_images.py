@@ -178,8 +178,8 @@ def generate_image_with_leonardo(config, prompt, story_index, max_retries=3):
                 print(f"❌ 未收到生成ID")
                 continue
 
-            print(f"📝 获得生成ID: {generation_id}，等待12秒...")
-            time.sleep(12)
+            print(f"📝 获得生成ID: {generation_id}，等待30秒...")
+            time.sleep(30)
 
             # 尝试获取生成的图片（带重试机制）
             get_url = f"{config['base_url']}/generations/{generation_id}"
@@ -197,8 +197,8 @@ def generate_image_with_leonardo(config, prompt, story_index, max_retries=3):
 
             # 检查是否获得了有效的数据
             if get_data is None:
-                print(f"⚠️ 第一次获取返回None，等待6秒后重试...")
-                time.sleep(6)
+                print(f"⚠️ 第一次获取返回None，等待15秒后重试...")
+                time.sleep(15)
 
                 # 第二次尝试获取图片（使用同样的ID）
                 get_response = requests.get(get_url, headers=config["headers"])
@@ -220,8 +220,8 @@ def generate_image_with_leonardo(config, prompt, story_index, max_retries=3):
             )
 
             if not generations:
-                print(f"⚠️ 未找到生成的图片，等待6秒后重试...")
-                time.sleep(6)
+                print(f"⚠️ 未找到生成的图片，等待15秒后重试...")
+                time.sleep(15)
 
                 # 第二次尝试获取图片（使用同样的ID）
                 get_response = requests.get(get_url, headers=config["headers"])
