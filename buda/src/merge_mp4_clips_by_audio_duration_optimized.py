@@ -14,6 +14,78 @@
 6. 更精确的视频时长匹配
 7. 进度显示和统计信息
 8. 配置文件支持
+
+参数说明：
+==========
+
+基本参数：
+  -c, --channel CHANNEL        指定处理哪个频道（可选，不指定则处理所有频道）
+  -l, --language LANGUAGE      指定处理哪种语言（可选，不指定则处理所有语言）
+  -f, --file FILENAME          指定处理单个音频文件（可选，不指定则处理目录下所有文件）
+
+路径配置参数：
+  --base-path BASE_PATH        自定义基础路径（覆盖默认路径）
+                                 Mac: /Volumes/dhl/buda_videos_youtube
+                                 Linux: /media/dhl/buda_videos_youtube
+  --config CONFIG_FILE         指定配置文件路径（JSON格式）
+
+性能参数：
+  --max-workers NUM           最大并发工作进程数（默认：CPU核心数，最多4个）
+
+信息查询参数：
+  --list-channels             列出所有可用的频道
+  --list-languages CHANNEL    列出指定频道下的所有语言
+  --dry-run                   试运行模式：只显示将要处理的文件，不实际处理
+
+使用示例：
+==========
+
+1. 处理所有频道和语言的所有文件（默认行为）：
+   python merge_mp4_clips_by_audio_duration_optimized.py
+
+2. 指定频道和语言处理：
+   python merge_mp4_clips_by_audio_duration_optimized.py -c news -l en
+
+3. 处理单个文件：
+   python merge_mp4_clips_by_audio_duration_optimized.py -c news -l en -f "audio_001.mp3"
+
+4. 自定义基础路径：
+   python merge_mp4_clips_by_audio_duration_optimized.py --base-path "/custom/path"
+
+5. 设置并发数：
+   python merge_mp4_clips_by_audio_duration_optimized.py --max-workers 8
+
+6. 试运行查看将要处理的文件：
+   python merge_mp4_clips_by_audio_duration_optimized.py --dry-run
+
+7. 列出所有频道：
+   python merge_mp4_clips_by_audio_duration_optimized.py --list-channels
+
+8. 列出指定频道的语言：
+   python merge_mp4_clips_by_audio_duration_optimized.py --list-languages news
+
+9. 使用配置文件：
+   python merge_mp4_clips_by_audio_duration_optimized.py --config /path/to/config.json
+
+配置文件格式（JSON）：
+{
+    "base_path": "/custom/path",
+    "mp3_base_dir": "/custom/path/merge_multi_lange_mp3",
+    "mp4_clips_dir": "/custom/path/mp4_clips",
+    "output_base_dir": "/custom/path/mp4_merge_silient",
+    "clip_duration": 8.0,
+    "max_workers": 4,
+    "cache_enabled": true,
+    "log_level": "INFO"
+}
+
+注意事项：
+==========
+1. 脚本会自动匹配音频时长选择合适的视频片段数量
+2. 如果输出文件已存在且时长匹配，会自动跳过
+3. 支持断点续传，失败的文件会记录错误日志
+4. 建议在GPU服务器上运行以获得最佳性能
+5. 确保FFmpeg已正确安装并在系统PATH中
 """
 
 import os

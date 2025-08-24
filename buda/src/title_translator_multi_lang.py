@@ -22,11 +22,24 @@
 2. 如果没有原始视频文件，则从源语言翻译到目标语言
 3. 所有标题都会去除#tag格式的标签
 
-使用方法:
+命令行参数:
+位置参数:
+  channel              频道名称，对应视频的频道目录名称（可选，不提供则处理所有频道）
+
+可选参数:
+  -h, --help           显示帮助信息
+  -l, --languages      目标语言列表，多个语言用空格分隔 (默认: English Korean)
+                       支持的语言: English, Korean
+  -f, --force          强制重新翻译，忽略已有翻译结果
+  -b, --batch_size     并发处理的批量大小，默认为5
+
+使用方法示例:
 1. 基本使用: python title_translator_multi_lang.py [频道名称]
 2. 指定目标语言: python title_translator_multi_lang.py [频道名称] -l English Korean
 3. 强制重新处理: python title_translator_multi_lang.py [频道名称] -f
 4. 设置批处理大小: python title_translator_multi_lang.py [频道名称] -b 20
+5. 处理所有频道: python title_translator_multi_lang.py
+6. 自定义语言和批量大小: python title_translator_multi_lang.py -l English -b 10
 
 注意:
 - 需要设置环境变量UNI_API_KEY以提供OpenAI API密钥（仅在需要翻译时）

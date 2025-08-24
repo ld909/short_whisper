@@ -12,18 +12,18 @@ YouTube频道音频下载脚本
 1. 准备工作：
    - 确保已安装依赖：pip install yt-dlp
    - 确保系统已安装 ffmpeg
-   - 准备频道列表文件（默认为 channel.txt）
+   - 准备频道列表文件（默认为 ../data/channel.txt）
 
 2. 创建频道列表文件：
-   创建一个文本文件（如 channel.txt），每行一个YouTube频道URL，例如：
+   创建一个文本文件（如 ../data/channel.txt），每行一个YouTube频道URL，例如：
 
    https://www.youtube.com/@channelname1
    https://www.youtube.com/c/channelname2
    https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxxxxx
 
 3. 运行脚本：
-   # 使用默认的 channel.txt 文件
-   python youtube_channel_audio_downloader.py
+   # 使用默认的 ../data/channel.txt 文件
+   
 
    # 使用自定义频道列表文件
    python youtube_channel_audio_downloader.py my_channels.txt
@@ -238,7 +238,10 @@ if __name__ == "__main__":
         if len(sys.argv) > 1:
             channel_file = sys.argv[1]
         else:
-            channel_file = "channel.txt"  # 默认文件名
+            # 默认文件名，相对于脚本所在目录的上级目录的data文件夹
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            project_dir = os.path.dirname(script_dir)
+            channel_file = os.path.join(project_dir, "data", "channel.txt")
 
         logger.info(f"开始处理频道列表: {channel_file}")
         process_channel_list(channel_file)
