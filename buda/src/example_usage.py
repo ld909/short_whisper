@@ -105,8 +105,11 @@ def main():
 
     try:
         # 检查必要文件
-        if not os.path.exists("mp4_publish_tracker.xlsx"):
-            print("错误: 未找到跟踪文件 mp4_publish_tracker.xlsx")
+        excel_file = os.path.join(
+            os.path.dirname(__file__), "..", "data", "mp4_publish_tracker.xlsx"
+        )
+        if not os.path.exists(excel_file):
+            print(f"错误: 未找到跟踪文件 {excel_file}")
             print("请先运行 generate_mp4_publish_tracker.py")
             return
 

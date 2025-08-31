@@ -47,12 +47,10 @@ def get_base_path():
         return "/media/dhl/buda_videos_youtube"
 
 
-# 基础路径
-BASE_PATH = get_base_path()
-
-# 目录配置 - 参考generate_mp4_publish_tracker.py的输出方式
-# Excel文件直接放在基础路径下，文件名为mp4_publish_tracker.xlsx
-EXCEL_FILE = f"{BASE_PATH}/mp4_publish_tracker.xlsx"
+# Excel文件路径 - 统一使用data目录
+EXCEL_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "mp4_publish_tracker.xlsx"
+)
 
 # 语言映射
 LANGUAGE_CODES = {"en": "English", "ja": "Japanese", "vi": "Vietnamese", "ko": "Korean"}
@@ -249,7 +247,6 @@ def main():
     if args.base_path:
         custom_base_path = args.base_path
         BASE_PATH = custom_base_path
-        EXCEL_FILE = f"{BASE_PATH}/mp4_publish_tracker.xlsx"
         print(f"使用自定义基础路径: {custom_base_path}")
     else:
         print(f"使用默认基础路径: {BASE_PATH}")
@@ -268,11 +265,14 @@ def main():
     else:
         # 尝试多个可能的路径
         possible_paths = [
-            EXCEL_FILE,  # 默认路径
-            os.path.join(os.getcwd(), "mp4_publish_tracker.xlsx"),  # 当前目录
+            EXCEL_FILE,  # 默认路径（data目录）
             os.path.join(
-                os.getcwd(), "buda", "mp4_publish_tracker.xlsx"
-            ),  # 当前目录的buda子目录
+                os.path.dirname(__file__), "..", "data", "mp4_publish_tracker.xlsx"
+            ),  # src目录上级data目录
+            os.path.join(
+                os.getcwd(), "data", "mp4_publish_tracker.xlsx"
+            ),  # 当前目录的data子目录
+            os.path.join(os.getcwd(), "mp4_publish_tracker.xlsx"),  # 当前目录
         ]
 
         excel_file = None

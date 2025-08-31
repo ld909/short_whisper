@@ -82,7 +82,7 @@ BASE_PATH = get_base_path()
 MP4_DIR = f"{BASE_PATH}/mp4_with_audio"
 TITLE_DIR = f"{BASE_PATH}/title_shorten_multi_lang"
 DESC_DIR = f"{BASE_PATH}/multi_lang_desc"
-# Excel文件现在在data目录下
+# Excel文件在data目录下
 TRACKER_FILE = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "data", "mp4_publish_tracker.xlsx"
 )

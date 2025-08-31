@@ -19,7 +19,7 @@ MP4发布状态跟踪器
 - MP4文件目录: /Volumes/dhl/buda_videos_youtube/mp4_with_audio/频道名/语言/ (Mac)
 
 输出文件:
-- Excel文件: mp4_publish_tracker.xlsx
+- Excel文件: data/mp4_publish_tracker.xlsx (默认保存在 data 目录下)
 
 命令行参数:
   -c, --channel     指定要处理的频道名（可选，默认处理所有频道）
@@ -62,9 +62,18 @@ def get_base_path():
         return "/media/dhl/buda_videos_youtube"
 
 
+def get_data_dir():
+    """获取 data 目录的绝对路径"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))  # src 目录
+    project_dir = os.path.dirname(script_dir)  # buda 目录
+    data_dir = os.path.join(project_dir, "data")
+    return data_dir
+
+
 # 基础路径和配置
 BASE_PATH = get_base_path()
 MP4_INPUT_DIR = f"{BASE_PATH}/mp4_with_audio"
+DATA_DIR = get_data_dir()
 DEFAULT_OUTPUT_FILE = "mp4_publish_tracker.xlsx"
 
 
@@ -386,6 +395,22 @@ def main():
 
     print(f"MP4输入目录: {MP4_INPUT_DIR}")
 
+    # 处理输出文件路径
+    if args.output == DEFAULT_OUTPUT_FILE:
+        # 默认情况下，Excel 文件保存在 data 目录下
+        output_file = os.path.join(DATA_DIR, args.output)
+    else:
+        # 用户指定了自定义输出文件名，检查是否为绝对路径
+        if os.path.isabs(args.output):
+            output_file = args.output
+        else:
+            # 相对路径，保存在 data 目录下
+            output_file = os.path.join(DATA_DIR, args.output)
+
+    # 确保 data 目录存在
+    os.makedirs(DATA_DIR, exist_ok=True)
+    print(f"Excel输出路径: {output_file}")
+
     # 处理列表命令
     if args.list_channels:
         list_channels(MP4_INPUT_DIR)
@@ -414,10 +439,10 @@ def main():
         return
 
     # 加载现有跟踪数据
-    existing_data = load_existing_tracker(args.output)
+    existing_data = load_existing_tracker(output_file)
 
     # 更新跟踪器
-    update_tracker(language_files, existing_data, args.output)
+    update_tracker(language_files, existing_data, output_file)
 
     print(f"\n处理完成！")
 
