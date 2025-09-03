@@ -17,9 +17,8 @@ Beauty视频音乐添加工具
 8. 支持硬件加速提高处理速度
 
 支持系统及路径：
-- Intel Mac: /Volumes/dhl/beauty/ (音乐: /Volumes/dhl/beauty/bg_music/)
-- Apple Silicon Mac: /Users/donghaoliu/Documents/beauty/ (音乐: /Users/donghaoliu/Documents/beauty/bg_music/)
-- Ubuntu: /mnt/dhl/beauty/ (音乐: /mnt/dhl/beauty/bg_music/)
+- macOS (Intel/Apple Silicon): /Volumes/dhl/beauty/ (音乐: bg_music/ 相对路径)
+- Ubuntu: /mnt/dhl/beauty/ (音乐: bg_music/ 相对路径)
 
 输入路径：
 - 视频文件：{base_path}/merged_2k_videos/[index].mp4
@@ -106,14 +105,8 @@ def get_base_media_path():
     system = platform.system()
 
     if system == "Darwin":
-        # macOS 系统
-        machine = platform.machine()
-        if machine == "x86_64":
-            # Intel Mac
-            return "/Volumes/dhl/beauty"
-        else:
-            # Apple Silicon Mac (arm64) 或其他
-            return "/Users/donghaoliu/Documents/beauty"
+        # macOS 系统（Intel和Apple Silicon都使用/Volumes/dhl/beauty）
+        return "/Volumes/dhl/beauty"
     else:
         # Linux/Ubuntu 系统
         return "/mnt/dhl/beauty"
@@ -121,21 +114,9 @@ def get_base_media_path():
 
 def get_assets_path():
     """根据系统类型返回音乐文件路径"""
-    system = platform.system()
-
-    if system == "Darwin":
-        # macOS 系统
-        machine = platform.machine()
-        if machine == "x86_64":
-            # Intel Mac
-            return "/Volumes/dhl/beauty/bg_music"
-        else:
-            # Apple Silicon Mac (arm64) 或其他
-            return "/Users/donghaoliu/Documents/beauty/bg_music"
-    else:
-        # Linux/Ubuntu 系统 - 自动适配
-        base_path = get_base_media_path()
-        return os.path.join(base_path, "bg_music")
+    # 获取当前脚本所在目录
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(current_dir, "bg_music")
 
 
 def get_available_mp3_files(assets_path: str) -> list:
@@ -561,8 +542,7 @@ def main():
    7. --reencode 选项可以重新编码视频（质量稍降但支持更多处理）
 
 支持系统:
-   - Intel Mac: /Volumes/dhl/beauty/
-   - Apple Silicon Mac: /Users/donghaoliu/Documents/beauty/
+   - macOS (Intel/Apple Silicon): /Volumes/dhl/beauty/
    - Ubuntu: /mnt/dhl/beauty/
         """,
     )
